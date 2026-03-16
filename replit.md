@@ -88,9 +88,61 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - `GET /api/v1/health` — DB connectivity status
 - `POST /api/v1/auth/login` — Tenant-aware login (email, password, tenantSlug)
 - `POST /api/v1/auth/refresh` — Exchange refresh token for new token pair
+- `POST /api/v1/questionnaires/respond` — Submit questionnaire responses via magic link token
 
 ### Protected (auth required)
 - `GET /api/v1/auth/me` — Current user profile
+
+### Risk Register
+- `GET /api/v1/risks` — List risks (filter: status, category, ownerId, search; paginated)
+- `GET /api/v1/risks/heatmap` — Risk heatmap data (likelihood × impact grid)
+- `GET /api/v1/risks/:id` — Get risk by ID
+- `POST /api/v1/risks` — Create risk (admin, risk_manager)
+- `PUT /api/v1/risks/:id` — Update risk (admin, risk_manager, risk_owner)
+- `DELETE /api/v1/risks/:id` — Delete risk (admin, risk_manager)
+- `GET /api/v1/risks/:riskId/treatments` — List treatments for a risk
+- `POST /api/v1/risks/:riskId/treatments` — Create treatment
+- `PUT /api/v1/risks/:riskId/treatments/:id` — Update treatment
+- `DELETE /api/v1/risks/:riskId/treatments/:id` — Delete treatment
+- `GET /api/v1/risks/:riskId/kris` — List KRIs for a risk
+- `POST /api/v1/risks/:riskId/kris` — Create KRI
+- `PUT /api/v1/risks/:riskId/kris/:id` — Update KRI (returns breach detection)
+- `GET /api/v1/risks/:riskId/incidents` — List incidents for a risk
+- `POST /api/v1/risks/:riskId/incidents` — Create incident
+- `PUT /api/v1/risks/:riskId/incidents/:id` — Update incident
+- `GET /api/v1/risks/:riskId/reviews` — List review cycles for a risk
+- `POST /api/v1/risks/:riskId/reviews` — Schedule review
+- `PUT /api/v1/risks/:riskId/reviews/:id/complete` — Complete review
+- `GET /api/v1/reviews/overdue` — List all overdue reviews
+
+### TPRM (Third-Party Risk Management)
+- `GET /api/v1/vendors` — List vendors (filter: status, tier, search; paginated)
+- `GET /api/v1/vendors/:id` — Get vendor
+- `POST /api/v1/vendors` — Create vendor (admin, risk_manager)
+- `PUT /api/v1/vendors/:id` — Update vendor
+- `DELETE /api/v1/vendors/:id` — Delete vendor (admin only)
+- `POST /api/v1/vendors/:id/transition` — Lifecycle state transition (onboarding→approved→active→suspended→offboarded)
+- `POST /api/v1/vendors/:id/risk-score` — Calculate vendor risk score
+- `GET /api/v1/vendors/:vendorId/questionnaires` — List questionnaires
+- `POST /api/v1/vendors/:vendorId/questionnaires` — Create questionnaire
+- `POST /api/v1/vendors/:vendorId/questionnaires/:id/magic-link` — Generate HMAC-signed magic link
+- `GET /api/v1/vendors/:vendorId/documents` — List documents
+- `POST /api/v1/vendors/:vendorId/documents` — Upload document record
+- `PUT /api/v1/vendors/:vendorId/documents/:id` — Update document status
+
+### Compliance & Controls
+- `GET /api/v1/frameworks` — List compliance frameworks
+- `GET /api/v1/frameworks/:id` — Get framework with requirements tree
+- `GET /api/v1/frameworks/:frameworkId/compliance-score` — Compliance score (coverage + effectiveness)
+- `GET /api/v1/frameworks/:frameworkId/gap-analysis` — Gap analysis (covered/partial/gap per requirement)
+- `GET /api/v1/controls` — List controls (filter: status; paginated)
+- `GET /api/v1/controls/:id` — Get control with mapped requirements and tests
+- `POST /api/v1/controls` — Create control with optional requirement mapping
+- `PUT /api/v1/controls/:id` — Update control
+- `DELETE /api/v1/controls/:id` — Delete control (admin only)
+- `POST /api/v1/controls/:id/requirements` — Map control to requirements (replace all)
+- `GET /api/v1/controls/:controlId/tests` — List control tests
+- `POST /api/v1/controls/:controlId/tests` — Execute control test (admin, auditor)
 
 ## Seed Data
 

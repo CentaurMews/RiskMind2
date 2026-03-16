@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * RiskMind API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
@@ -77,4 +77,1217 @@ export const GetMeResponse = zod.object({
   ]),
   tenantId: zod.string().uuid(),
   createdAt: zod.date().optional(),
+});
+
+/**
+ * @summary List risks
+ */
+export const listRisksQueryPageDefault = 1;
+export const listRisksQueryLimitDefault = 20;
+
+export const ListRisksQueryParams = zod.object({
+  status: zod
+    .enum(["draft", "open", "mitigated", "accepted", "closed"])
+    .optional(),
+  category: zod
+    .enum([
+      "operational",
+      "financial",
+      "compliance",
+      "strategic",
+      "technology",
+      "reputational",
+    ])
+    .optional(),
+  ownerId: zod.coerce.string().uuid().optional(),
+  search: zod.coerce.string().optional(),
+  page: zod.coerce.number().default(listRisksQueryPageDefault),
+  limit: zod.coerce.number().default(listRisksQueryLimitDefault),
+});
+
+export const listRisksResponseDataItemLikelihoodMax = 5;
+
+export const listRisksResponseDataItemImpactMax = 5;
+
+export const ListRisksResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        title: zod.string().optional(),
+        description: zod.string().nullish(),
+        category: zod
+          .enum([
+            "operational",
+            "financial",
+            "compliance",
+            "strategic",
+            "technology",
+            "reputational",
+          ])
+          .optional(),
+        status: zod
+          .enum(["draft", "open", "mitigated", "accepted", "closed"])
+          .optional(),
+        ownerId: zod.string().uuid().nullish(),
+        likelihood: zod
+          .number()
+          .min(1)
+          .max(listRisksResponseDataItemLikelihoodMax)
+          .optional(),
+        impact: zod
+          .number()
+          .min(1)
+          .max(listRisksResponseDataItemImpactMax)
+          .optional(),
+        residualLikelihood: zod.number().nullish(),
+        residualImpact: zod.number().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * @summary Create risk
+ */
+export const createRiskBodyLikelihoodMax = 5;
+
+export const createRiskBodyImpactMax = 5;
+
+export const CreateRiskBody = zod.object({
+  title: zod.string(),
+  description: zod.string().optional(),
+  category: zod.enum([
+    "operational",
+    "financial",
+    "compliance",
+    "strategic",
+    "technology",
+    "reputational",
+  ]),
+  status: zod
+    .enum(["draft", "open", "mitigated", "accepted", "closed"])
+    .optional(),
+  ownerId: zod.string().uuid().optional(),
+  likelihood: zod.number().min(1).max(createRiskBodyLikelihoodMax).optional(),
+  impact: zod.number().min(1).max(createRiskBodyImpactMax).optional(),
+});
+
+/**
+ * @summary Risk heatmap data
+ */
+export const getRiskHeatmapResponseCellsItemRisksItemLikelihoodMax = 5;
+
+export const getRiskHeatmapResponseCellsItemRisksItemImpactMax = 5;
+
+export const GetRiskHeatmapResponse = zod.object({
+  cells: zod
+    .array(
+      zod.object({
+        likelihood: zod.number().optional(),
+        impact: zod.number().optional(),
+        risks: zod
+          .array(
+            zod.object({
+              id: zod.string().uuid().optional(),
+              title: zod.string().optional(),
+              description: zod.string().nullish(),
+              category: zod
+                .enum([
+                  "operational",
+                  "financial",
+                  "compliance",
+                  "strategic",
+                  "technology",
+                  "reputational",
+                ])
+                .optional(),
+              status: zod
+                .enum(["draft", "open", "mitigated", "accepted", "closed"])
+                .optional(),
+              ownerId: zod.string().uuid().nullish(),
+              likelihood: zod
+                .number()
+                .min(1)
+                .max(getRiskHeatmapResponseCellsItemRisksItemLikelihoodMax)
+                .optional(),
+              impact: zod
+                .number()
+                .min(1)
+                .max(getRiskHeatmapResponseCellsItemRisksItemImpactMax)
+                .optional(),
+              residualLikelihood: zod.number().nullish(),
+              residualImpact: zod.number().nullish(),
+              createdAt: zod.date().optional(),
+              updatedAt: zod.date().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get risk by ID
+ */
+export const GetRiskParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const getRiskResponseLikelihoodMax = 5;
+
+export const getRiskResponseImpactMax = 5;
+
+export const GetRiskResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  category: zod
+    .enum([
+      "operational",
+      "financial",
+      "compliance",
+      "strategic",
+      "technology",
+      "reputational",
+    ])
+    .optional(),
+  status: zod
+    .enum(["draft", "open", "mitigated", "accepted", "closed"])
+    .optional(),
+  ownerId: zod.string().uuid().nullish(),
+  likelihood: zod.number().min(1).max(getRiskResponseLikelihoodMax).optional(),
+  impact: zod.number().min(1).max(getRiskResponseImpactMax).optional(),
+  residualLikelihood: zod.number().nullish(),
+  residualImpact: zod.number().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Update risk
+ */
+export const UpdateRiskParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateRiskBody = zod.object({
+  title: zod.string().optional(),
+  description: zod.string().optional(),
+  category: zod
+    .enum([
+      "operational",
+      "financial",
+      "compliance",
+      "strategic",
+      "technology",
+      "reputational",
+    ])
+    .optional(),
+  status: zod
+    .enum(["draft", "open", "mitigated", "accepted", "closed"])
+    .optional(),
+  ownerId: zod.string().uuid().optional(),
+  likelihood: zod.number().optional(),
+  impact: zod.number().optional(),
+  residualLikelihood: zod.number().optional(),
+  residualImpact: zod.number().optional(),
+});
+
+export const updateRiskResponseLikelihoodMax = 5;
+
+export const updateRiskResponseImpactMax = 5;
+
+export const UpdateRiskResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  category: zod
+    .enum([
+      "operational",
+      "financial",
+      "compliance",
+      "strategic",
+      "technology",
+      "reputational",
+    ])
+    .optional(),
+  status: zod
+    .enum(["draft", "open", "mitigated", "accepted", "closed"])
+    .optional(),
+  ownerId: zod.string().uuid().nullish(),
+  likelihood: zod
+    .number()
+    .min(1)
+    .max(updateRiskResponseLikelihoodMax)
+    .optional(),
+  impact: zod.number().min(1).max(updateRiskResponseImpactMax).optional(),
+  residualLikelihood: zod.number().nullish(),
+  residualImpact: zod.number().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Delete risk
+ */
+export const DeleteRiskParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const DeleteRiskResponse = zod.object({
+  deleted: zod.boolean().optional(),
+  id: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary List treatments for a risk
+ */
+export const ListTreatmentsParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const ListTreatmentsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        riskId: zod.string().uuid().optional(),
+        strategy: zod
+          .enum(["mitigate", "transfer", "accept", "avoid"])
+          .optional(),
+        description: zod.string().nullish(),
+        status: zod
+          .enum(["planned", "in_progress", "completed", "cancelled"])
+          .optional(),
+        ownerId: zod.string().uuid().nullish(),
+        dueDate: zod.date().nullish(),
+        cost: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Create treatment
+ */
+export const CreateTreatmentParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const CreateTreatmentBody = zod.object({
+  strategy: zod.enum(["mitigate", "transfer", "accept", "avoid"]),
+  description: zod.string().optional(),
+  status: zod
+    .enum(["planned", "in_progress", "completed", "cancelled"])
+    .optional(),
+  ownerId: zod.string().uuid().optional(),
+  dueDate: zod.date().optional(),
+  cost: zod.string().optional(),
+});
+
+/**
+ * @summary Update treatment
+ */
+export const UpdateTreatmentParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateTreatmentBody = zod.object({
+  strategy: zod.enum(["mitigate", "transfer", "accept", "avoid"]),
+  description: zod.string().optional(),
+  status: zod
+    .enum(["planned", "in_progress", "completed", "cancelled"])
+    .optional(),
+  ownerId: zod.string().uuid().optional(),
+  dueDate: zod.date().optional(),
+  cost: zod.string().optional(),
+});
+
+export const UpdateTreatmentResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  riskId: zod.string().uuid().optional(),
+  strategy: zod.enum(["mitigate", "transfer", "accept", "avoid"]).optional(),
+  description: zod.string().nullish(),
+  status: zod
+    .enum(["planned", "in_progress", "completed", "cancelled"])
+    .optional(),
+  ownerId: zod.string().uuid().nullish(),
+  dueDate: zod.date().nullish(),
+  cost: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Delete treatment
+ */
+export const DeleteTreatmentParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const DeleteTreatmentResponse = zod.object({
+  deleted: zod.boolean().optional(),
+  id: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary List KRIs for a risk
+ */
+export const ListKRIsParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const ListKRIsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        riskId: zod.string().uuid().optional(),
+        name: zod.string().optional(),
+        description: zod.string().nullish(),
+        warningThreshold: zod.string().nullish(),
+        criticalThreshold: zod.string().nullish(),
+        currentValue: zod.string().nullish(),
+        unit: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Create KRI
+ */
+export const CreateKRIParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const CreateKRIBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  warningThreshold: zod.string().optional(),
+  criticalThreshold: zod.string().optional(),
+  currentValue: zod.string().optional(),
+  unit: zod.string().optional(),
+});
+
+/**
+ * @summary Update KRI value and thresholds
+ */
+export const UpdateKRIParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateKRIBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  warningThreshold: zod.string().optional(),
+  criticalThreshold: zod.string().optional(),
+  currentValue: zod.string().optional(),
+  unit: zod.string().optional(),
+});
+
+export const UpdateKRIResponse = zod
+  .object({
+    id: zod.string().uuid().optional(),
+    riskId: zod.string().uuid().optional(),
+    name: zod.string().optional(),
+    description: zod.string().nullish(),
+    warningThreshold: zod.string().nullish(),
+    criticalThreshold: zod.string().nullish(),
+    currentValue: zod.string().nullish(),
+    unit: zod.string().nullish(),
+    createdAt: zod.date().optional(),
+    updatedAt: zod.date().optional(),
+  })
+  .and(
+    zod.object({
+      breach: zod.enum(["warning", "critical"]).nullish(),
+    }),
+  );
+
+/**
+ * @summary List incidents for a risk
+ */
+export const ListIncidentsParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const ListIncidentsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        riskId: zod.string().uuid().nullish(),
+        title: zod.string().optional(),
+        description: zod.string().nullish(),
+        severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+        reportedBy: zod.string().uuid().nullish(),
+        occurredAt: zod.date().nullish(),
+        resolvedAt: zod.date().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Create incident
+ */
+export const CreateIncidentParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const CreateIncidentBody = zod.object({
+  title: zod.string(),
+  description: zod.string().optional(),
+  severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  occurredAt: zod.date().optional(),
+});
+
+/**
+ * @summary Update incident
+ */
+export const UpdateIncidentParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateIncidentBody = zod.object({
+  title: zod.string().optional(),
+  description: zod.string().optional(),
+  severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  resolvedAt: zod.date().optional(),
+});
+
+export const UpdateIncidentResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  riskId: zod.string().uuid().nullish(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  reportedBy: zod.string().uuid().nullish(),
+  occurredAt: zod.date().nullish(),
+  resolvedAt: zod.date().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary List reviews for a risk
+ */
+export const ListReviewsParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const ListReviewsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        riskId: zod.string().uuid().optional(),
+        reviewerId: zod.string().uuid().nullish(),
+        status: zod
+          .enum(["scheduled", "in_progress", "completed", "overdue"])
+          .optional(),
+        dueDate: zod.date().optional(),
+        completedAt: zod.date().nullish(),
+        notes: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Schedule a review
+ */
+export const CreateReviewParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const CreateReviewBody = zod.object({
+  reviewerId: zod.string().uuid().optional(),
+  dueDate: zod.date(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary Complete a review
+ */
+export const CompleteReviewParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const CompleteReviewBody = zod.object({
+  notes: zod.string().optional(),
+});
+
+export const CompleteReviewResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  riskId: zod.string().uuid().optional(),
+  reviewerId: zod.string().uuid().nullish(),
+  status: zod
+    .enum(["scheduled", "in_progress", "completed", "overdue"])
+    .optional(),
+  dueDate: zod.date().optional(),
+  completedAt: zod.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary List overdue reviews
+ */
+export const ListOverdueReviewsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        riskId: zod.string().uuid().optional(),
+        reviewerId: zod.string().uuid().nullish(),
+        status: zod
+          .enum(["scheduled", "in_progress", "completed", "overdue"])
+          .optional(),
+        dueDate: zod.date().optional(),
+        completedAt: zod.date().nullish(),
+        notes: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary List vendors
+ */
+export const listVendorsQueryPageDefault = 1;
+export const listVendorsQueryLimitDefault = 20;
+
+export const ListVendorsQueryParams = zod.object({
+  status: zod
+    .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+    .optional(),
+  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  search: zod.coerce.string().optional(),
+  page: zod.coerce.number().default(listVendorsQueryPageDefault),
+  limit: zod.coerce.number().default(listVendorsQueryLimitDefault),
+});
+
+export const ListVendorsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        name: zod.string().optional(),
+        description: zod.string().nullish(),
+        tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+        status: zod
+          .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+          .optional(),
+        category: zod.string().nullish(),
+        contactEmail: zod.string().nullish(),
+        contactName: zod.string().nullish(),
+        riskScore: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * @summary Create vendor
+ */
+export const CreateVendorBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  category: zod.string().optional(),
+  contactEmail: zod.string().optional(),
+  contactName: zod.string().optional(),
+});
+
+/**
+ * @summary Get vendor
+ */
+export const GetVendorParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetVendorResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  name: zod.string().optional(),
+  description: zod.string().nullish(),
+  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  status: zod
+    .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+    .optional(),
+  category: zod.string().nullish(),
+  contactEmail: zod.string().nullish(),
+  contactName: zod.string().nullish(),
+  riskScore: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Update vendor
+ */
+export const UpdateVendorParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateVendorBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  category: zod.string().optional(),
+  contactEmail: zod.string().optional(),
+  contactName: zod.string().optional(),
+});
+
+export const UpdateVendorResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  name: zod.string().optional(),
+  description: zod.string().nullish(),
+  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  status: zod
+    .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+    .optional(),
+  category: zod.string().nullish(),
+  contactEmail: zod.string().nullish(),
+  contactName: zod.string().nullish(),
+  riskScore: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Delete vendor
+ */
+export const DeleteVendorParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const DeleteVendorResponse = zod.object({
+  deleted: zod.boolean().optional(),
+  id: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary Transition vendor lifecycle status
+ */
+export const TransitionVendorParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const TransitionVendorBody = zod.object({
+  targetStatus: zod.enum([
+    "onboarding",
+    "approved",
+    "active",
+    "suspended",
+    "offboarded",
+  ]),
+});
+
+export const TransitionVendorResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  name: zod.string().optional(),
+  description: zod.string().nullish(),
+  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  status: zod
+    .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+    .optional(),
+  category: zod.string().nullish(),
+  contactEmail: zod.string().nullish(),
+  contactName: zod.string().nullish(),
+  riskScore: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Calculate vendor risk score
+ */
+export const CalculateVendorRiskScoreParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const CalculateVendorRiskScoreResponse = zod.object({
+  riskScore: zod.number().optional(),
+  vendor: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      name: zod.string().optional(),
+      description: zod.string().nullish(),
+      tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+      status: zod
+        .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+        .optional(),
+      category: zod.string().nullish(),
+      contactEmail: zod.string().nullish(),
+      contactName: zod.string().nullish(),
+      riskScore: zod.string().nullish(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * @summary List questionnaires for a vendor
+ */
+export const ListQuestionnairesParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+});
+
+export const ListQuestionnairesResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        vendorId: zod.string().uuid().optional(),
+        title: zod.string().optional(),
+        status: zod
+          .enum(["draft", "sent", "in_progress", "completed"])
+          .optional(),
+        template: zod.object({}).passthrough().optional(),
+        responses: zod.object({}).passthrough().optional(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Create questionnaire
+ */
+export const CreateQuestionnaireParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+});
+
+export const CreateQuestionnaireBody = zod.object({
+  title: zod.string(),
+  template: zod.object({}).passthrough().optional(),
+});
+
+/**
+ * @summary Generate magic link for questionnaire
+ */
+export const GenerateMagicLinkParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const generateMagicLinkBodyExpiresInHoursDefault = 72;
+
+export const GenerateMagicLinkBody = zod.object({
+  expiresInHours: zod
+    .number()
+    .default(generateMagicLinkBodyExpiresInHoursDefault),
+});
+
+export const GenerateMagicLinkResponse = zod.object({
+  token: zod.string().optional(),
+  expiresAt: zod.date().optional(),
+});
+
+/**
+ * @summary Submit questionnaire responses via magic link
+ */
+export const RespondToQuestionnaireBody = zod.object({
+  token: zod.string(),
+  responses: zod.object({}).passthrough(),
+});
+
+export const RespondToQuestionnaireResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  vendorId: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  status: zod.enum(["draft", "sent", "in_progress", "completed"]).optional(),
+  template: zod.object({}).passthrough().optional(),
+  responses: zod.object({}).passthrough().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary List documents for a vendor
+ */
+export const ListDocumentsParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+});
+
+export const ListDocumentsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        vendorId: zod.string().uuid().nullish(),
+        fileName: zod.string().optional(),
+        fileUrl: zod.string().nullish(),
+        mimeType: zod.string().nullish(),
+        status: zod
+          .enum(["uploaded", "processing", "processed", "failed"])
+          .optional(),
+        summary: zod.string().nullish(),
+        extractedData: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Upload document record
+ */
+export const CreateDocumentParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+});
+
+export const CreateDocumentBody = zod.object({
+  fileName: zod.string(),
+  fileUrl: zod.string().optional(),
+  mimeType: zod.string().optional(),
+});
+
+/**
+ * @summary Update document status
+ */
+export const UpdateDocumentParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateDocumentBody = zod.object({
+  status: zod
+    .enum(["uploaded", "processing", "processed", "failed"])
+    .optional(),
+  summary: zod.string().optional(),
+  extractedData: zod.string().optional(),
+});
+
+export const UpdateDocumentResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  vendorId: zod.string().uuid().nullish(),
+  fileName: zod.string().optional(),
+  fileUrl: zod.string().nullish(),
+  mimeType: zod.string().nullish(),
+  status: zod
+    .enum(["uploaded", "processing", "processed", "failed"])
+    .optional(),
+  summary: zod.string().nullish(),
+  extractedData: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary List compliance frameworks
+ */
+export const ListFrameworksResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        name: zod.string().optional(),
+        version: zod.string().nullish(),
+        type: zod.string().nullish(),
+        description: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get framework with requirements tree
+ */
+export const GetFrameworkParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetFrameworkResponse = zod
+  .object({
+    id: zod.string().uuid().optional(),
+    name: zod.string().optional(),
+    version: zod.string().nullish(),
+    type: zod.string().nullish(),
+    description: zod.string().nullish(),
+    createdAt: zod.date().optional(),
+  })
+  .and(
+    zod.object({
+      requirements: zod
+        .array(
+          zod.object({
+            id: zod.string().uuid().optional(),
+            parentId: zod.string().uuid().nullish(),
+            code: zod.string().optional(),
+            title: zod.string().optional(),
+            description: zod.string().nullish(),
+          }),
+        )
+        .optional(),
+    }),
+  );
+
+/**
+ * @summary Get compliance score for a framework
+ */
+export const GetComplianceScoreParams = zod.object({
+  frameworkId: zod.coerce.string().uuid(),
+});
+
+export const GetComplianceScoreResponse = zod.object({
+  frameworkId: zod.string().uuid().optional(),
+  frameworkName: zod.string().optional(),
+  totalRequirements: zod.number().optional(),
+  coveredRequirements: zod.number().optional(),
+  coverageScore: zod.number().optional(),
+  effectivenessScore: zod.number().optional(),
+  score: zod.number().optional(),
+  totalControls: zod.number().optional(),
+  passedControls: zod.number().optional(),
+});
+
+/**
+ * @summary Get gap analysis for a framework
+ */
+export const GetGapAnalysisParams = zod.object({
+  frameworkId: zod.coerce.string().uuid(),
+});
+
+export const GetGapAnalysisResponse = zod.object({
+  frameworkId: zod.string().uuid().optional(),
+  frameworkName: zod.string().optional(),
+  summary: zod
+    .object({
+      total: zod.number().optional(),
+      covered: zod.number().optional(),
+      partial: zod.number().optional(),
+      gap: zod.number().optional(),
+    })
+    .optional(),
+  requirements: zod
+    .array(
+      zod.object({
+        requirementId: zod.string().uuid().optional(),
+        code: zod.string().optional(),
+        title: zod.string().optional(),
+        parentId: zod.string().uuid().nullish(),
+        status: zod.enum(["covered", "partial", "gap"]).optional(),
+        controls: zod
+          .array(
+            zod.object({
+              id: zod.string().uuid().optional(),
+              title: zod.string().optional(),
+              status: zod.string().optional(),
+              testResult: zod.string().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary List controls
+ */
+export const listControlsQueryPageDefault = 1;
+export const listControlsQueryLimitDefault = 20;
+
+export const ListControlsQueryParams = zod.object({
+  status: zod.enum(["active", "inactive", "planned"]).optional(),
+  page: zod.coerce.number().default(listControlsQueryPageDefault),
+  limit: zod.coerce.number().default(listControlsQueryLimitDefault),
+});
+
+export const ListControlsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        title: zod.string().optional(),
+        description: zod.string().nullish(),
+        status: zod.enum(["active", "inactive", "planned"]).optional(),
+        ownerId: zod.string().uuid().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * @summary Create control
+ */
+export const CreateControlBody = zod.object({
+  title: zod.string(),
+  description: zod.string().optional(),
+  status: zod.enum(["active", "inactive", "planned"]).optional(),
+  ownerId: zod.string().uuid().optional(),
+  requirementIds: zod.array(zod.string().uuid()).optional(),
+});
+
+/**
+ * @summary Get control with requirements and tests
+ */
+export const GetControlParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetControlResponse = zod
+  .object({
+    id: zod.string().uuid().optional(),
+    title: zod.string().optional(),
+    description: zod.string().nullish(),
+    status: zod.enum(["active", "inactive", "planned"]).optional(),
+    ownerId: zod.string().uuid().nullish(),
+    createdAt: zod.date().optional(),
+    updatedAt: zod.date().optional(),
+  })
+  .and(
+    zod.object({
+      requirementIds: zod.array(zod.string().uuid()).optional(),
+      tests: zod
+        .array(
+          zod.object({
+            id: zod.string().uuid().optional(),
+            controlId: zod.string().uuid().optional(),
+            testerId: zod.string().uuid().nullish(),
+            result: zod
+              .enum(["pass", "fail", "partial", "not_tested"])
+              .optional(),
+            evidence: zod.string().nullish(),
+            evidenceUrl: zod.string().nullish(),
+            notes: zod.string().nullish(),
+            testedAt: zod.date().nullish(),
+            createdAt: zod.date().optional(),
+            updatedAt: zod.date().optional(),
+          }),
+        )
+        .optional(),
+    }),
+  );
+
+/**
+ * @summary Update control
+ */
+export const UpdateControlParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateControlBody = zod.object({
+  title: zod.string().optional(),
+  description: zod.string().optional(),
+  status: zod.enum(["active", "inactive", "planned"]).optional(),
+  ownerId: zod.string().uuid().optional(),
+});
+
+export const UpdateControlResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  status: zod.enum(["active", "inactive", "planned"]).optional(),
+  ownerId: zod.string().uuid().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Delete control
+ */
+export const DeleteControlParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const DeleteControlResponse = zod.object({
+  deleted: zod.boolean().optional(),
+  id: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary Map control to requirements
+ */
+export const MapControlRequirementsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const MapControlRequirementsBody = zod.object({
+  requirementIds: zod.array(zod.string().uuid()),
+});
+
+export const MapControlRequirementsResponse = zod.object({
+  controlId: zod.string().uuid().optional(),
+  requirementIds: zod.array(zod.string().uuid()).optional(),
+});
+
+/**
+ * @summary List control tests
+ */
+export const ListControlTestsParams = zod.object({
+  controlId: zod.coerce.string().uuid(),
+});
+
+export const ListControlTestsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        controlId: zod.string().uuid().optional(),
+        testerId: zod.string().uuid().nullish(),
+        result: zod.enum(["pass", "fail", "partial", "not_tested"]).optional(),
+        evidence: zod.string().nullish(),
+        evidenceUrl: zod.string().nullish(),
+        notes: zod.string().nullish(),
+        testedAt: zod.date().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Execute a control test
+ */
+export const CreateControlTestParams = zod.object({
+  controlId: zod.coerce.string().uuid(),
+});
+
+export const CreateControlTestBody = zod.object({
+  result: zod.enum(["pass", "fail", "partial", "not_tested"]),
+  evidence: zod.string().optional(),
+  evidenceUrl: zod.string().optional(),
+  notes: zod.string().optional(),
 });

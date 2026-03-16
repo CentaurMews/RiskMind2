@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * RiskMind API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -58,3 +58,604 @@ export interface RFC7807Error {
   status: number;
   detail?: string;
 }
+
+export interface DeleteResponse {
+  deleted?: boolean;
+  id?: string;
+}
+
+export type RiskStatus = (typeof RiskStatus)[keyof typeof RiskStatus];
+
+export const RiskStatus = {
+  draft: "draft",
+  open: "open",
+  mitigated: "mitigated",
+  accepted: "accepted",
+  closed: "closed",
+} as const;
+
+export type RiskCategory = (typeof RiskCategory)[keyof typeof RiskCategory];
+
+export const RiskCategory = {
+  operational: "operational",
+  financial: "financial",
+  compliance: "compliance",
+  strategic: "strategic",
+  technology: "technology",
+  reputational: "reputational",
+} as const;
+
+export interface Risk {
+  id?: string;
+  title?: string;
+  description?: string | null;
+  category?: RiskCategory;
+  status?: RiskStatus;
+  ownerId?: string | null;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  likelihood?: number;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  impact?: number;
+  residualLikelihood?: number | null;
+  residualImpact?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateRiskRequest {
+  title: string;
+  description?: string;
+  category: RiskCategory;
+  status?: RiskStatus;
+  ownerId?: string;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  likelihood?: number;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  impact?: number;
+}
+
+export interface UpdateRiskRequest {
+  title?: string;
+  description?: string;
+  category?: RiskCategory;
+  status?: RiskStatus;
+  ownerId?: string;
+  likelihood?: number;
+  impact?: number;
+  residualLikelihood?: number;
+  residualImpact?: number;
+}
+
+export interface RiskListResponse {
+  data?: Risk[];
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+
+export interface HeatmapCell {
+  likelihood?: number;
+  impact?: number;
+  risks?: Risk[];
+}
+
+export interface HeatmapResponse {
+  cells?: HeatmapCell[];
+}
+
+export type TreatmentStrategy =
+  (typeof TreatmentStrategy)[keyof typeof TreatmentStrategy];
+
+export const TreatmentStrategy = {
+  mitigate: "mitigate",
+  transfer: "transfer",
+  accept: "accept",
+  avoid: "avoid",
+} as const;
+
+export type TreatmentStatus =
+  (typeof TreatmentStatus)[keyof typeof TreatmentStatus];
+
+export const TreatmentStatus = {
+  planned: "planned",
+  in_progress: "in_progress",
+  completed: "completed",
+  cancelled: "cancelled",
+} as const;
+
+export interface Treatment {
+  id?: string;
+  riskId?: string;
+  strategy?: TreatmentStrategy;
+  description?: string | null;
+  status?: TreatmentStatus;
+  ownerId?: string | null;
+  dueDate?: string | null;
+  cost?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateTreatmentRequest {
+  strategy: TreatmentStrategy;
+  description?: string;
+  status?: TreatmentStatus;
+  ownerId?: string;
+  dueDate?: string;
+  cost?: string;
+}
+
+export interface TreatmentListResponse {
+  data?: Treatment[];
+}
+
+export interface Kri {
+  id?: string;
+  riskId?: string;
+  name?: string;
+  description?: string | null;
+  warningThreshold?: string | null;
+  criticalThreshold?: string | null;
+  currentValue?: string | null;
+  unit?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type KRIWithBreachBreach =
+  | (typeof KRIWithBreachBreach)[keyof typeof KRIWithBreachBreach]
+  | null;
+
+export const KRIWithBreachBreach = {
+  warning: "warning",
+  critical: "critical",
+} as const;
+
+export type KRIWithBreach = Kri & {
+  breach?: KRIWithBreachBreach;
+};
+
+export interface CreateKRIRequest {
+  name: string;
+  description?: string;
+  warningThreshold?: string;
+  criticalThreshold?: string;
+  currentValue?: string;
+  unit?: string;
+}
+
+export interface KRIListResponse {
+  data?: Kri[];
+}
+
+export type IncidentSeverity =
+  (typeof IncidentSeverity)[keyof typeof IncidentSeverity];
+
+export const IncidentSeverity = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export interface Incident {
+  id?: string;
+  riskId?: string | null;
+  title?: string;
+  description?: string | null;
+  severity?: IncidentSeverity;
+  reportedBy?: string | null;
+  occurredAt?: string | null;
+  resolvedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateIncidentRequest {
+  title: string;
+  description?: string;
+  severity?: IncidentSeverity;
+  occurredAt?: string;
+}
+
+export interface UpdateIncidentRequest {
+  title?: string;
+  description?: string;
+  severity?: IncidentSeverity;
+  resolvedAt?: string;
+}
+
+export interface IncidentListResponse {
+  data?: Incident[];
+}
+
+export type ReviewStatus = (typeof ReviewStatus)[keyof typeof ReviewStatus];
+
+export const ReviewStatus = {
+  scheduled: "scheduled",
+  in_progress: "in_progress",
+  completed: "completed",
+  overdue: "overdue",
+} as const;
+
+export interface Review {
+  id?: string;
+  riskId?: string;
+  reviewerId?: string | null;
+  status?: ReviewStatus;
+  dueDate?: string;
+  completedAt?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateReviewRequest {
+  reviewerId?: string;
+  dueDate: string;
+  notes?: string;
+}
+
+export interface ReviewListResponse {
+  data?: Review[];
+}
+
+export type VendorStatus = (typeof VendorStatus)[keyof typeof VendorStatus];
+
+export const VendorStatus = {
+  onboarding: "onboarding",
+  approved: "approved",
+  active: "active",
+  suspended: "suspended",
+  offboarded: "offboarded",
+} as const;
+
+export type VendorTier = (typeof VendorTier)[keyof typeof VendorTier];
+
+export const VendorTier = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export interface Vendor {
+  id?: string;
+  name?: string;
+  description?: string | null;
+  tier?: VendorTier;
+  status?: VendorStatus;
+  category?: string | null;
+  contactEmail?: string | null;
+  contactName?: string | null;
+  riskScore?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateVendorRequest {
+  name: string;
+  description?: string;
+  tier?: VendorTier;
+  category?: string;
+  contactEmail?: string;
+  contactName?: string;
+}
+
+export interface VendorListResponse {
+  data?: Vendor[];
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+
+export type QuestionnaireStatus =
+  (typeof QuestionnaireStatus)[keyof typeof QuestionnaireStatus];
+
+export const QuestionnaireStatus = {
+  draft: "draft",
+  sent: "sent",
+  in_progress: "in_progress",
+  completed: "completed",
+} as const;
+
+export type QuestionnaireTemplate = { [key: string]: unknown };
+
+export type QuestionnaireResponses = { [key: string]: unknown };
+
+export interface Questionnaire {
+  id?: string;
+  vendorId?: string;
+  title?: string;
+  status?: QuestionnaireStatus;
+  template?: QuestionnaireTemplate;
+  responses?: QuestionnaireResponses;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type CreateQuestionnaireRequestTemplate = { [key: string]: unknown };
+
+export interface CreateQuestionnaireRequest {
+  title: string;
+  template?: CreateQuestionnaireRequestTemplate;
+}
+
+export interface QuestionnaireListResponse {
+  data?: Questionnaire[];
+}
+
+export type DocumentStatus =
+  (typeof DocumentStatus)[keyof typeof DocumentStatus];
+
+export const DocumentStatus = {
+  uploaded: "uploaded",
+  processing: "processing",
+  processed: "processed",
+  failed: "failed",
+} as const;
+
+export interface Document {
+  id?: string;
+  vendorId?: string | null;
+  fileName?: string;
+  fileUrl?: string | null;
+  mimeType?: string | null;
+  status?: DocumentStatus;
+  summary?: string | null;
+  extractedData?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateDocumentRequest {
+  fileName: string;
+  fileUrl?: string;
+  mimeType?: string;
+}
+
+export interface UpdateDocumentRequest {
+  status?: DocumentStatus;
+  summary?: string;
+  extractedData?: string;
+}
+
+export interface DocumentListResponse {
+  data?: Document[];
+}
+
+export interface Framework {
+  id?: string;
+  name?: string;
+  version?: string | null;
+  type?: string | null;
+  description?: string | null;
+  createdAt?: string;
+}
+
+export interface FrameworkListResponse {
+  data?: Framework[];
+}
+
+export interface Requirement {
+  id?: string;
+  parentId?: string | null;
+  code?: string;
+  title?: string;
+  description?: string | null;
+}
+
+export type FrameworkWithRequirements = Framework & {
+  requirements?: Requirement[];
+};
+
+export type ControlStatus = (typeof ControlStatus)[keyof typeof ControlStatus];
+
+export const ControlStatus = {
+  active: "active",
+  inactive: "inactive",
+  planned: "planned",
+} as const;
+
+export interface Control {
+  id?: string;
+  title?: string;
+  description?: string | null;
+  status?: ControlStatus;
+  ownerId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type ControlTestResult =
+  (typeof ControlTestResult)[keyof typeof ControlTestResult];
+
+export const ControlTestResult = {
+  pass: "pass",
+  fail: "fail",
+  partial: "partial",
+  not_tested: "not_tested",
+} as const;
+
+export interface ControlTest {
+  id?: string;
+  controlId?: string;
+  testerId?: string | null;
+  result?: ControlTestResult;
+  evidence?: string | null;
+  evidenceUrl?: string | null;
+  notes?: string | null;
+  testedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type ControlDetail = Control & {
+  requirementIds?: string[];
+  tests?: ControlTest[];
+};
+
+export interface CreateControlRequest {
+  title: string;
+  description?: string;
+  status?: ControlStatus;
+  ownerId?: string;
+  requirementIds?: string[];
+}
+
+export interface UpdateControlRequest {
+  title?: string;
+  description?: string;
+  status?: ControlStatus;
+  ownerId?: string;
+}
+
+export interface ControlListResponse {
+  data?: Control[];
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateControlTestRequest {
+  result: ControlTestResult;
+  evidence?: string;
+  evidenceUrl?: string;
+  notes?: string;
+}
+
+export interface ControlTestListResponse {
+  data?: ControlTest[];
+}
+
+export interface ComplianceScore {
+  frameworkId?: string;
+  frameworkName?: string;
+  totalRequirements?: number;
+  coveredRequirements?: number;
+  coverageScore?: number;
+  effectivenessScore?: number;
+  score?: number;
+  totalControls?: number;
+  passedControls?: number;
+}
+
+export type GapStatus = (typeof GapStatus)[keyof typeof GapStatus];
+
+export const GapStatus = {
+  covered: "covered",
+  partial: "partial",
+  gap: "gap",
+} as const;
+
+export type GapRequirementControlsItem = {
+  id?: string;
+  title?: string;
+  status?: string;
+  testResult?: string;
+};
+
+export interface GapRequirement {
+  requirementId?: string;
+  code?: string;
+  title?: string;
+  parentId?: string | null;
+  status?: GapStatus;
+  controls?: GapRequirementControlsItem[];
+}
+
+export type GapAnalysisSummary = {
+  total?: number;
+  covered?: number;
+  partial?: number;
+  gap?: number;
+};
+
+export interface GapAnalysis {
+  frameworkId?: string;
+  frameworkName?: string;
+  summary?: GapAnalysisSummary;
+  requirements?: GapRequirement[];
+}
+
+/**
+ * Resource not found
+ */
+export type NotFoundResponse = RFC7807Error;
+
+export type PageParameter = number;
+
+export type LimitParameter = number;
+
+export type ListRisksParams = {
+  status?: RiskStatus;
+  category?: RiskCategory;
+  ownerId?: string;
+  search?: string;
+  page?: PageParameter;
+  limit?: LimitParameter;
+};
+
+export type CompleteReviewBody = {
+  notes?: string;
+};
+
+export type ListVendorsParams = {
+  status?: VendorStatus;
+  tier?: VendorTier;
+  search?: string;
+  page?: PageParameter;
+  limit?: LimitParameter;
+};
+
+export type TransitionVendorBody = {
+  targetStatus: VendorStatus;
+};
+
+export type CalculateVendorRiskScore200 = {
+  riskScore?: number;
+  vendor?: Vendor;
+};
+
+export type GenerateMagicLinkBody = {
+  expiresInHours?: number;
+};
+
+export type GenerateMagicLink200 = {
+  token?: string;
+  expiresAt?: string;
+};
+
+export type RespondToQuestionnaireBodyResponses = { [key: string]: unknown };
+
+export type RespondToQuestionnaireBody = {
+  token: string;
+  responses: RespondToQuestionnaireBodyResponses;
+};
+
+export type ListControlsParams = {
+  status?: ControlStatus;
+  page?: PageParameter;
+  limit?: LimitParameter;
+};
+
+export type MapControlRequirementsBody = {
+  requirementIds: string[];
+};
+
+export type MapControlRequirements200 = {
+  controlId?: string;
+  requirementIds?: string[];
+};

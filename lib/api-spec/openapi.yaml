@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: RiskMind API specification
 servers:
   - url: /api
@@ -12,6 +12,30 @@ tags:
     description: Health operations
   - name: auth
     description: Authentication operations
+  - name: risks
+    description: Risk register operations
+  - name: treatments
+    description: Risk treatment operations
+  - name: kris
+    description: Key Risk Indicator operations
+  - name: incidents
+    description: Incident operations
+  - name: reviews
+    description: Review cycle operations
+  - name: vendors
+    description: Third-party vendor operations
+  - name: questionnaires
+    description: Vendor questionnaire operations
+  - name: documents
+    description: Vendor document operations
+  - name: frameworks
+    description: Compliance framework operations
+  - name: controls
+    description: Control operations
+  - name: controlTests
+    description: Control test operations
+  - name: compliance
+    description: Compliance scoring and gap analysis
 paths:
   /v1/health:
     get:
@@ -107,12 +131,1034 @@ paths:
               schema:
                 $ref: "#/components/schemas/RFC7807Error"
 
+  /v1/risks:
+    get:
+      operationId: listRisks
+      tags: [risks]
+      summary: List risks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/RiskStatus"
+        - name: category
+          in: query
+          schema:
+            $ref: "#/components/schemas/RiskCategory"
+        - name: ownerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of risks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskListResponse"
+    post:
+      operationId: createRisk
+      tags: [risks]
+      summary: Create risk
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRiskRequest"
+      responses:
+        "201":
+          description: Risk created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+
+  /v1/risks/heatmap:
+    get:
+      operationId: getRiskHeatmap
+      tags: [risks]
+      summary: Risk heatmap data
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Heatmap cells
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HeatmapResponse"
+
+  /v1/risks/{id}:
+    get:
+      operationId: getRisk
+      tags: [risks]
+      summary: Get risk by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Risk details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateRisk
+      tags: [risks]
+      summary: Update risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRiskRequest"
+      responses:
+        "200":
+          description: Risk updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteRisk
+      tags: [risks]
+      summary: Delete risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Risk deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/risks/{riskId}/treatments:
+    get:
+      operationId: listTreatments
+      tags: [treatments]
+      summary: List treatments for a risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      responses:
+        "200":
+          description: List of treatments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreatmentListResponse"
+    post:
+      operationId: createTreatment
+      tags: [treatments]
+      summary: Create treatment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTreatmentRequest"
+      responses:
+        "201":
+          description: Treatment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Treatment"
+
+  /v1/risks/{riskId}/treatments/{id}:
+    put:
+      operationId: updateTreatment
+      tags: [treatments]
+      summary: Update treatment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTreatmentRequest"
+      responses:
+        "200":
+          description: Treatment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Treatment"
+    delete:
+      operationId: deleteTreatment
+      tags: [treatments]
+      summary: Delete treatment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Treatment deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /v1/risks/{riskId}/kris:
+    get:
+      operationId: listKRIs
+      tags: [kris]
+      summary: List KRIs for a risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      responses:
+        "200":
+          description: List of KRIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KRIListResponse"
+    post:
+      operationId: createKRI
+      tags: [kris]
+      summary: Create KRI
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateKRIRequest"
+      responses:
+        "201":
+          description: KRI created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KRI"
+
+  /v1/risks/{riskId}/kris/{id}:
+    put:
+      operationId: updateKRI
+      tags: [kris]
+      summary: Update KRI value and thresholds
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateKRIRequest"
+      responses:
+        "200":
+          description: KRI updated with breach detection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KRIWithBreach"
+
+  /v1/risks/{riskId}/incidents:
+    get:
+      operationId: listIncidents
+      tags: [incidents]
+      summary: List incidents for a risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      responses:
+        "200":
+          description: List of incidents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentListResponse"
+    post:
+      operationId: createIncident
+      tags: [incidents]
+      summary: Create incident
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIncidentRequest"
+      responses:
+        "201":
+          description: Incident created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /v1/risks/{riskId}/incidents/{id}:
+    put:
+      operationId: updateIncident
+      tags: [incidents]
+      summary: Update incident
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateIncidentRequest"
+      responses:
+        "200":
+          description: Incident updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /v1/risks/{riskId}/reviews:
+    get:
+      operationId: listReviews
+      tags: [reviews]
+      summary: List reviews for a risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      responses:
+        "200":
+          description: List of reviews
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewListResponse"
+    post:
+      operationId: createReview
+      tags: [reviews]
+      summary: Schedule a review
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequest"
+      responses:
+        "201":
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /v1/risks/{riskId}/reviews/{id}/complete:
+    put:
+      operationId: completeReview
+      tags: [reviews]
+      summary: Complete a review
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+      responses:
+        "200":
+          description: Review completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /v1/reviews/overdue:
+    get:
+      operationId: listOverdueReviews
+      tags: [reviews]
+      summary: List overdue reviews
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Overdue reviews
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewListResponse"
+
+  /v1/vendors:
+    get:
+      operationId: listVendors
+      tags: [vendors]
+      summary: List vendors
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/VendorStatus"
+        - name: tier
+          in: query
+          schema:
+            $ref: "#/components/schemas/VendorTier"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of vendors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorListResponse"
+    post:
+      operationId: createVendor
+      tags: [vendors]
+      summary: Create vendor
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVendorRequest"
+      responses:
+        "201":
+          description: Vendor created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /v1/vendors/{id}:
+    get:
+      operationId: getVendor
+      tags: [vendors]
+      summary: Get vendor
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Vendor details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+    put:
+      operationId: updateVendor
+      tags: [vendors]
+      summary: Update vendor
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVendorRequest"
+      responses:
+        "200":
+          description: Vendor updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+    delete:
+      operationId: deleteVendor
+      tags: [vendors]
+      summary: Delete vendor
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Vendor deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /v1/vendors/{id}/transition:
+    post:
+      operationId: transitionVendor
+      tags: [vendors]
+      summary: Transition vendor lifecycle status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetStatus:
+                  $ref: "#/components/schemas/VendorStatus"
+              required:
+                - targetStatus
+      responses:
+        "200":
+          description: Vendor transitioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "409":
+          description: Invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/vendors/{id}/risk-score:
+    post:
+      operationId: calculateVendorRiskScore
+      tags: [vendors]
+      summary: Calculate vendor risk score
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Risk score calculated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  riskScore:
+                    type: number
+                  vendor:
+                    $ref: "#/components/schemas/Vendor"
+
+  /v1/vendors/{vendorId}/questionnaires:
+    get:
+      operationId: listQuestionnaires
+      tags: [questionnaires]
+      summary: List questionnaires for a vendor
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+      responses:
+        "200":
+          description: List of questionnaires
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionnaireListResponse"
+    post:
+      operationId: createQuestionnaire
+      tags: [questionnaires]
+      summary: Create questionnaire
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuestionnaireRequest"
+      responses:
+        "201":
+          description: Questionnaire created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Questionnaire"
+
+  /v1/vendors/{vendorId}/questionnaires/{id}/magic-link:
+    post:
+      operationId: generateMagicLink
+      tags: [questionnaires]
+      summary: Generate magic link for questionnaire
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresInHours:
+                  type: integer
+                  default: 72
+      responses:
+        "200":
+          description: Magic link generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+
+  /v1/questionnaires/respond:
+    post:
+      operationId: respondToQuestionnaire
+      tags: [questionnaires]
+      summary: Submit questionnaire responses via magic link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                responses:
+                  type: object
+              required:
+                - token
+                - responses
+      responses:
+        "200":
+          description: Response recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Questionnaire"
+
+  /v1/vendors/{vendorId}/documents:
+    get:
+      operationId: listDocuments
+      tags: [documents]
+      summary: List documents for a vendor
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+      responses:
+        "200":
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentListResponse"
+    post:
+      operationId: createDocument
+      tags: [documents]
+      summary: Upload document record
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+      responses:
+        "201":
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+
+  /v1/vendors/{vendorId}/documents/{id}:
+    put:
+      operationId: updateDocument
+      tags: [documents]
+      summary: Update document status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDocumentRequest"
+      responses:
+        "200":
+          description: Document updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+
+  /v1/frameworks:
+    get:
+      operationId: listFrameworks
+      tags: [frameworks]
+      summary: List compliance frameworks
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of frameworks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrameworkListResponse"
+
+  /v1/frameworks/{id}:
+    get:
+      operationId: getFramework
+      tags: [frameworks]
+      summary: Get framework with requirements tree
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Framework with requirements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrameworkWithRequirements"
+
+  /v1/frameworks/{frameworkId}/compliance-score:
+    get:
+      operationId: getComplianceScore
+      tags: [compliance]
+      summary: Get compliance score for a framework
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/frameworkId"
+      responses:
+        "200":
+          description: Compliance score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceScore"
+
+  /v1/frameworks/{frameworkId}/gap-analysis:
+    get:
+      operationId: getGapAnalysis
+      tags: [compliance]
+      summary: Get gap analysis for a framework
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/frameworkId"
+      responses:
+        "200":
+          description: Gap analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapAnalysis"
+
+  /v1/controls:
+    get:
+      operationId: listControls
+      tags: [controls]
+      summary: List controls
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ControlStatus"
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of controls
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControlListResponse"
+    post:
+      operationId: createControl
+      tags: [controls]
+      summary: Create control
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateControlRequest"
+      responses:
+        "201":
+          description: Control created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Control"
+
+  /v1/controls/{id}:
+    get:
+      operationId: getControl
+      tags: [controls]
+      summary: Get control with requirements and tests
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Control details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControlDetail"
+    put:
+      operationId: updateControl
+      tags: [controls]
+      summary: Update control
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateControlRequest"
+      responses:
+        "200":
+          description: Control updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Control"
+    delete:
+      operationId: deleteControl
+      tags: [controls]
+      summary: Delete control
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Control deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /v1/controls/{id}/requirements:
+    post:
+      operationId: mapControlRequirements
+      tags: [controls]
+      summary: Map control to requirements
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requirementIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+              required:
+                - requirementIds
+      responses:
+        "200":
+          description: Requirements mapped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  controlId:
+                    type: string
+                    format: uuid
+                  requirementIds:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+
+  /v1/controls/{controlId}/tests:
+    get:
+      operationId: listControlTests
+      tags: [controlTests]
+      summary: List control tests
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/controlId"
+      responses:
+        "200":
+          description: List of control tests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControlTestListResponse"
+    post:
+      operationId: createControlTest
+      tags: [controlTests]
+      summary: Execute a control test
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/controlId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateControlTestRequest"
+      responses:
+        "201":
+          description: Control test created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControlTest"
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    riskId:
+      name: riskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    vendorId:
+      name: vendorId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    frameworkId:
+      name: frameworkId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    controlId:
+      name: controlId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RFC7807Error"
 
   schemas:
     HealthStatus:
@@ -215,3 +1261,893 @@ components:
         - type
         - title
         - status
+
+    DeleteResponse:
+      type: object
+      properties:
+        deleted:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+
+    RiskStatus:
+      type: string
+      enum: [draft, open, mitigated, accepted, closed]
+
+    RiskCategory:
+      type: string
+      enum: [operational, financial, compliance, strategic, technology, reputational]
+
+    Risk:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          $ref: "#/components/schemas/RiskCategory"
+        status:
+          $ref: "#/components/schemas/RiskStatus"
+        ownerId:
+          type: string
+          format: uuid
+          nullable: true
+        likelihood:
+          type: integer
+          minimum: 1
+          maximum: 5
+        impact:
+          type: integer
+          minimum: 1
+          maximum: 5
+        residualLikelihood:
+          type: integer
+          nullable: true
+        residualImpact:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateRiskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/RiskCategory"
+        status:
+          $ref: "#/components/schemas/RiskStatus"
+        ownerId:
+          type: string
+          format: uuid
+        likelihood:
+          type: integer
+          minimum: 1
+          maximum: 5
+        impact:
+          type: integer
+          minimum: 1
+          maximum: 5
+      required:
+        - title
+        - category
+
+    UpdateRiskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/RiskCategory"
+        status:
+          $ref: "#/components/schemas/RiskStatus"
+        ownerId:
+          type: string
+          format: uuid
+        likelihood:
+          type: integer
+        impact:
+          type: integer
+        residualLikelihood:
+          type: integer
+        residualImpact:
+          type: integer
+
+    RiskListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    HeatmapCell:
+      type: object
+      properties:
+        likelihood:
+          type: integer
+        impact:
+          type: integer
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+
+    HeatmapResponse:
+      type: object
+      properties:
+        cells:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeatmapCell"
+
+    TreatmentStrategy:
+      type: string
+      enum: [mitigate, transfer, accept, avoid]
+
+    TreatmentStatus:
+      type: string
+      enum: [planned, in_progress, completed, cancelled]
+
+    Treatment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        riskId:
+          type: string
+          format: uuid
+        strategy:
+          $ref: "#/components/schemas/TreatmentStrategy"
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/TreatmentStatus"
+        ownerId:
+          type: string
+          format: uuid
+          nullable: true
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+        cost:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTreatmentRequest:
+      type: object
+      properties:
+        strategy:
+          $ref: "#/components/schemas/TreatmentStrategy"
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/TreatmentStatus"
+        ownerId:
+          type: string
+          format: uuid
+        dueDate:
+          type: string
+          format: date-time
+        cost:
+          type: string
+      required:
+        - strategy
+
+    TreatmentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Treatment"
+
+    KRI:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        riskId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        warningThreshold:
+          type: string
+          nullable: true
+        criticalThreshold:
+          type: string
+          nullable: true
+        currentValue:
+          type: string
+          nullable: true
+        unit:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    KRIWithBreach:
+      allOf:
+        - $ref: "#/components/schemas/KRI"
+        - type: object
+          properties:
+            breach:
+              type: string
+              nullable: true
+              enum: [warning, critical]
+
+    CreateKRIRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        warningThreshold:
+          type: string
+        criticalThreshold:
+          type: string
+        currentValue:
+          type: string
+        unit:
+          type: string
+      required:
+        - name
+
+    KRIListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/KRI"
+
+    IncidentSeverity:
+      type: string
+      enum: [critical, high, medium, low]
+
+    Incident:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        riskId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        severity:
+          $ref: "#/components/schemas/IncidentSeverity"
+        reportedBy:
+          type: string
+          format: uuid
+          nullable: true
+        occurredAt:
+          type: string
+          format: date-time
+          nullable: true
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateIncidentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: "#/components/schemas/IncidentSeverity"
+        occurredAt:
+          type: string
+          format: date-time
+      required:
+        - title
+
+    UpdateIncidentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: "#/components/schemas/IncidentSeverity"
+        resolvedAt:
+          type: string
+          format: date-time
+
+    IncidentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Incident"
+
+    ReviewStatus:
+      type: string
+      enum: [scheduled, in_progress, completed, overdue]
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        riskId:
+          type: string
+          format: uuid
+        reviewerId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ReviewStatus"
+        dueDate:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateReviewRequest:
+      type: object
+      properties:
+        reviewerId:
+          type: string
+          format: uuid
+        dueDate:
+          type: string
+          format: date-time
+        notes:
+          type: string
+      required:
+        - dueDate
+
+    ReviewListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Review"
+
+    VendorStatus:
+      type: string
+      enum: [onboarding, approved, active, suspended, offboarded]
+
+    VendorTier:
+      type: string
+      enum: [critical, high, medium, low]
+
+    Vendor:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        tier:
+          $ref: "#/components/schemas/VendorTier"
+        status:
+          $ref: "#/components/schemas/VendorStatus"
+        category:
+          type: string
+          nullable: true
+        contactEmail:
+          type: string
+          nullable: true
+        contactName:
+          type: string
+          nullable: true
+        riskScore:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateVendorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        tier:
+          $ref: "#/components/schemas/VendorTier"
+        category:
+          type: string
+        contactEmail:
+          type: string
+        contactName:
+          type: string
+      required:
+        - name
+
+    VendorListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Vendor"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    QuestionnaireStatus:
+      type: string
+      enum: [draft, sent, in_progress, completed]
+
+    Questionnaire:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/QuestionnaireStatus"
+        template:
+          type: object
+        responses:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateQuestionnaireRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        template:
+          type: object
+      required:
+        - title
+
+    QuestionnaireListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Questionnaire"
+
+    DocumentStatus:
+      type: string
+      enum: [uploaded, processing, processed, failed]
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+          nullable: true
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+          nullable: true
+        mimeType:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/DocumentStatus"
+        summary:
+          type: string
+          nullable: true
+        extractedData:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateDocumentRequest:
+      type: object
+      properties:
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+        mimeType:
+          type: string
+      required:
+        - fileName
+
+    UpdateDocumentRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/DocumentStatus"
+        summary:
+          type: string
+        extractedData:
+          type: string
+
+    DocumentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+
+    Framework:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        version:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    FrameworkListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Framework"
+
+    Requirement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        code:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    FrameworkWithRequirements:
+      allOf:
+        - $ref: "#/components/schemas/Framework"
+        - type: object
+          properties:
+            requirements:
+              type: array
+              items:
+                $ref: "#/components/schemas/Requirement"
+
+    ControlStatus:
+      type: string
+      enum: [active, inactive, planned]
+
+    Control:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ControlStatus"
+        ownerId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ControlDetail:
+      allOf:
+        - $ref: "#/components/schemas/Control"
+        - type: object
+          properties:
+            requirementIds:
+              type: array
+              items:
+                type: string
+                format: uuid
+            tests:
+              type: array
+              items:
+                $ref: "#/components/schemas/ControlTest"
+
+    CreateControlRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/ControlStatus"
+        ownerId:
+          type: string
+          format: uuid
+        requirementIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+        - title
+
+    UpdateControlRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/ControlStatus"
+        ownerId:
+          type: string
+          format: uuid
+
+    ControlListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Control"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ControlTestResult:
+      type: string
+      enum: [pass, fail, partial, not_tested]
+
+    ControlTest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        controlId:
+          type: string
+          format: uuid
+        testerId:
+          type: string
+          format: uuid
+          nullable: true
+        result:
+          $ref: "#/components/schemas/ControlTestResult"
+        evidence:
+          type: string
+          nullable: true
+        evidenceUrl:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        testedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateControlTestRequest:
+      type: object
+      properties:
+        result:
+          $ref: "#/components/schemas/ControlTestResult"
+        evidence:
+          type: string
+        evidenceUrl:
+          type: string
+        notes:
+          type: string
+      required:
+        - result
+
+    ControlTestListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ControlTest"
+
+    ComplianceScore:
+      type: object
+      properties:
+        frameworkId:
+          type: string
+          format: uuid
+        frameworkName:
+          type: string
+        totalRequirements:
+          type: integer
+        coveredRequirements:
+          type: integer
+        coverageScore:
+          type: integer
+        effectivenessScore:
+          type: integer
+        score:
+          type: integer
+        totalControls:
+          type: integer
+        passedControls:
+          type: integer
+
+    GapStatus:
+      type: string
+      enum: [covered, partial, gap]
+
+    GapRequirement:
+      type: object
+      properties:
+        requirementId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          $ref: "#/components/schemas/GapStatus"
+        controls:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              title:
+                type: string
+              status:
+                type: string
+              testResult:
+                type: string
+
+    GapAnalysis:
+      type: object
+      properties:
+        frameworkId:
+          type: string
+          format: uuid
+        frameworkName:
+          type: string
+        summary:
+          type: object
+          properties:
+            total:
+              type: integer
+            covered:
+              type: integer
+            partial:
+              type: integer
+            gap:
+              type: integer
+        requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapRequirement"
