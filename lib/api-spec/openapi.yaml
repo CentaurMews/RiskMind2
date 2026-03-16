@@ -2083,6 +2083,43 @@ paths:
                   limit:
                     type: integer
 
+  /v1/agent/queue:
+    get:
+      operationId: getAgentQueue
+      tags: [agent]
+      summary: Get pending approval queue (findings with status pending_review)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated queue of pending findings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentFinding"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
   /v1/agent/findings/{id}/approve:
     post:
       operationId: approveAgentFinding

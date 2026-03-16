@@ -71,6 +71,35 @@ router.get("/v1/agent/findings", requireRole("admin", "risk_manager", "auditor")
   }
 });
 
+router.get("/v1/agent/queue", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    const [findings, countResult] = await Promise.all([
+      db.select().from(agentFindingsTable)
+        .where(and(
+          eq(agentFindingsTable.tenantId, tenantId),
+          eq(agentFindingsTable.status, "pending_review"),
+        ))
+        .orderBy(desc(agentFindingsTable.createdAt))
+        .limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(agentFindingsTable)
+        .where(and(
+          eq(agentFindingsTable.tenantId, tenantId),
+          eq(agentFindingsTable.status, "pending_review"),
+        )),
+    ]);
+
+    res.json({ data: findings, total: countResult[0].count, page, limit });
+  } catch (err) {
+    console.error("Get agent queue error:", err);
+    serverError(res);
+  }
+});
+
 router.post("/v1/agent/runs", requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;

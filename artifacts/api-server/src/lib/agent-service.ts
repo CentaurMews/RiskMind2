@@ -118,7 +118,11 @@ async function observe(tenantId: string): Promise<ObservationData> {
     }).from(frameworkRequirementsTable)
       .where(and(
         eq(frameworkRequirementsTable.tenantId, tenantId),
-        sql`${frameworkRequirementsTable.id} NOT IN (SELECT requirement_id FROM control_requirement_maps)`,
+        sql`${frameworkRequirementsTable.id} NOT IN (
+          SELECT crm.requirement_id FROM control_requirement_maps crm
+          INNER JOIN controls c ON c.id = crm.control_id
+          WHERE c.tenant_id = ${tenantId}
+        )`,
       ));
   }
 
@@ -383,7 +387,7 @@ async function detectPredictiveSignals(tenantId: string, data: ObservationData):
       }
     }
 
-    if (trendingKris.length >= 2) {
+    if (trendingKris.length >= 3) {
       const details = trendingKris.map(t =>
         `"${t.kri.name}" (${t.kri.currentValue}/${t.kri.criticalThreshold} ${t.kri.unit}): ${t.trendInfo}`
       ).join("; ");
@@ -530,7 +534,7 @@ async function act(
             content: String(action.content || finding.title),
             status: "pending",
             classification: String(action.classification || "agent_generated"),
-            confidence: 0.7,
+            confidence: "0.7000",
           }).returning();
 
           await recordAuditDirect(tenantId, null, "agent_draft_signal_created", "signal", draftSignal.id, {

@@ -196,6 +196,7 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - `GET /api/v1/agent/runs` — List agent runs (paginated, admin/risk_manager/auditor)
 - `POST /api/v1/agent/runs` — Manually trigger agent run (admin only)
 - `GET /api/v1/agent/findings` — List findings (paginated, filterable by type/severity/status)
+- `GET /api/v1/agent/queue` — Approval queue (pending_review findings only)
 - `POST /api/v1/agent/findings/:id/approve` — Approve a pending finding (admin/risk_manager)
 - `POST /api/v1/agent/findings/:id/dismiss` — Dismiss a finding with optional reason
 - `GET /api/v1/agent/config` — Get tenant agent configuration (admin only)
