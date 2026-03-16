@@ -304,7 +304,7 @@ router.post("/v1/vendors/:vendorId/documents", requireRole("admin", "risk_manage
   try {
     const vendorId = p(req, "vendorId");
     if (!(await verifyVendorOwnership(vendorId, req.user!.tenantId, res))) return;
-    const { fileName, fileUrl, mimeType } = req.body;
+    const { fileName, fileUrl, mimeType, expiresAt } = req.body;
     if (!fileName) { badRequest(res, "fileName is required"); return; }
 
     const [doc] = await db.insert(documentsTable).values({
@@ -313,6 +313,7 @@ router.post("/v1/vendors/:vendorId/documents", requireRole("admin", "risk_manage
       fileName,
       fileUrl,
       mimeType,
+      ...(expiresAt && { expiresAt: new Date(expiresAt) }),
     }).returning();
 
     await recordAudit(req, "create", "document", doc.id);
@@ -325,11 +326,12 @@ router.post("/v1/vendors/:vendorId/documents", requireRole("admin", "risk_manage
 
 router.put("/v1/vendors/:vendorId/documents/:id", requireRole("admin", "risk_manager"), async (req, res) => {
   try {
-    const { status, summary, extractedData } = req.body;
+    const { status, summary, extractedData, expiresAt } = req.body;
     const [doc] = await db.update(documentsTable).set({
       ...(status !== undefined && { status }),
       ...(summary !== undefined && { summary }),
       ...(extractedData !== undefined && { extractedData }),
+      ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
       updatedAt: new Date(),
     }).where(and(
       eq(documentsTable.id, p(req, "id")),

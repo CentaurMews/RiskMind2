@@ -12,6 +12,15 @@ async function getTenantIds(): Promise<string[]> {
 }
 
 async function createAlert(tenantId: string, type: string, title: string, severity: "critical" | "high" | "medium" | "low", description: string, context: Record<string, unknown> = {}) {
+  const [existing] = await db.select({ id: alertsTable.id }).from(alertsTable)
+    .where(and(
+      eq(alertsTable.tenantId, tenantId),
+      eq(alertsTable.type, type),
+      eq(alertsTable.title, title),
+      eq(alertsTable.status, "active"),
+    )).limit(1);
+  if (existing) return existing;
+
   const [alert] = await db.insert(alertsTable).values({
     tenantId,
     type,
