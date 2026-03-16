@@ -101,6 +101,7 @@ import type {
   ReviewListResponse,
   Risk,
   RiskListResponse,
+  RiskSourceListResponse,
   SendInterviewMessageBody,
   Signal,
   SignalListResponse,
@@ -951,6 +952,93 @@ export const useDeleteRisk = <
 > => {
   return useMutation(getDeleteRiskMutationOptions(options));
 };
+
+/**
+ * @summary List sources for a risk
+ */
+export const getListRiskSourcesUrl = (riskId: string) => {
+  return `/api/v1/risks/${riskId}/sources`;
+};
+
+export const listRiskSources = async (
+  riskId: string,
+  options?: RequestInit,
+): Promise<RiskSourceListResponse> => {
+  return customFetch<RiskSourceListResponse>(getListRiskSourcesUrl(riskId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListRiskSourcesQueryKey = (riskId: string) => {
+  return [`/api/v1/risks/${riskId}/sources`] as const;
+};
+
+export const getListRiskSourcesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listRiskSources>>,
+  TError = ErrorType<NotFoundResponse>,
+>(
+  riskId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listRiskSources>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListRiskSourcesQueryKey(riskId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listRiskSources>>> = ({
+    signal,
+  }) => listRiskSources(riskId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!riskId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listRiskSources>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListRiskSourcesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listRiskSources>>
+>;
+export type ListRiskSourcesQueryError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary List sources for a risk
+ */
+
+export function useListRiskSources<
+  TData = Awaited<ReturnType<typeof listRiskSources>>,
+  TError = ErrorType<NotFoundResponse>,
+>(
+  riskId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listRiskSources>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListRiskSourcesQueryOptions(riskId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List treatments for a risk

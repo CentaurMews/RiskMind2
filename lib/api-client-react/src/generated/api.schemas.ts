@@ -144,6 +144,32 @@ export interface Risk {
   updatedAt?: string;
 }
 
+export type RiskSourceType =
+  (typeof RiskSourceType)[keyof typeof RiskSourceType];
+
+export const RiskSourceType = {
+  signal: "signal",
+  finding: "finding",
+  agent_detection: "agent_detection",
+} as const;
+
+export interface RiskSourceInput {
+  sourceType: RiskSourceType;
+  sourceId: string;
+}
+
+export interface RiskSource {
+  id?: string;
+  riskId?: string;
+  sourceType?: RiskSourceType;
+  sourceId?: string;
+  createdAt?: string;
+}
+
+export interface RiskSourceListResponse {
+  data?: RiskSource[];
+}
+
 export interface CreateRiskRequest {
   title: string;
   description?: string;
@@ -160,6 +186,7 @@ export interface CreateRiskRequest {
    * @maximum 5
    */
   impact?: number;
+  sources?: RiskSourceInput[];
 }
 
 export interface UpdateRiskRequest {

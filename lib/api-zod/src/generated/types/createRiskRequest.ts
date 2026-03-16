@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.3.0
  */
 import type { RiskCategory } from "./riskCategory";
+import type { RiskSourceInput } from "./riskSourceInput";
 import type { RiskStatus } from "./riskStatus";
 
 export interface CreateRiskRequest {
@@ -24,4 +25,5 @@ export interface CreateRiskRequest {
    * @maximum 5
    */
   impact?: number;
+  sources?: RiskSourceInput[];
 }

@@ -1,36 +1,42 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Link, useLocation } from "wouter";
-import { useListRisks, useCreateRisk, type RiskCategory } from "@workspace/api-client-react";
+import { useListRisks, useCreateRisk, type RiskCategory, type RiskSourceInput } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SeverityBadge, StatusBadge } from "@/components/ui/severity-badge";
-import { Plus, Search, Filter, Loader2, ArrowRight, Sparkles } from "lucide-react";
+import { Plus, Search, Filter, Loader2, ArrowRight, Sparkles, X, Brain, ChevronDown, ChevronUp } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { InterviewDialog } from "@/components/ai-interview/interview-dialog";
+import { AiIntelligencePanel } from "@/components/risk-creation/ai-intelligence-panel";
+import { Badge } from "@/components/ui/badge";
+
+interface SourceItem {
+  id: string;
+  sourceType: "signal" | "finding" | "agent_detection";
+  title: string;
+  description: string;
+  confidence?: number;
+  category?: string;
+  severity?: string;
+}
 
 export default function RiskList() {
   const [search, setSearch] = useState("");
   const { data, isLoading } = useListRisks({ search: search || undefined });
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
-  const createMutation = useCreateRisk({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/v1/risks"] });
-        setIsOpen(false);
-      }
-    }
-  });
 
   const [isOpen, setIsOpen] = useState(false);
   const [interviewOpen, setInterviewOpen] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<SourceItem[]>([]);
+  const [showMobilePanel, setShowMobilePanel] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -39,8 +45,41 @@ export default function RiskList() {
     impact: "3"
   });
 
+  const createMutation = useCreateRisk({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/risks"] });
+        setIsOpen(false);
+        resetForm();
+      }
+    }
+  });
+
+  const resetForm = useCallback(() => {
+    setFormData({
+      title: "",
+      description: "",
+      category: "operational" as RiskCategory,
+      likelihood: "3",
+      impact: "3",
+    });
+    setSelectedSources([]);
+    setShowMobilePanel(false);
+  }, []);
+
+  const handleOpenChange = useCallback((open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      resetForm();
+    }
+  }, [resetForm]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const sources: RiskSourceInput[] = selectedSources.map(s => ({
+      sourceType: s.sourceType,
+      sourceId: s.id,
+    }));
     createMutation.mutate({
       data: {
         title: formData.title,
@@ -48,9 +87,26 @@ export default function RiskList() {
         category: formData.category,
         likelihood: parseInt(formData.likelihood),
         impact: parseInt(formData.impact),
+        ...(sources.length > 0 ? { sources } : {}),
       }
     });
   };
+
+  const handleSelectSource = useCallback((source: SourceItem) => {
+    setSelectedSources(prev => [...prev, source]);
+    setFormData(prev => ({
+      ...prev,
+      title: source.title.slice(0, 200),
+      description: source.description?.slice(0, 500) || prev.description,
+      ...(source.category && ["operational", "financial", "compliance", "strategic", "technology", "reputational"].includes(source.category)
+        ? { category: source.category as RiskCategory }
+        : {}),
+    }));
+  }, []);
+
+  const handleDeselectSource = useCallback((sourceId: string) => {
+    setSelectedSources(prev => prev.filter(s => s.id !== sourceId));
+  }, []);
 
   const computeSeverity = (l?: number, i?: number) => {
     if (!l || !i) return 'unknown';
@@ -71,68 +127,135 @@ export default function RiskList() {
           </div>
           
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setInterviewOpen(true)}
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              Create with AI
-            </Button>
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              <Button className="shadow-md">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Risk
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="sm:max-w-md w-full border-l overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Create New Risk</SheetTitle>
-                <SheetDescription>Log a new risk into the enterprise register.</SheetDescription>
-              </SheetHeader>
-              <form onSubmit={handleSubmit} className="space-y-6 mt-6">
-                <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Data Breach via Third-Party" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <textarea 
-                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[100px] resize-y" 
-                    value={formData.description} 
-                    onChange={e => setFormData({...formData, description: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v as typeof formData.category})}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="operational">Operational</SelectItem>
-                      <SelectItem value="financial">Financial</SelectItem>
-                      <SelectItem value="compliance">Compliance</SelectItem>
-                      <SelectItem value="strategic">Strategic</SelectItem>
-                      <SelectItem value="technology">Technology</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Likelihood (1-5)</Label>
-                    <Input type="number" min="1" max="5" required value={formData.likelihood} onChange={e => setFormData({...formData, likelihood: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Impact (1-5)</Label>
-                    <Input type="number" min="1" max="5" required value={formData.impact} onChange={e => setFormData({...formData, impact: e.target.value})} />
-                  </div>
-                </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : null}
-                  Save Risk
+            <Sheet open={isOpen} onOpenChange={handleOpenChange}>
+              <SheetTrigger asChild>
+                <Button className="shadow-md">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Risk
                 </Button>
-              </form>
-            </SheetContent>
-          </Sheet>
+              </SheetTrigger>
+              <SheetContent className="sm:max-w-3xl w-full border-l overflow-y-auto p-0">
+                <div className="flex h-full">
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    <SheetHeader className="px-6 pt-6 pb-4">
+                      <SheetTitle>Create New Risk</SheetTitle>
+                      <SheetDescription>Log a new risk into the enterprise register. Use the AI panel to find related intelligence.</SheetDescription>
+                    </SheetHeader>
+
+                    <div className="flex-1 overflow-y-auto px-6 pb-6">
+                      <form onSubmit={handleSubmit} className="space-y-6">
+                        {selectedSources.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Linked Sources</Label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedSources.map(s => (
+                                <Badge key={s.id} variant="secondary" className="text-xs pr-1 gap-1">
+                                  {s.sourceType === "signal" ? "Signal" : s.sourceType === "finding" ? "Finding" : "Detection"}: {s.title.slice(0, 30)}
+                                  <button type="button" onClick={() => handleDeselectSource(s.id)} className="ml-1 hover:text-destructive">
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <Label>Title</Label>
+                          <Input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Data Breach via Third-Party" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          <textarea 
+                            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[100px] resize-y" 
+                            value={formData.description} 
+                            onChange={e => setFormData({...formData, description: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Category</Label>
+                          <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v as typeof formData.category})}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="operational">Operational</SelectItem>
+                              <SelectItem value="financial">Financial</SelectItem>
+                              <SelectItem value="compliance">Compliance</SelectItem>
+                              <SelectItem value="strategic">Strategic</SelectItem>
+                              <SelectItem value="technology">Technology</SelectItem>
+                              <SelectItem value="reputational">Reputational</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Likelihood (1-5)</Label>
+                            <Input type="number" min="1" max="5" required value={formData.likelihood} onChange={e => setFormData({...formData, likelihood: e.target.value})} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Impact (1-5)</Label>
+                            <Input type="number" min="1" max="5" required value={formData.impact} onChange={e => setFormData({...formData, impact: e.target.value})} />
+                          </div>
+                        </div>
+
+                        <div className="md:hidden">
+                          <button
+                            type="button"
+                            onClick={() => setShowMobilePanel(!showMobilePanel)}
+                            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors text-sm"
+                          >
+                            <span className="flex items-center gap-2 font-medium">
+                              <Brain className="h-4 w-4 text-primary" />
+                              AI Intelligence
+                              {selectedSources.length > 0 && (
+                                <Badge variant="secondary" className="text-[10px]">{selectedSources.length}</Badge>
+                              )}
+                            </span>
+                            {showMobilePanel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </button>
+                          {showMobilePanel && (
+                            <div className="mt-2 border rounded-lg h-[300px] overflow-hidden">
+                              <AiIntelligencePanel
+                                searchText={formData.title + " " + formData.description}
+                                selectedSources={selectedSources}
+                                onSelectSource={handleSelectSource}
+                                onDeselectSource={handleDeselectSource}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button type="submit" className="flex-1" disabled={createMutation.isPending}>
+                            {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : null}
+                            Save Risk
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setIsOpen(false);
+                              setInterviewOpen(true);
+                            }}
+                          >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Guide Me
+                          </Button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+
+                  <div className="hidden md:flex w-[300px] border-l bg-muted/20 flex-col min-h-0">
+                    <AiIntelligencePanel
+                      searchText={formData.title + " " + formData.description}
+                      selectedSources={selectedSources}
+                      onSelectSource={handleSelectSource}
+                      onDeselectSource={handleDeselectSource}
+                    />
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 

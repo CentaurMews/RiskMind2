@@ -7,6 +7,7 @@ function p(req: Request, name: string): string {
 import {
   db,
   risksTable,
+  riskSourcesTable,
   treatmentsTable,
   krisTable,
   incidentsTable,
@@ -144,24 +145,67 @@ router.get("/v1/risks/:id", async (req, res) => {
 
 router.post("/v1/risks", requireRole("admin", "risk_manager"), async (req, res) => {
   try {
-    const { title, description, category, status, ownerId, likelihood, impact } = req.body;
+    const { title, description, category, status, ownerId, likelihood, impact, sources } = req.body;
     if (!title || !category) { badRequest(res, "title and category are required"); return; }
 
-    const [risk] = await db.insert(risksTable).values({
-      tenantId: req.user!.tenantId,
-      title,
-      description,
-      category,
-      status: status || "draft",
-      ownerId,
-      likelihood: likelihood || 1,
-      impact: impact || 1,
-    }).returning();
+    const validSourceTypes = ["signal", "finding", "agent_detection"];
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let sourceRows: { riskId: string; sourceType: "signal" | "finding" | "agent_detection"; sourceId: string }[] = [];
+
+    if (sources && Array.isArray(sources)) {
+      for (const s of sources) {
+        if (!s.sourceType || !validSourceTypes.includes(s.sourceType)) {
+          badRequest(res, `Invalid source type: ${s.sourceType}`); return;
+        }
+        if (!s.sourceId || !uuidRegex.test(s.sourceId)) {
+          badRequest(res, `Invalid source ID: ${s.sourceId}`); return;
+        }
+      }
+      sourceRows = sources.map((s: { sourceType: "signal" | "finding" | "agent_detection"; sourceId: string }) => ({
+        riskId: "",
+        sourceType: s.sourceType,
+        sourceId: s.sourceId,
+      }));
+    }
+
+    const risk = await db.transaction(async (tx) => {
+      const [newRisk] = await tx.insert(risksTable).values({
+        tenantId: req.user!.tenantId,
+        title,
+        description,
+        category,
+        status: status || "draft",
+        ownerId,
+        likelihood: likelihood || 1,
+        impact: impact || 1,
+      }).returning();
+
+      if (sourceRows.length > 0) {
+        await tx.insert(riskSourcesTable).values(
+          sourceRows.map(s => ({ ...s, riskId: newRisk.id }))
+        );
+      }
+
+      return newRisk;
+    });
 
     await recordAudit(req, "create", "risk", risk.id);
     res.status(201).json(risk);
   } catch (err) {
     console.error("Create risk error:", err);
+    serverError(res);
+  }
+});
+
+router.get("/v1/risks/:riskId/sources", async (req, res) => {
+  try {
+    const riskId = p(req, "riskId");
+    if (!(await verifyRiskOwnership(riskId, req.user!.tenantId, res))) return;
+    const sources = await db.select().from(riskSourcesTable)
+      .where(eq(riskSourcesTable.riskId, riskId));
+    res.json({ data: sources });
+  } catch (err) {
+    console.error("List risk sources error:", err);
     serverError(res);
   }
 });
