@@ -13,7 +13,7 @@ import {
   controlRequirementMapsTable,
 } from "@workspace/db";
 import { recordAuditDirect } from "../lib/audit";
-import { getMcpAuth } from "./handler";
+import { getMcpAuthBySessionId, type McpAuthContext } from "./handler";
 
 function rfc7807(status: number, title: string, detail: string) {
   return {
@@ -27,10 +27,8 @@ function rfc7807(status: number, title: string, detail: string) {
   };
 }
 
-function getAuth() {
-  const auth = getMcpAuth();
-  if (!auth) return null;
-  return auth;
+function getAuth(extra: { sessionId?: string }): McpAuthContext | null {
+  return getMcpAuthBySessionId(extra.sessionId);
 }
 
 function checkRole(user: { role: string }, ...allowed: string[]): boolean {
@@ -52,8 +50,8 @@ export function registerMcpTools(mcp: McpServer) {
       page: z.number().int().min(1).default(1),
       limit: z.number().int().min(1).max(100).default(20),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(risksTable.tenantId, user.tenantId)];
@@ -83,8 +81,8 @@ export function registerMcpTools(mcp: McpServer) {
       impact: z.number().int().min(1).max(5),
       status: z.enum(["draft", "open", "mitigated", "accepted", "closed"]).default("draft"),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
@@ -116,8 +114,8 @@ export function registerMcpTools(mcp: McpServer) {
       impact: z.number().int().min(1).max(5).optional(),
       status: z.enum(["draft", "open", "mitigated", "accepted", "closed"]).optional(),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
@@ -148,8 +146,8 @@ export function registerMcpTools(mcp: McpServer) {
       page: z.number().int().min(1).default(1),
       limit: z.number().int().min(1).max(100).default(20),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(vendorsTable.tenantId, user.tenantId)];
@@ -178,8 +176,8 @@ export function registerMcpTools(mcp: McpServer) {
       contactName: z.string().optional(),
       contactEmail: z.string().email().optional(),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
@@ -208,8 +206,8 @@ export function registerMcpTools(mcp: McpServer) {
       page: z.number().int().min(1).default(1),
       limit: z.number().int().min(1).max(100).default(20),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(signalsTable.tenantId, user.tenantId)];
@@ -234,8 +232,8 @@ export function registerMcpTools(mcp: McpServer) {
     {
       signalId: z.string().uuid(),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager", "auditor")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
@@ -263,8 +261,8 @@ export function registerMcpTools(mcp: McpServer) {
       page: z.number().int().min(1).default(1),
       limit: z.number().int().min(1).max(100).default(20),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(alertsTable.tenantId, user.tenantId)];
@@ -289,8 +287,8 @@ export function registerMcpTools(mcp: McpServer) {
     {
       alertId: z.string().uuid(),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager", "auditor")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
@@ -317,8 +315,8 @@ export function registerMcpTools(mcp: McpServer) {
     {
       frameworkId: z.string().uuid(),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
 
       const [framework] = await db.select().from(frameworksTable)
@@ -357,8 +355,8 @@ export function registerMcpTools(mcp: McpServer) {
     {
       frameworkId: z.string().uuid(),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
 
       const [framework] = await db.select().from(frameworksTable)
@@ -396,8 +394,8 @@ export function registerMcpTools(mcp: McpServer) {
       page: z.number().int().min(1).default(1),
       limit: z.number().int().min(1).max(100).default(20),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(controlsTable.tenantId, user.tenantId)];
@@ -424,8 +422,8 @@ export function registerMcpTools(mcp: McpServer) {
       status: z.enum(["active", "inactive", "planned"]).default("planned"),
       ownerId: z.string().uuid().optional(),
     },
-    async (args) => {
-      const user = getAuth();
+    async (args, extra) => {
+      const user = getAuth(extra);
       if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 

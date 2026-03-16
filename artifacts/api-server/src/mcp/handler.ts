@@ -5,19 +5,25 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { verifyAccessToken } from "../lib/jwt";
 import { registerMcpTools } from "./tools";
 
-interface AuthContext {
+export interface McpAuthContext {
   tenantId: string;
   userId: string;
   role: string;
 }
 
-let currentAuth: AuthContext | null = null;
-
-export function getMcpAuth(): AuthContext | null {
-  return currentAuth;
+interface McpSession {
+  server: McpServer;
+  transport: StreamableHTTPServerTransport;
+  auth: McpAuthContext | null;
 }
 
-const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
+const sessions = new Map<string, McpSession>();
+
+export function getMcpAuthBySessionId(sessionId: string | undefined): McpAuthContext | null {
+  if (!sessionId) return null;
+  const session = sessions.get(sessionId);
+  return session?.auth ?? null;
+}
 
 function createMcpServer(): McpServer {
   const mcp = new McpServer({
@@ -28,30 +34,18 @@ function createMcpServer(): McpServer {
   return mcp;
 }
 
+function extractAuth(req: Request): McpAuthContext | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7);
+  const payload = verifyAccessToken(token);
+  if (!payload) return null;
+  return { tenantId: payload.tenantId, userId: payload.sub, role: payload.role };
+}
+
 export async function handleMcpRequest(req: Request, res: Response) {
   try {
-    const authHeader = req.headers.authorization;
-    currentAuth = null;
-
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      const payload = verifyAccessToken(token);
-      if (payload) {
-        currentAuth = {
-          tenantId: payload.tenantId,
-          userId: payload.sub,
-          role: payload.role,
-        };
-      }
-    }
-
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
-    if (sessionId && sessions.has(sessionId)) {
-      const session = sessions.get(sessionId)!;
-      await session.transport.handleRequest(req, res, req.body);
-      return;
-    }
 
     if (req.method === "DELETE") {
       if (sessionId && sessions.has(sessionId)) {
@@ -63,6 +57,17 @@ export async function handleMcpRequest(req: Request, res: Response) {
       return;
     }
 
+    if (sessionId && sessions.has(sessionId)) {
+      const session = sessions.get(sessionId)!;
+      const auth = extractAuth(req);
+      if (auth) {
+        session.auth = auth;
+      }
+      await session.transport.handleRequest(req, res, req.body);
+      return;
+    }
+
+    const auth = extractAuth(req);
     const server = createMcpServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
 
@@ -74,7 +79,7 @@ export async function handleMcpRequest(req: Request, res: Response) {
     await transport.handleRequest(req, res, req.body);
 
     if (transport.sessionId) {
-      sessions.set(transport.sessionId, { server, transport });
+      sessions.set(transport.sessionId, { server, transport, auth });
     }
   } catch (err) {
     console.error("MCP request error:", err);

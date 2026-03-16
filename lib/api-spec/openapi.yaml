@@ -1593,6 +1593,129 @@ paths:
         "501":
           description: Not implemented
 
+  /mcp:
+    post:
+      operationId: mcpStreamableHttp
+      tags: [mcp]
+      summary: MCP Streamable HTTP endpoint
+      description: |
+        Model Context Protocol (MCP) Streamable HTTP endpoint for AI agent integrations.
+        Mounted at `/mcp` (root path, not under `/api`).
+
+        **Protocol**: JSON-RPC 2.0 over HTTP with SSE streaming responses.
+
+        **Session lifecycle**:
+        1. `POST /mcp` with `initialize` JSON-RPC method (Accept: application/json, text/event-stream)
+        2. Response includes `mcp-session-id` header
+        3. Send `notifications/initialized` with session ID
+        4. Call `tools/call` or `tools/list` with session ID
+
+        **Authentication**: JWT Bearer token in Authorization header (same tokens as REST API).
+
+        **Available tools** (13 total):
+        - `list_risks` — List risks with status/category/search filters
+        - `create_risk` — Create risk (admin, risk_manager)
+        - `update_risk` — Update risk (admin, risk_manager)
+        - `list_vendors` — List vendors with status/search filters
+        - `create_vendor` — Register vendor (admin, risk_manager)
+        - `list_signals` — List signals with status/source filters
+        - `triage_signal` — Triage pending signal (admin, risk_manager, auditor)
+        - `list_alerts` — List alerts with severity/status filters
+        - `acknowledge_alert` — Acknowledge alert (admin, risk_manager, auditor)
+        - `get_compliance_score` — Framework compliance score
+        - `run_gap_analysis` — Framework gap analysis
+        - `list_controls` — List controls with status filter
+        - `create_control` — Create control (admin, risk_manager)
+
+        **Error format**: RFC 7807 JSON in tool result content with `isError: true`.
+        All tool calls record audit events with `mcp_*` action prefix.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: mcp-session-id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Session ID returned from initialization (required for non-init requests)
+        - name: Accept
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: ["application/json, text/event-stream"]
+          description: Must accept both application/json and text/event-stream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jsonrpc:
+                  type: string
+                  enum: ["2.0"]
+                id:
+                  oneOf:
+                    - type: string
+                    - type: integer
+                method:
+                  type: string
+                  enum: [initialize, "notifications/initialized", "tools/list", "tools/call"]
+                params:
+                  type: object
+              required: [jsonrpc, method]
+      responses:
+        "200":
+          description: SSE stream with JSON-RPC responses
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Invalid JSON-RPC request
+        "404":
+          description: Invalid session ID
+    get:
+      operationId: mcpSseStream
+      tags: [mcp]
+      summary: MCP SSE notification stream
+      description: Server-Sent Events stream for MCP server notifications. Requires active session.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: mcp-session-id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: SSE notification stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+    delete:
+      operationId: mcpSessionTeardown
+      tags: [mcp]
+      summary: Tear down MCP session
+      description: Close and clean up an active MCP session.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: mcp-session-id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Session terminated
+
 components:
   securitySchemes:
     bearerAuth:
