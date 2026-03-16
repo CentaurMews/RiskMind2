@@ -46,6 +46,8 @@ tags:
     description: AI enrichment and document summarization
   - name: jobs
     description: Async job status tracking
+  - name: mcp
+    description: MCP (Model Context Protocol) Streamable HTTP endpoint for AI agent integrations
   - name: foresight
     description: Foresight features (not yet implemented)
 paths:

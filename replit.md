@@ -177,6 +177,17 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - `GET /api/v1/foresight/risk-graph` — Risk graph
 - `GET /api/v1/foresight/trust-circles` — Trust circles
 
+### MCP (Model Context Protocol) Endpoint
+- `POST /mcp` — MCP Streamable HTTP endpoint for AI agent integrations
+- `GET /mcp` — SSE stream for server notifications
+- `DELETE /mcp` — Session teardown
+- Session-based: clients must initialize, send `notifications/initialized`, then call tools
+- Auth: JWT Bearer token in Authorization header (same tokens as REST API)
+- 13 tools: list_risks, create_risk, update_risk, list_vendors, create_vendor, list_signals, triage_signal, list_alerts, acknowledge_alert, get_compliance_score, run_gap_analysis, list_controls, create_control
+- All tool calls record audit events with `mcp_*` action prefix
+- Errors returned as RFC 7807 JSON in `isError: true` content blocks
+- SDK: `@modelcontextprotocol/sdk` v1.27
+
 ## Async Job Infrastructure
 
 PostgreSQL-backed job queue (no Redis dependency) with:
