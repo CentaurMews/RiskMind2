@@ -21,6 +21,7 @@ export const documentsTable = pgTable("documents", {
   status: documentStatusEnum("document_status").notNull().default("uploaded"),
   summary: text("summary"),
   extractedData: text("extracted_data"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

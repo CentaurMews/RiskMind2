@@ -12,7 +12,7 @@ import { badRequest, notFound, serverError, conflict } from "../lib/errors";
 import { enqueueJob } from "../lib/job-queue";
 
 const SIGNAL_TRANSITIONS: Record<string, string[]> = {
-  pending: ["triaged", "dismissed"],
+  pending: ["triaged"],
   triaged: ["finding", "dismissed"],
   finding: [],
   dismissed: [],

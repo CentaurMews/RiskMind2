@@ -5,7 +5,7 @@ function p(req: Request, name: string): string {
   return String(req.params[name]);
 }
 
-import { db, findingsTable, signalsTable } from "@workspace/db";
+import { db, findingsTable, signalsTable, risksTable, vendorsTable } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, conflict } from "../lib/errors";
@@ -52,6 +52,22 @@ router.post("/v1/findings", requireRole("admin", "risk_manager", "auditor"), asy
     const { signalId, riskId, vendorId, title, description } = req.body;
     if (!title) { badRequest(res, "title is required"); return; }
     const tenantId = req.user!.tenantId;
+
+    if (signalId) {
+      const [s] = await db.select({ id: signalsTable.id }).from(signalsTable)
+        .where(and(eq(signalsTable.id, signalId), eq(signalsTable.tenantId, tenantId))).limit(1);
+      if (!s) { notFound(res, "Signal not found in this tenant"); return; }
+    }
+    if (riskId) {
+      const [r] = await db.select({ id: risksTable.id }).from(risksTable)
+        .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId))).limit(1);
+      if (!r) { notFound(res, "Risk not found in this tenant"); return; }
+    }
+    if (vendorId) {
+      const [v] = await db.select({ id: vendorsTable.id }).from(vendorsTable)
+        .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId))).limit(1);
+      if (!v) { notFound(res, "Vendor not found in this tenant"); return; }
+    }
 
     const [finding] = await db.insert(findingsTable).values({
       tenantId,

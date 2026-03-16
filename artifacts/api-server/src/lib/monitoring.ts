@@ -67,16 +67,32 @@ export async function checkOverdueReviews() {
 }
 
 export async function checkExpiredDocuments() {
+  const now = new Date();
+  let alertCount = 0;
+
+  const expiredDocs = await db.select().from(documentsTable)
+    .where(and(
+      lt(documentsTable.expiresAt, now),
+      inArray(documentsTable.status, ["uploaded", "processed"]),
+    ));
+
+  for (const doc of expiredDocs) {
+    await createAlert(doc.tenantId, "document_expired", `Document expired: ${doc.fileName}`, "medium",
+      `Document "${doc.fileName}" expired on ${doc.expiresAt!.toISOString().split("T")[0]}`,
+      { documentId: doc.id, vendorId: doc.vendorId });
+    alertCount++;
+  }
+
   const failedDocs = await db.select().from(documentsTable)
     .where(eq(documentsTable.status, "failed"));
 
-  let alertCount = 0;
   for (const doc of failedDocs) {
-    await createAlert(doc.tenantId, "document_issue", `Document processing failed: ${doc.fileName}`, "medium",
+    await createAlert(doc.tenantId, "document_failed", `Document processing failed: ${doc.fileName}`, "medium",
       `Document "${doc.fileName}" has failed processing`,
       { documentId: doc.id, vendorId: doc.vendorId });
     alertCount++;
   }
+
   return alertCount;
 }
 
@@ -109,31 +125,32 @@ export async function checkVendorStatusIssues() {
 }
 
 export async function checkComplianceDrift() {
+  const tenantRows = await db.selectDistinct({ tenantId: controlsTable.tenantId }).from(controlsTable);
   const frameworks = await db.select().from(frameworksTable);
   let alertCount = 0;
 
-  for (const fw of frameworks) {
-    const totalReqs = await db.select({ count: sql<number>`count(*)::int` })
-      .from(frameworkRequirementsTable)
-      .where(eq(frameworkRequirementsTable.frameworkId, fw.id));
+  for (const { tenantId } of tenantRows) {
+    for (const fw of frameworks) {
+      const totalReqs = await db.select({ count: sql<number>`count(*)::int` })
+        .from(frameworkRequirementsTable)
+        .where(eq(frameworkRequirementsTable.frameworkId, fw.id));
 
-    const coveredReqs = await db.select({ count: sql<number>`count(DISTINCT ${controlRequirementMapsTable.requirementId})::int` })
-      .from(controlRequirementMapsTable)
-      .innerJoin(frameworkRequirementsTable, eq(controlRequirementMapsTable.requirementId, frameworkRequirementsTable.id))
-      .innerJoin(controlsTable, eq(controlRequirementMapsTable.controlId, controlsTable.id))
-      .where(and(
-        eq(frameworkRequirementsTable.frameworkId, fw.id),
-        eq(controlsTable.status, "active"),
-      ));
+      const coveredReqs = await db.select({ count: sql<number>`count(DISTINCT ${controlRequirementMapsTable.requirementId})::int` })
+        .from(controlRequirementMapsTable)
+        .innerJoin(frameworkRequirementsTable, eq(controlRequirementMapsTable.requirementId, frameworkRequirementsTable.id))
+        .innerJoin(controlsTable, eq(controlRequirementMapsTable.controlId, controlsTable.id))
+        .where(and(
+          eq(frameworkRequirementsTable.frameworkId, fw.id),
+          eq(controlsTable.status, "active"),
+          eq(controlsTable.tenantId, tenantId),
+        ));
 
-    const total = totalReqs[0].count;
-    const covered = coveredReqs[0].count;
+      const total = totalReqs[0].count;
+      const covered = coveredReqs[0].count;
 
-    if (total > 0) {
-      const coveragePercent = (covered / total) * 100;
-      if (coveragePercent < 50) {
-        const tenantIds = await db.selectDistinct({ tenantId: controlsTable.tenantId }).from(controlsTable);
-        for (const { tenantId } of tenantIds) {
+      if (total > 0) {
+        const coveragePercent = (covered / total) * 100;
+        if (coveragePercent < 50) {
           await createAlert(tenantId, "compliance_drift", `Low compliance coverage: ${fw.name}`, "high",
             `Framework "${fw.name}" has only ${coveragePercent.toFixed(1)}% requirement coverage (${covered}/${total})`,
             { frameworkId: fw.id, coveragePercent, covered, total });
