@@ -1963,6 +1963,73 @@ paths:
         "422":
           description: AI unavailable
 
+  /v1/risks/{id}/ai/score-suggestions:
+    post:
+      operationId: aiScoreSuggestions
+      tags: [aiEnrichment]
+      summary: Get AI-generated score suggestions for inherent, residual, and target risk scores
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Score suggestions with confidence
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  riskId:
+                    type: string
+                    format: uuid
+                  inherent:
+                    type: object
+                    properties:
+                      likelihood:
+                        type: integer
+                        minimum: 1
+                        maximum: 5
+                      impact:
+                        type: integer
+                        minimum: 1
+                        maximum: 5
+                  residual:
+                    type: object
+                    properties:
+                      likelihood:
+                        type: integer
+                        minimum: 1
+                        maximum: 5
+                      impact:
+                        type: integer
+                        minimum: 1
+                        maximum: 5
+                  target:
+                    type: object
+                    properties:
+                      likelihood:
+                        type: integer
+                        minimum: 1
+                        maximum: 5
+                      impact:
+                        type: integer
+                        minimum: 1
+                        maximum: 5
+                  confidence:
+                    type: number
+                    minimum: 0
+                    maximum: 1
+                  rationale:
+                    type: string
+        "422":
+          description: AI unavailable
+
   /v1/risks/{id}/ai/suggest-treatments:
     post:
       operationId: suggestTreatments
@@ -2678,6 +2745,12 @@ components:
         residualImpact:
           type: integer
           nullable: true
+        targetLikelihood:
+          type: integer
+          nullable: true
+        targetImpact:
+          type: integer
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -2781,6 +2854,10 @@ components:
         residualLikelihood:
           type: integer
         residualImpact:
+          type: integer
+        targetLikelihood:
+          type: integer
+        targetImpact:
           type: integer
 
     RiskListResponse:

@@ -429,6 +429,120 @@ router.post("/v1/risks/:id/ai/suggest-treatments", requireRole("admin", "risk_ma
   }
 });
 
+router.post("/v1/risks/:id/ai/score-suggestions", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const riskId = String(req.params.id);
+
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
+      return;
+    }
+
+    const [risk] = await db.select().from(risksTable)
+      .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId)))
+      .limit(1);
+
+    if (!risk) { notFound(res, "Risk not found"); return; }
+
+    const historicalRisks = await db.select({
+      title: risksTable.title,
+      category: risksTable.category,
+      likelihood: risksTable.likelihood,
+      impact: risksTable.impact,
+      residualLikelihood: risksTable.residualLikelihood,
+      residualImpact: risksTable.residualImpact,
+      targetLikelihood: risksTable.targetLikelihood,
+      targetImpact: risksTable.targetImpact,
+    }).from(risksTable)
+      .where(and(
+        eq(risksTable.tenantId, tenantId),
+        eq(risksTable.category, risk.category),
+      ))
+      .limit(5);
+
+    const historicalContext = historicalRisks
+      .filter(r => r.title !== risk.title)
+      .slice(0, 3)
+      .map(r => `- "${r.title}" (${r.category}): Inherent L=${r.likelihood}/I=${r.impact}, Residual L=${r.residualLikelihood || "?"}/I=${r.residualImpact || "?"}, Target L=${r.targetLikelihood || "?"}/I=${r.targetImpact || "?"}`)
+      .join("\n");
+
+    const response = await complete(tenantId, {
+      messages: [
+        {
+          role: "system",
+          content: `You are a risk scoring expert. Given a risk, provide suggested scores for three risk assessment levels:
+1. Inherent (raw risk before any controls)
+2. Residual (current risk accounting for existing controls)
+3. Target (goal risk after planned treatments)
+
+Each score has likelihood (1-5) and impact (1-5). Also provide a confidence score (0-1) reflecting how certain you are, and a short rationale.
+
+Respond in JSON only: {"inherent":{"likelihood":N,"impact":N},"residual":{"likelihood":N,"impact":N},"target":{"likelihood":N,"impact":N},"confidence":N,"rationale":"..."}`,
+        },
+        {
+          role: "user",
+          content: `Risk: ${risk.title}\nDescription: ${risk.description || "N/A"}\nCategory: ${risk.category}\nStatus: ${risk.status}\nCurrent Inherent: L=${risk.likelihood}/5, I=${risk.impact}/5\nCurrent Residual: L=${risk.residualLikelihood || "unset"}, I=${risk.residualImpact || "unset"}\nCurrent Target: L=${risk.targetLikelihood || "unset"}, I=${risk.targetImpact || "unset"}${historicalContext ? `\n\nHistorical scoring context from similar risks:\n${historicalContext}` : ""}`,
+        },
+      ],
+    });
+
+    let result: {
+      inherent: { likelihood: number; impact: number };
+      residual: { likelihood: number; impact: number };
+      target: { likelihood: number; impact: number };
+      confidence: number;
+      rationale: string;
+    };
+
+    try {
+      const parsed = JSON.parse(response);
+      const extractScore = (obj: unknown, fallbackL: number, fallbackI: number) => {
+        if (obj && typeof obj === "object" && "likelihood" in obj && "impact" in obj) {
+          return { likelihood: Number((obj as Record<string, unknown>).likelihood) || fallbackL, impact: Number((obj as Record<string, unknown>).impact) || fallbackI };
+        }
+        return { likelihood: fallbackL, impact: fallbackI };
+      };
+      result = {
+        inherent: extractScore(parsed.inherent, risk.likelihood, risk.impact),
+        residual: extractScore(parsed.residual, risk.residualLikelihood || risk.likelihood, risk.residualImpact || risk.impact),
+        target: extractScore(parsed.target, Math.max(1, risk.likelihood - 1), Math.max(1, risk.impact - 1)),
+        confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5,
+        rationale: typeof parsed.rationale === "string" ? parsed.rationale : "AI-generated suggestion",
+      };
+    } catch {
+      result = {
+        inherent: { likelihood: risk.likelihood, impact: risk.impact },
+        residual: { likelihood: risk.residualLikelihood || risk.likelihood, impact: risk.residualImpact || risk.impact },
+        target: { likelihood: Math.max(1, (risk.likelihood || 3) - 1), impact: Math.max(1, (risk.impact || 3) - 1) },
+        confidence: 0.5,
+        rationale: response,
+      };
+    }
+
+    const clamp = (v: number) => Math.max(1, Math.min(5, Math.round(v)));
+    result.inherent.likelihood = clamp(result.inherent.likelihood);
+    result.inherent.impact = clamp(result.inherent.impact);
+    result.residual.likelihood = clamp(result.residual.likelihood);
+    result.residual.impact = clamp(result.residual.impact);
+    result.target.likelihood = clamp(result.target.likelihood);
+    result.target.impact = clamp(result.target.impact);
+    result.confidence = Math.max(0, Math.min(1, result.confidence));
+
+    await recordAudit(req, "ai_score_suggestions", "risk", riskId, { confidence: result.confidence });
+    res.json({ riskId, ...result });
+  } catch (err) {
+    if (err instanceof LLMUnavailableError) {
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
+      return;
+    }
+    console.error("AI score suggestions error:", err);
+    const msg = err instanceof Error ? err.message : "AI service error";
+    sendError(res, 502, "AI Service Error", msg);
+  }
+});
+
 router.post("/v1/compliance/:frameworkId/gap-analysis/ai-remediate", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;

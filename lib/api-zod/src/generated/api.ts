@@ -148,6 +148,8 @@ export const ListRisksResponse = zod.object({
           .optional(),
         residualLikelihood: zod.number().nullish(),
         residualImpact: zod.number().nullish(),
+        targetLikelihood: zod.number().nullish(),
+        targetImpact: zod.number().nullish(),
         createdAt: zod.date().optional(),
         updatedAt: zod.date().optional(),
       }),
@@ -237,6 +239,8 @@ export const GetRiskHeatmapResponse = zod.object({
                 .optional(),
               residualLikelihood: zod.number().nullish(),
               residualImpact: zod.number().nullish(),
+              targetLikelihood: zod.number().nullish(),
+              targetImpact: zod.number().nullish(),
               createdAt: zod.date().optional(),
               updatedAt: zod.date().optional(),
             }),
@@ -280,6 +284,8 @@ export const GetRiskResponse = zod.object({
   impact: zod.number().min(1).max(getRiskResponseImpactMax).optional(),
   residualLikelihood: zod.number().nullish(),
   residualImpact: zod.number().nullish(),
+  targetLikelihood: zod.number().nullish(),
+  targetImpact: zod.number().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -312,6 +318,8 @@ export const UpdateRiskBody = zod.object({
   impact: zod.number().optional(),
   residualLikelihood: zod.number().optional(),
   residualImpact: zod.number().optional(),
+  targetLikelihood: zod.number().optional(),
+  targetImpact: zod.number().optional(),
 });
 
 export const updateRiskResponseLikelihoodMax = 5;
@@ -344,6 +352,8 @@ export const UpdateRiskResponse = zod.object({
   impact: zod.number().min(1).max(updateRiskResponseImpactMax).optional(),
   residualLikelihood: zod.number().nullish(),
   residualImpact: zod.number().nullish(),
+  targetLikelihood: zod.number().nullish(),
+  targetImpact: zod.number().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -1986,6 +1996,80 @@ export const AbandonInterviewResponse = zod.object({
  */
 export const AiEnrichRiskParams = zod.object({
   id: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Get AI-generated score suggestions for inherent, residual, and target risk scores
+ */
+export const AiScoreSuggestionsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const aiScoreSuggestionsResponseInherentLikelihoodMax = 5;
+
+export const aiScoreSuggestionsResponseInherentImpactMax = 5;
+
+export const aiScoreSuggestionsResponseResidualLikelihoodMax = 5;
+
+export const aiScoreSuggestionsResponseResidualImpactMax = 5;
+
+export const aiScoreSuggestionsResponseTargetLikelihoodMax = 5;
+
+export const aiScoreSuggestionsResponseTargetImpactMax = 5;
+
+export const aiScoreSuggestionsResponseConfidenceMin = 0;
+export const aiScoreSuggestionsResponseConfidenceMax = 1;
+
+export const AiScoreSuggestionsResponse = zod.object({
+  riskId: zod.string().uuid().optional(),
+  inherent: zod
+    .object({
+      likelihood: zod
+        .number()
+        .min(1)
+        .max(aiScoreSuggestionsResponseInherentLikelihoodMax)
+        .optional(),
+      impact: zod
+        .number()
+        .min(1)
+        .max(aiScoreSuggestionsResponseInherentImpactMax)
+        .optional(),
+    })
+    .optional(),
+  residual: zod
+    .object({
+      likelihood: zod
+        .number()
+        .min(1)
+        .max(aiScoreSuggestionsResponseResidualLikelihoodMax)
+        .optional(),
+      impact: zod
+        .number()
+        .min(1)
+        .max(aiScoreSuggestionsResponseResidualImpactMax)
+        .optional(),
+    })
+    .optional(),
+  target: zod
+    .object({
+      likelihood: zod
+        .number()
+        .min(1)
+        .max(aiScoreSuggestionsResponseTargetLikelihoodMax)
+        .optional(),
+      impact: zod
+        .number()
+        .min(1)
+        .max(aiScoreSuggestionsResponseTargetImpactMax)
+        .optional(),
+    })
+    .optional(),
+  confidence: zod
+    .number()
+    .min(aiScoreSuggestionsResponseConfidenceMin)
+    .max(aiScoreSuggestionsResponseConfidenceMax)
+    .optional(),
+  rationale: zod.string().optional(),
 });
 
 /**

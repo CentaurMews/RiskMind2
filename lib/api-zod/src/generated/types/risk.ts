@@ -27,6 +27,8 @@ export interface Risk {
   impact?: number;
   residualLikelihood?: number | null;
   residualImpact?: number | null;
+  targetLikelihood?: number | null;
+  targetImpact?: number | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
