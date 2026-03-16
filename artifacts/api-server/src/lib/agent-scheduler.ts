@@ -1,25 +1,94 @@
-import { runAgentForAllTenants } from "./agent-service";
+import { db, tenantsTable } from "@workspace/db";
+import { runAgentCycle, getTenantAgentConfig } from "./agent-service";
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 
-const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const CHECK_INTERVAL_MS = 60 * 1000;
 
-export function startAgentScheduler(intervalMs: number = DEFAULT_INTERVAL_MS): void {
+const lastRunTimestamps = new Map<string, number>();
+
+function cronMatchesNow(cron: string): boolean {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return false;
+
+  const now = new Date();
+  const minute = now.getUTCMinutes();
+  const hour = now.getUTCHours();
+  const dayOfMonth = now.getUTCDate();
+  const month = now.getUTCMonth() + 1;
+  const dayOfWeek = now.getUTCDay();
+
+  return (
+    fieldMatches(parts[0], minute) &&
+    fieldMatches(parts[1], hour) &&
+    fieldMatches(parts[2], dayOfMonth) &&
+    fieldMatches(parts[3], month) &&
+    fieldMatches(parts[4], dayOfWeek)
+  );
+}
+
+function fieldMatches(field: string, value: number): boolean {
+  if (field === "*") return true;
+
+  if (field.includes("/")) {
+    const [base, stepStr] = field.split("/");
+    const step = parseInt(stepStr, 10);
+    if (isNaN(step) || step <= 0) return false;
+    const start = base === "*" ? 0 : parseInt(base, 10);
+    return (value - start) % step === 0 && value >= start;
+  }
+
+  if (field.includes(",")) {
+    return field.split(",").some(v => parseInt(v, 10) === value);
+  }
+
+  if (field.includes("-")) {
+    const [low, high] = field.split("-").map(v => parseInt(v, 10));
+    return value >= low && value <= high;
+  }
+
+  return parseInt(field, 10) === value;
+}
+
+async function checkAndRunTenants(): Promise<void> {
+  try {
+    const tenants = await db.select({ id: tenantsTable.id, settings: tenantsTable.settings }).from(tenantsTable);
+
+    for (const tenant of tenants) {
+      const config = getTenantAgentConfig(tenant.settings);
+
+      if (config.agentEnabled === false) continue;
+
+      const schedule = config.agentSchedule || "0 6 * * *";
+      if (!cronMatchesNow(schedule)) continue;
+
+      const lastRun = lastRunTimestamps.get(tenant.id) || 0;
+      const minutesSinceLastRun = (Date.now() - lastRun) / (60 * 1000);
+      if (minutesSinceLastRun < 55) continue;
+
+      const policyTier = config.agentPolicyTier || "observe";
+      console.log(`[Agent Scheduler] Running for tenant ${tenant.id} (policy: ${policyTier}, schedule: ${schedule})`);
+
+      try {
+        lastRunTimestamps.set(tenant.id, Date.now());
+        await runAgentCycle(tenant.id, policyTier);
+      } catch (err) {
+        console.error(`[Agent Scheduler] Error for tenant ${tenant.id}:`, err instanceof Error ? err.message : err);
+      }
+    }
+  } catch (err) {
+    console.error("[Agent Scheduler] Check error:", err instanceof Error ? err.message : err);
+  }
+}
+
+export function startAgentScheduler(): void {
   if (schedulerInterval) {
     clearInterval(schedulerInterval);
   }
 
-  console.log(`[Agent Scheduler] Started (interval: ${intervalMs}ms)`);
+  console.log("[Agent Scheduler] Started (checking every 60s for tenant cron matches)");
 
-  schedulerInterval = setInterval(async () => {
-    console.log("[Agent Scheduler] Running scheduled agent cycle...");
-    try {
-      await runAgentForAllTenants();
-      console.log("[Agent Scheduler] Scheduled cycle complete");
-    } catch (err) {
-      console.error("[Agent Scheduler] Error:", err instanceof Error ? err.message : err);
-    }
-  }, intervalMs);
+  schedulerInterval = setInterval(checkAndRunTenants, CHECK_INTERVAL_MS);
 }
 
 export function stopAgentScheduler(): void {
