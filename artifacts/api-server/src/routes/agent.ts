@@ -286,9 +286,16 @@ router.put("/v1/agent/config", requireRole("admin"), async (req: Request, res: R
       return;
     }
 
-    if (schedule !== undefined && typeof schedule !== "string") {
-      badRequest(res, "schedule must be a cron expression string");
-      return;
+    if (schedule !== undefined) {
+      if (typeof schedule !== "string") {
+        badRequest(res, "schedule must be a cron expression string");
+        return;
+      }
+      const cronParts = schedule.trim().split(/\s+/);
+      if (cronParts.length < 5 || cronParts.length > 6) {
+        badRequest(res, "schedule must be a valid cron expression with 5 or 6 fields (e.g. '0 6 * * *')");
+        return;
+      }
     }
 
     const [tenant] = await db.select({ settings: tenantsTable.settings }).from(tenantsTable)

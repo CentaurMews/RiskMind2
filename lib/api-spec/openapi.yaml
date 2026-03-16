@@ -2138,11 +2138,24 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Finding approved
+          description: Finding approved and action executed
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AgentFinding"
+                allOf:
+                  - $ref: "#/components/schemas/AgentFinding"
+                  - type: object
+                    properties:
+                      actionResult:
+                        type: object
+                        nullable: true
+                        description: Result of executing the proposed action. Null if no action was proposed. Includes type and id for created entities, or error details if execution failed. Duplicate alerts return type ending in _already_exists with existing alert id.
+                        properties:
+                          type:
+                            type: string
+                          id:
+                            type: string
+                            format: uuid
 
   /v1/agent/findings/{id}/dismiss:
     post:
