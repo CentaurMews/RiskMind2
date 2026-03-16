@@ -2,21 +2,14 @@ import { eq, and, sql, desc, gt, lt, inArray } from "drizzle-orm";
 import {
   db,
   tenantsTable,
-  risksTable,
-  krisTable,
-  vendorsTable,
   signalsTable,
   alertsTable,
-  controlsTable,
-  frameworksTable,
-  frameworkRequirementsTable,
-  controlRequirementMapsTable,
-  controlTestsTable,
   agentRunsTable,
   agentFindingsTable,
 } from "@workspace/db";
 import { complete, isAvailable } from "./llm-service";
 import { recordAuditDirect } from "./audit";
+import { invokeTool } from "./tool-registry";
 
 async function agentAudit(
   tenantId: string,
@@ -78,108 +71,33 @@ export function getTenantAgentConfig(settings: unknown): TenantAgentConfig {
   };
 }
 
-async function callTool_listRisks(tenantId: string): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: risksTable.id, title: risksTable.title, description: risksTable.description,
-    category: risksTable.category, status: risksTable.status,
-    likelihood: risksTable.likelihood, impact: risksTable.impact,
-    residualLikelihood: risksTable.residualLikelihood, residualImpact: risksTable.residualImpact,
-  }).from(risksTable).where(eq(risksTable.tenantId, tenantId));
-}
-
-async function callTool_listVendors(tenantId: string): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: vendorsTable.id, name: vendorsTable.name, tier: vendorsTable.tier,
-    status: vendorsTable.status, riskScore: vendorsTable.riskScore, category: vendorsTable.category,
-  }).from(vendorsTable).where(eq(vendorsTable.tenantId, tenantId));
-}
-
-async function callTool_listSignals(tenantId: string, since: Date): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: signalsTable.id, source: signalsTable.source, content: signalsTable.content,
-    status: signalsTable.status, classification: signalsTable.classification,
-    confidence: signalsTable.confidence,
-  }).from(signalsTable)
-    .where(and(eq(signalsTable.tenantId, tenantId), gt(signalsTable.createdAt, since)));
-}
-
-async function callTool_listAlerts(tenantId: string): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: alertsTable.id, type: alertsTable.type, title: alertsTable.title,
-    severity: alertsTable.severity, status: alertsTable.status, context: alertsTable.context,
-  }).from(alertsTable)
-    .where(and(eq(alertsTable.tenantId, tenantId), inArray(alertsTable.status, ["active", "escalated"])));
-}
-
-async function callTool_listControls(tenantId: string): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: controlsTable.id, title: controlsTable.title, status: controlsTable.status,
-  }).from(controlsTable).where(eq(controlsTable.tenantId, tenantId));
-}
-
-async function callTool_listKris(tenantId: string): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: krisTable.id, riskId: krisTable.riskId, name: krisTable.name,
-    currentValue: krisTable.currentValue, warningThreshold: krisTable.warningThreshold,
-    criticalThreshold: krisTable.criticalThreshold, unit: krisTable.unit,
-  }).from(krisTable).where(eq(krisTable.tenantId, tenantId));
-}
-
-async function callTool_listFrameworks(tenantId: string): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: frameworksTable.id, name: frameworksTable.name, type: frameworksTable.type,
-  }).from(frameworksTable).where(eq(frameworksTable.tenantId, tenantId));
-}
-
-async function callTool_runGapAnalysis(tenantId: string): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: frameworkRequirementsTable.id,
-    frameworkId: frameworkRequirementsTable.frameworkId,
-    code: frameworkRequirementsTable.code,
-    title: frameworkRequirementsTable.title,
-  }).from(frameworkRequirementsTable)
-    .where(and(
-      eq(frameworkRequirementsTable.tenantId, tenantId),
-      sql`${frameworkRequirementsTable.id} NOT IN (
-        SELECT crm.requirement_id FROM control_requirement_maps crm
-        INNER JOIN controls c ON c.id = crm.control_id
-        WHERE c.tenant_id = ${tenantId}
-      )`,
-    ));
-}
-
-async function callTool_listFailedControlTests(tenantId: string, since: Date): Promise<Array<Record<string, unknown>>> {
-  return db.select({
-    id: controlTestsTable.id, controlId: controlTestsTable.controlId,
-    result: controlTestsTable.result, notes: controlTestsTable.notes,
-    testedAt: controlTestsTable.testedAt,
-  }).from(controlTestsTable)
-    .where(and(
-      eq(controlTestsTable.tenantId, tenantId),
-      inArray(controlTestsTable.result, ["fail", "partial"]),
-      gt(controlTestsTable.testedAt, since),
-    ));
-}
-
 async function observe(tenantId: string): Promise<ObservationData> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const [risks, kris, vendors, signals, alerts, controls, frameworks] = await Promise.all([
-    callTool_listRisks(tenantId),
-    callTool_listKris(tenantId),
-    callTool_listVendors(tenantId),
-    callTool_listSignals(tenantId, thirtyDaysAgo),
-    callTool_listAlerts(tenantId),
-    callTool_listControls(tenantId),
-    callTool_listFrameworks(tenantId),
+  const [risksResult, krisResult, vendorsResult, signalsResult, alertsResult, controlsResult, frameworksResult] = await Promise.all([
+    invokeTool("list_risks", { tenantId }),
+    invokeTool("list_kris", { tenantId }),
+    invokeTool("list_vendors", { tenantId }),
+    invokeTool("list_signals", { tenantId, since: thirtyDaysAgo }),
+    invokeTool("list_alerts", { tenantId }),
+    invokeTool("list_controls", { tenantId }),
+    invokeTool("list_frameworks", { tenantId }),
   ]);
 
+  const risks = risksResult.data;
+  const kris = krisResult.data;
+  const vendors = vendorsResult.data;
+  const signals = signalsResult.data;
+  const alerts = alertsResult.data;
+  const controls = controlsResult.data;
+  const frameworks = frameworksResult.data;
+
   const unmappedRequirements = frameworks.length > 0
-    ? await callTool_runGapAnalysis(tenantId)
+    ? (await invokeTool("run_gap_analysis", { tenantId })).data
     : [];
 
   const failedControlTests = controls.length > 0
-    ? await callTool_listFailedControlTests(tenantId, thirtyDaysAgo)
+    ? (await invokeTool("list_failed_control_tests", { tenantId, since: thirtyDaysAgo })).data
     : [];
 
   return { risks, kris, vendors, signals, alerts, controls, frameworks, unmappedRequirements, failedControlTests };
@@ -598,7 +516,7 @@ async function act(
       linkedEntities: finding.linkedEntities,
       proposedAction: storedAction,
       status: findingStatus,
-      actionedAt: policyTier === "active" ? new Date() : null,
+      actionedAt: findingStatus === "actioned" ? new Date() : null,
     }).returning();
 
     await agentAudit(tenantId, runId, "agent_finding_created", "agent_finding", saved.id, {
@@ -712,6 +630,8 @@ export async function runAgentCycle(
             reason: `LLM provider unreachable: ${errMsg}`,
             llmAvailable: false,
             localFindingsDetected: localFindings.length,
+            schedule: scheduleInfo?.schedule || null,
+            triggeredBy: scheduleInfo?.triggeredBy || "manual",
             observationSummary: {
               risks: data.risks.length,
               kris: data.kris.length,
@@ -728,6 +648,7 @@ export async function runAgentCycle(
           policyTier,
           reason: `LLM provider unreachable: ${errMsg}`,
           localFindingsDetected: localFindings.length,
+          triggeredBy: scheduleInfo?.triggeredBy || "manual",
         });
 
         return run.id;
@@ -746,6 +667,8 @@ export async function runAgentCycle(
           reason: skipReason,
           llmAvailable: false,
           localFindingsDetected: localFindings.length,
+          schedule: scheduleInfo?.schedule || null,
+          triggeredBy: scheduleInfo?.triggeredBy || "manual",
           observationSummary: {
             risks: data.risks.length,
             kris: data.kris.length,
@@ -762,6 +685,7 @@ export async function runAgentCycle(
         policyTier,
         reason: skipReason,
         localFindingsDetected: localFindings.length,
+        triggeredBy: scheduleInfo?.triggeredBy || "manual",
       });
 
       console.log(`[Agent] Run ${run.id} skipped for tenant ${tenantId}: ${skipReason}`);
