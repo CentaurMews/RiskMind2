@@ -54,6 +54,8 @@ tags:
     description: LLM provider configuration and platform settings
   - name: interviews
     description: AI-powered interview sessions for risk creation and control assessment
+  - name: agent
+    description: Autonomous Risk Intelligence Agent — runs, findings, queue, and configuration
 paths:
   /v1/health:
     get:

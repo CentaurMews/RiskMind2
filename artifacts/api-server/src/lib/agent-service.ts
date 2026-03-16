@@ -120,45 +120,6 @@ function detectCascadeChains(data: ObservationData): Finding[] {
     failedByControl.get(cid)!.push(t);
   }
 
-  for (const risk of data.risks) {
-    const riskId = risk.id as string;
-    const riskKris = krisByRisk.get(riskId) || [];
-    const breachedKris = riskKris.filter(k => {
-      const val = Number(k.currentValue);
-      const crit = Number(k.criticalThreshold);
-      return val >= crit;
-    });
-
-    if (breachedKris.length === 0) continue;
-
-    const activeAlerts = data.alerts.filter(a => {
-      const ctx = a.context as Record<string, unknown> | null;
-      return ctx && ctx.riskId === riskId;
-    });
-
-    if (activeAlerts.length === 0) continue;
-
-    const entities: LinkedEntity[] = [
-      { type: "risk", id: riskId, label: risk.title as string },
-      ...breachedKris.map(k => ({ type: "kri", id: k.id as string, label: k.name as string })),
-      ...activeAlerts.map(a => ({ type: "alert", id: a.id as string, label: a.title as string })),
-    ];
-
-    findings.push({
-      type: "cascade_chain",
-      severity: "high",
-      title: `Cascade: ${risk.title} — KRI breach + active alerts`,
-      narrative: `Risk "${risk.title}" has ${breachedKris.length} KRI(s) breaching critical thresholds with ${activeAlerts.length} active alert(s). This indicates an escalating risk pattern requiring immediate attention.`,
-      linkedEntities: entities,
-      proposedAction: {
-        type: "create_review_flag",
-        title: `Review cascade: ${risk.title}`,
-        severity: "high",
-        context: { riskId, breachedKriCount: breachedKris.length, activeAlertCount: activeAlerts.length },
-      },
-    });
-  }
-
   const gapsByFramework = new Map<string, Array<Record<string, unknown>>>();
   for (const req of data.unmappedRequirements) {
     const fwId = req.frameworkId as string;
@@ -166,40 +127,196 @@ function detectCascadeChains(data: ObservationData): Finding[] {
     gapsByFramework.get(fwId)!.push(req);
   }
 
+  const vendorsByCategory = new Map<string, Array<Record<string, unknown>>>();
+  for (const v of data.vendors) {
+    const cat = (v.category as string) || "uncategorized";
+    if (!vendorsByCategory.has(cat)) vendorsByCategory.set(cat, []);
+    vendorsByCategory.get(cat)!.push(v);
+  }
+
+  const risksByCategory = new Map<string, Array<Record<string, unknown>>>();
+  for (const r of data.risks) {
+    const cat = r.category as string;
+    if (!risksByCategory.has(cat)) risksByCategory.set(cat, []);
+    risksByCategory.get(cat)!.push(r);
+  }
+
+  for (const risk of data.risks) {
+    const riskId = risk.id as string;
+    const riskCategory = risk.category as string;
+    const chain: LinkedEntity[] = [];
+    const chainSegments: string[] = [];
+
+    chain.push({ type: "risk", id: riskId, label: risk.title as string });
+
+    const riskKris = krisByRisk.get(riskId) || [];
+    const breachedKris = riskKris.filter(k => {
+      const val = Number(k.currentValue);
+      const crit = Number(k.criticalThreshold);
+      return val >= crit;
+    });
+
+    if (breachedKris.length > 0) {
+      for (const k of breachedKris) {
+        chain.push({ type: "kri", id: k.id as string, label: k.name as string });
+      }
+      chainSegments.push(`${breachedKris.length} breached KRI(s)`);
+    }
+
+    const riskAlerts = data.alerts.filter(a => {
+      const ctx = a.context as Record<string, unknown> | null;
+      return ctx && ctx.riskId === riskId;
+    });
+    if (riskAlerts.length > 0) {
+      for (const a of riskAlerts) {
+        chain.push({ type: "alert", id: a.id as string, label: a.title as string });
+      }
+      chainSegments.push(`${riskAlerts.length} active alert(s)`);
+    }
+
+    const relatedVendors = vendorsByCategory.get(riskCategory) || [];
+    const highRiskVendors = relatedVendors.filter(v => {
+      const score = Number(v.riskScore || 0);
+      return score >= 7;
+    });
+    if (highRiskVendors.length > 0) {
+      for (const v of highRiskVendors) {
+        chain.push({ type: "vendor", id: v.id as string, label: v.name as string });
+      }
+      chainSegments.push(`${highRiskVendors.length} high-risk vendor(s) in category "${riskCategory}"`);
+    }
+
+    const controlsWithFailures = [...failedByControl.keys()];
+    if (controlsWithFailures.length > 0 && breachedKris.length > 0) {
+      for (const cid of controlsWithFailures) {
+        const ctrl = data.controls.find(c => c.id === cid);
+        if (ctrl) {
+          chain.push({ type: "control", id: cid, label: ctrl.title as string });
+        }
+      }
+      chainSegments.push(`${controlsWithFailures.length} control(s) with test failures`);
+    }
+
+    if (chainSegments.length < 2) continue;
+
+    const severity = chainSegments.length >= 4 ? "critical" :
+                     chainSegments.length >= 3 ? "high" : "medium";
+
+    const chainPath = chainSegments.join(" → ");
+    findings.push({
+      type: "cascade_chain",
+      severity,
+      title: `Multi-hop cascade: ${risk.title} — ${chain.length} linked entities across ${chainSegments.length} domains`,
+      narrative: `Risk "${risk.title}" participates in a cross-domain cascade chain: ${chainPath}. This ${chain.length}-node graph spans multiple entity types indicating systemic exposure that requires coordinated remediation.`,
+      linkedEntities: chain,
+      proposedAction: {
+        type: "create_review_flag",
+        title: `Review cascade: ${risk.title}`,
+        severity,
+        context: {
+          riskId,
+          chainDepth: chainSegments.length,
+          entityCount: chain.length,
+          domains: chainSegments,
+        },
+      },
+    });
+  }
+
   for (const [fwId, gaps] of gapsByFramework) {
     const framework = data.frameworks.find(f => f.id === fwId);
     if (!framework) continue;
     if (gaps.length < 3) continue;
 
-    const topGaps = gaps.slice(0, 5);
-    const entities: LinkedEntity[] = [
+    const chain: LinkedEntity[] = [
       { type: "framework", id: fwId, label: framework.name as string },
-      ...topGaps.map(g => ({
-        type: "framework_requirement" as const,
-        id: g.id as string,
-        label: `${g.code}: ${g.title}`,
-      })),
     ];
+    const chainSegments: string[] = [`${gaps.length} unmapped requirements`];
+
+    const topGaps = gaps.slice(0, 5);
+    for (const g of topGaps) {
+      chain.push({ type: "framework_requirement", id: g.id as string, label: `${g.code}: ${g.title}` });
+    }
 
     if (failedByControl.size > 0) {
-      for (const [cid, tests] of failedByControl) {
+      for (const [cid] of failedByControl) {
         const ctrl = data.controls.find(c => c.id === cid);
         if (ctrl) {
-          entities.push({ type: "control", id: cid, label: ctrl.title as string });
+          chain.push({ type: "control", id: cid, label: ctrl.title as string });
         }
       }
+      chainSegments.push(`${failedByControl.size} control(s) with test failures`);
     }
+
+    const relatedRisks = (risksByCategory.get("compliance") || [])
+      .filter(r => r.status === "open" || r.status === "mitigating");
+    if (relatedRisks.length > 0) {
+      for (const r of relatedRisks.slice(0, 3)) {
+        chain.push({ type: "risk", id: r.id as string, label: r.title as string });
+      }
+      chainSegments.push(`${relatedRisks.length} open compliance risk(s)`);
+    }
+
+    const severity = gaps.length >= 10 || chainSegments.length >= 3 ? "high" : "medium";
 
     findings.push({
       type: "cascade_chain",
-      severity: gaps.length >= 10 ? "high" : "medium",
-      title: `Compliance gap cluster: ${framework.name} — ${gaps.length} unmapped requirements`,
-      narrative: `Framework "${framework.name}" has ${gaps.length} requirement(s) with no mapped control. ${failedByControl.size > 0 ? `Additionally, ${failedByControl.size} existing control(s) have recent test failures, indicating weakened coverage.` : ""} This creates a systemic compliance gap that increases regulatory risk.`,
-      linkedEntities: entities,
+      severity,
+      title: `Compliance cascade: ${framework.name} — ${chain.length} linked entities across ${chainSegments.length} domains`,
+      narrative: `Framework "${framework.name}" has ${gaps.length} requirement(s) with no mapped control. ${failedByControl.size > 0 ? `Additionally, ${failedByControl.size} existing control(s) have recent test failures, indicating weakened coverage. ` : ""}${relatedRisks.length > 0 ? `${relatedRisks.length} open compliance risks amplify this exposure. ` : ""}This creates a systemic compliance gap spanning ${chainSegments.length} domains.`,
+      linkedEntities: chain,
       proposedAction: {
         type: "create_signal",
-        content: `Compliance gap: ${framework.name} has ${gaps.length} unmapped requirements`,
+        content: `Compliance cascade: ${framework.name} — ${gaps.length} unmapped requirements across ${chainSegments.length} domains`,
         classification: "compliance_gap",
+      },
+    });
+  }
+
+  for (const [cat, vendors] of vendorsByCategory) {
+    const highRiskVendors = vendors.filter(v => Number(v.riskScore || 0) >= 7);
+    if (highRiskVendors.length < 2) continue;
+
+    const chain: LinkedEntity[] = [];
+    const chainSegments: string[] = [`${highRiskVendors.length} high-risk vendors in "${cat}"`];
+
+    for (const v of highRiskVendors) {
+      chain.push({ type: "vendor", id: v.id as string, label: v.name as string });
+    }
+
+    const catRisks = risksByCategory.get(cat) || [];
+    const openCatRisks = catRisks.filter(r => r.status === "open" || r.status === "mitigating");
+    if (openCatRisks.length > 0) {
+      for (const r of openCatRisks.slice(0, 3)) {
+        chain.push({ type: "risk", id: r.id as string, label: r.title as string });
+      }
+      chainSegments.push(`${openCatRisks.length} open risk(s) in category`);
+    }
+
+    const vendorAlerts = data.alerts.filter(a => {
+      const ctx = a.context as Record<string, unknown> | null;
+      return ctx && highRiskVendors.some(v => v.id === ctx.vendorId);
+    });
+    if (vendorAlerts.length > 0) {
+      for (const a of vendorAlerts) {
+        chain.push({ type: "alert", id: a.id as string, label: a.title as string });
+      }
+      chainSegments.push(`${vendorAlerts.length} vendor alert(s)`);
+    }
+
+    if (chainSegments.length < 2) continue;
+
+    findings.push({
+      type: "cascade_chain",
+      severity: highRiskVendors.length >= 3 ? "high" : "medium",
+      title: `Vendor concentration cascade: ${cat} — ${chain.length} linked entities`,
+      narrative: `${highRiskVendors.length} high-risk vendors in category "${cat}" create concentration risk. ${openCatRisks.length > 0 ? `${openCatRisks.length} open risk(s) in the same category amplify this exposure. ` : ""}${vendorAlerts.length > 0 ? `${vendorAlerts.length} active vendor alert(s) indicate ongoing issues. ` : ""}This multi-hop chain spans ${chainSegments.length} domains.`,
+      linkedEntities: chain,
+      proposedAction: {
+        type: "create_review_flag",
+        title: `Review vendor concentration: ${cat}`,
+        severity: highRiskVendors.length >= 3 ? "high" : "medium",
+        context: { category: cat, vendorCount: highRiskVendors.length, chainDepth: chainSegments.length },
       },
     });
   }

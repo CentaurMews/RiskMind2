@@ -1,4 +1,4 @@
-import { eq, and, sql, gt, inArray, ilike } from "drizzle-orm";
+import { eq, and, sql, gt, inArray, ilike, type SQL } from "drizzle-orm";
 import {
   db,
   risksTable,
@@ -48,9 +48,9 @@ type ToolHandler = (params: ToolCallParams) => Promise<ToolResult>;
 
 const toolHandlers: Record<ToolName, ToolHandler> = {
   list_risks: async ({ tenantId, status, category, search, page, limit: lim }) => {
-    const conditions: ReturnType<typeof eq>[] = [eq(risksTable.tenantId, tenantId)];
-    if (status) conditions.push(eq(risksTable.status, status as any));
-    if (category) conditions.push(eq(risksTable.category, category as any));
+    const conditions: SQL[] = [eq(risksTable.tenantId, tenantId)];
+    if (status) conditions.push(sql`${risksTable.status} = ${status}`);
+    if (category) conditions.push(sql`${risksTable.category} = ${category}`);
     if (search) conditions.push(ilike(risksTable.title, `%${search}%`));
 
     if (page && lim) {
@@ -73,8 +73,8 @@ const toolHandlers: Record<ToolName, ToolHandler> = {
   },
 
   list_vendors: async ({ tenantId, status, search, page, limit: lim }) => {
-    const conditions: ReturnType<typeof eq>[] = [eq(vendorsTable.tenantId, tenantId)];
-    if (status) conditions.push(eq(vendorsTable.status, status as any));
+    const conditions: SQL[] = [eq(vendorsTable.tenantId, tenantId)];
+    if (status) conditions.push(sql`${vendorsTable.status} = ${status}`);
     if (search) conditions.push(ilike(vendorsTable.name, `%${search}%`));
 
     if (page && lim) {
@@ -95,8 +95,8 @@ const toolHandlers: Record<ToolName, ToolHandler> = {
   },
 
   list_signals: async ({ tenantId, since, status, source, search, page, limit: lim }) => {
-    const conditions: ReturnType<typeof eq>[] = [eq(signalsTable.tenantId, tenantId)];
-    if (status) conditions.push(eq(signalsTable.status, status as any));
+    const conditions: SQL[] = [eq(signalsTable.tenantId, tenantId)];
+    if (status) conditions.push(sql`${signalsTable.status} = ${status}`);
     if (source) conditions.push(eq(signalsTable.source, source));
     if (search) conditions.push(ilike(signalsTable.content, `%${search}%`));
     if (since) conditions.push(gt(signalsTable.createdAt, since));
@@ -120,11 +120,13 @@ const toolHandlers: Record<ToolName, ToolHandler> = {
   },
 
   list_alerts: async ({ tenantId, severity, status, type, alertStatuses, page, limit: lim }) => {
-    const conditions: ReturnType<typeof eq>[] = [eq(alertsTable.tenantId, tenantId)];
-    if (severity) conditions.push(eq(alertsTable.severity, severity as any));
-    if (status) conditions.push(eq(alertsTable.status, status as any));
-    if (type) conditions.push(eq(alertsTable.type, type as any));
-    if (alertStatuses) conditions.push(inArray(alertsTable.status, alertStatuses as any));
+    const conditions: SQL[] = [eq(alertsTable.tenantId, tenantId)];
+    if (severity) conditions.push(sql`${alertsTable.severity} = ${severity}`);
+    if (status) conditions.push(sql`${alertsTable.status} = ${status}`);
+    if (type) conditions.push(eq(alertsTable.type, type));
+    if (alertStatuses && alertStatuses.length > 0) {
+      conditions.push(sql`${alertsTable.status} IN (${sql.join(alertStatuses.map(s => sql`${s}`), sql`, `)})`);
+    }
 
     if (page && lim) {
       const offset = (page - 1) * lim;
@@ -135,18 +137,21 @@ const toolHandlers: Record<ToolName, ToolHandler> = {
       return { data, total: countResult[0].count };
     }
 
+    if (!alertStatuses && !status) {
+      conditions.push(sql`${alertsTable.status} IN ('active', 'escalated')`);
+    }
+
     return {
       data: await db.select({
         id: alertsTable.id, type: alertsTable.type, title: alertsTable.title,
         severity: alertsTable.severity, status: alertsTable.status, context: alertsTable.context,
-      }).from(alertsTable)
-        .where(and(...conditions, alertStatuses ? undefined : inArray(alertsTable.status, ["active", "escalated"]))),
+      }).from(alertsTable).where(and(...conditions)),
     };
   },
 
   list_controls: async ({ tenantId, status, search, page, limit: lim }) => {
-    const conditions: ReturnType<typeof eq>[] = [eq(controlsTable.tenantId, tenantId)];
-    if (status) conditions.push(eq(controlsTable.status, status as any));
+    const conditions: SQL[] = [eq(controlsTable.tenantId, tenantId)];
+    if (status) conditions.push(sql`${controlsTable.status} = ${status}`);
     if (search) conditions.push(ilike(controlsTable.title, `%${search}%`));
 
     if (page && lim) {
@@ -197,7 +202,7 @@ const toolHandlers: Record<ToolName, ToolHandler> = {
       const coveredReqIds = new Set(mappings.map(m => m.requirementId));
       const gaps = requirements
         .filter(r => !coveredReqIds.has(r.id))
-        .map(r => ({ id: r.id, code: r.code, title: r.title, description: (r as any).description, frameworkId: r.frameworkId }));
+        .map(r => ({ id: r.id, code: r.code, title: r.title, frameworkId: r.frameworkId }));
 
       return { data: gaps, total: requirements.length };
     }
@@ -228,7 +233,7 @@ const toolHandlers: Record<ToolName, ToolHandler> = {
     }).from(controlTestsTable)
       .where(and(
         eq(controlTestsTable.tenantId, tenantId),
-        inArray(controlTestsTable.result, ["fail", "partial"]),
+        sql`${controlTestsTable.result} IN ('fail', 'partial')`,
         since ? gt(controlTestsTable.testedAt, since) : undefined,
       )),
   }),

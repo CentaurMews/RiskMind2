@@ -158,8 +158,8 @@ router.post("/v1/agent/findings/:id/approve", requireRole("admin", "risk_manager
           const existing = await db.select({ id: alertsTable.id }).from(alertsTable)
             .where(and(
               eq(alertsTable.tenantId, tenantId),
-              eq(alertsTable.type, alertType as any),
-              eq(alertsTable.status, "active"),
+              eq(alertsTable.type, alertType),
+              sql`${alertsTable.status} = 'active'`,
               sql`${alertsTable.context}->>'findingId' = ${findingId}`,
             )).limit(1);
 
