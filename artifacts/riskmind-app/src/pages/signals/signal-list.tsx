@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, Search, Bot, ArrowRight, Check, X, Loader2 } from "lucide-react";
+import { Activity, Search, Bot, ArrowRight, Check, X, Loader2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,23 @@ export default function SignalList() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"pending" | "triaged">("pending");
   const queryClient = useQueryClient();
+  const [retriggering, setRetriggering] = useState<Record<string, boolean>>({});
+
+  const handleRetriggerTriage = async (signalId: string) => {
+    setRetriggering((prev) => ({ ...prev, [signalId]: true }));
+    try {
+      const token = localStorage.getItem("accessToken");
+      await fetch(`/api/v1/signals/${signalId}/retrigger-triage`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+    } finally {
+      setRetriggering((prev) => ({ ...prev, [signalId]: false }));
+    }
+  };
 
   const { data: pendingData, isLoading: pendingLoading } = useListSignals(
     { status: "pending", search: search || undefined },
@@ -127,16 +144,32 @@ export default function SignalList() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
                           {tab === "pending" ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              disabled={triageMutation.isPending}
-                              onClick={() => signal.id && handleMarkTriaged(signal.id)}
-                            >
-                              <ArrowRight className="h-3 w-3 mr-1" />
-                              Triage
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30"
+                                disabled={retriggering[signal.id!] || false}
+                                onClick={() => signal.id && handleRetriggerTriage(signal.id)}
+                                title="Re-queue AI triage for this signal"
+                              >
+                                {retriggering[signal.id!]
+                                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  : <Sparkles className="h-3 w-3 mr-1" />
+                                }
+                                Retrigger AI
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                disabled={triageMutation.isPending}
+                                onClick={() => signal.id && handleMarkTriaged(signal.id)}
+                              >
+                                <ArrowRight className="h-3 w-3 mr-1" />
+                                Triage
+                              </Button>
+                            </>
                           ) : (
                             <>
                               <Button

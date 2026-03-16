@@ -116,7 +116,7 @@ router.post("/v1/ai/interview/start", requireRole("admin", "risk_manager", "audi
     const [session] = await db.insert(interviewSessionsTable).values({
       tenantId,
       userId,
-      type,
+      type: type as "risk_creation" | "control_assessment",
       transcript,
     }).returning();
 

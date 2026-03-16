@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useListRisks, useCreateRisk, type RiskCategory } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,17 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SeverityBadge, StatusBadge } from "@/components/ui/severity-badge";
-import { Plus, Search, Filter, Loader2, ArrowRight } from "lucide-react";
+import { Plus, Search, Filter, Loader2, ArrowRight, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { InterviewDialog } from "@/components/ai-interview/interview-dialog";
 
 export default function RiskList() {
   const [search, setSearch] = useState("");
   const { data, isLoading } = useListRisks({ search: search || undefined });
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const createMutation = useCreateRisk({
     mutation: {
       onSuccess: () => {
@@ -28,6 +30,7 @@ export default function RiskList() {
   });
 
   const [isOpen, setIsOpen] = useState(false);
+  const [interviewOpen, setInterviewOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -67,7 +70,15 @@ export default function RiskList() {
             <p className="text-muted-foreground mt-1">Manage and track enterprise risks across all domains.</p>
           </div>
           
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setInterviewOpen(true)}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Create with AI
+            </Button>
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
               <Button className="shadow-md">
                 <Plus className="h-4 w-4 mr-2" />
@@ -122,7 +133,18 @@ export default function RiskList() {
               </form>
             </SheetContent>
           </Sheet>
+          </div>
         </div>
+
+        <InterviewDialog
+          open={interviewOpen}
+          onOpenChange={setInterviewOpen}
+          type="risk_creation"
+          onCommitted={(resultId) => {
+            queryClient.invalidateQueries({ queryKey: ["/api/v1/risks"] });
+            if (resultId) navigate(`/risks/${resultId}`);
+          }}
+        />
 
         <Card className="flex-1 flex flex-col min-h-0 overflow-hidden shadow-sm">
           <div className="p-4 border-b bg-card flex items-center justify-between gap-4">

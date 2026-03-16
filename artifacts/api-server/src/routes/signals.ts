@@ -137,4 +137,29 @@ router.patch("/v1/signals/:id/status", requireRole("admin", "risk_manager", "aud
   }
 });
 
+router.post("/v1/signals/:id/retrigger-triage", requireRole("admin", "risk_manager", "auditor"), async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const signalId = p(req, "id");
+
+    const [signal] = await db.select().from(signalsTable)
+      .where(and(eq(signalsTable.id, signalId), eq(signalsTable.tenantId, tenantId)))
+      .limit(1);
+
+    if (!signal) { notFound(res, "Signal not found"); return; }
+    if (signal.status !== "pending") {
+      badRequest(res, "Only pending signals can be retriggered for AI triage");
+      return;
+    }
+
+    const job = await enqueueJob("ai-triage", "classify", { signalId }, tenantId);
+    await recordAudit(req, "retrigger_triage", "signal", signalId, { jobId: job.id });
+
+    res.json({ jobId: job.id, status: "queued", message: "AI triage job re-queued" });
+  } catch (err) {
+    console.error("Retrigger triage error:", err);
+    serverError(res);
+  }
+});
+
 export default router;

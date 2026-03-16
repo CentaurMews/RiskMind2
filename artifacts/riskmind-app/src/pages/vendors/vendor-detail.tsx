@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useRoute } from "wouter";
-import { useGetVendor, useListQuestionnaires, useListDocuments, useCalculateVendorRiskScore, useTransitionVendor, useCreateDocument } from "@workspace/api-client-react";
+import { useGetVendor, useListQuestionnaires, useListDocuments, useCalculateVendorRiskScore, useTransitionVendor, useCreateDocument, useSummarizeVendorDocument } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/severity-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Mail, Loader2, FileText, ClipboardList, RefreshCw, Upload, ArrowRight } from "lucide-react";
+import { ArrowLeft, Building2, Mail, Loader2, FileText, ClipboardList, RefreshCw, Upload, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,6 +30,7 @@ export default function VendorDetail() {
   const queryClient = useQueryClient();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [docForm, setDocForm] = useState({ fileName: "", mimeType: "application/pdf" });
+  const [summarizingDocs, setSummarizingDocs] = useState<Record<string, "pending" | "done">>({});
 
   const { data: vendor, isLoading } = useGetVendor(id);
   const { data: questionnaires } = useListQuestionnaires(id);
@@ -55,6 +56,14 @@ export default function VendorDetail() {
         setDocForm({ fileName: "", mimeType: "application/pdf" });
       }
     }
+  });
+
+  const summarizeMutation = useSummarizeVendorDocument({
+    mutation: {
+      onSuccess: (_, vars) => {
+        setSummarizingDocs((prev) => ({ ...prev, [vars.documentId]: "done" }));
+      },
+    },
   });
 
   if (isLoading) return <AppLayout><div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div></AppLayout>;
@@ -198,7 +207,33 @@ export default function VendorDetail() {
                           <span className="text-xs text-muted-foreground">Type: {doc.mimeType?.split('/')[1] || 'unknown'}</span>
                         </div>
                       </div>
-                      <StatusBadge status={doc.status} />
+                      <div className="flex items-center gap-2">
+                        {summarizingDocs[doc.id!] === "done" ? (
+                          <span className="text-xs text-emerald-700 flex items-center gap-1 font-medium">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Analysis queued
+                          </span>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={summarizeMutation.isPending || summarizingDocs[doc.id!] === "pending"}
+                            onClick={() => {
+                              if (!doc.id) return;
+                              setSummarizingDocs((prev) => ({ ...prev, [doc.id!]: "pending" }));
+                              summarizeMutation.mutate({ vendorId: id, documentId: doc.id });
+                            }}
+                          >
+                            {summarizingDocs[doc.id!] === "pending" ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3 w-3 mr-1" />
+                            )}
+                            AI Analysis
+                          </Button>
+                        )}
+                        <StatusBadge status={doc.status} />
+                      </div>
                     </div>
                   ))}
                 </div>
