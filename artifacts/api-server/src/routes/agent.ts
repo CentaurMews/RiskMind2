@@ -292,8 +292,8 @@ router.put("/v1/agent/config", requireRole("admin"), async (req: Request, res: R
         return;
       }
       const cronParts = schedule.trim().split(/\s+/);
-      if (cronParts.length < 5 || cronParts.length > 6) {
-        badRequest(res, "schedule must be a valid cron expression with 5 or 6 fields (e.g. '0 6 * * *')");
+      if (cronParts.length !== 5) {
+        badRequest(res, "schedule must be a standard 5-field cron expression: minute hour day-of-month month day-of-week (e.g. '0 6 * * *')");
         return;
       }
     }
