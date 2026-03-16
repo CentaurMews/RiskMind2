@@ -1,5 +1,8 @@
 import app from "./app";
 import { ensureExtensions } from "@workspace/db";
+import { startJobProcessor } from "./lib/job-queue";
+import { registerAIWorkers } from "./lib/ai-workers";
+import { startMonitoringScheduler } from "./lib/monitoring";
 
 const rawPort = process.env["PORT"];
 
@@ -17,6 +20,11 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function start() {
   await ensureExtensions();
+
+  registerAIWorkers();
+  startJobProcessor();
+  startMonitoringScheduler();
+
   app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
   });

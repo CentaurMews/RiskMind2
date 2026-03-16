@@ -24,15 +24,15 @@ AI-native multi-organization enterprise risk management platform. pnpm workspace
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
 │   └── api-server/         # Express API server
-│       ├── src/lib/        # JWT, audit, password, errors utilities
+│       ├── src/lib/        # JWT, audit, password, errors, job-queue, monitoring, ai-workers
 │       ├── src/middlewares/ # Auth + RBAC middleware
-│       └── src/routes/     # Route handlers (health, auth)
+│       └── src/routes/     # Route handlers (health, auth, risks, vendors, compliance, signals, findings, alerts, ai-enrichment, foresight)
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
 │   └── db/                 # Drizzle ORM schema + DB connection
-│       └── src/schema/     # 19 table definitions (tenants, users, risks, etc.)
+│       └── src/schema/     # 20 table definitions (tenants, users, risks, jobs, etc.)
 ├── scripts/                # Utility scripts
 │   └── src/seed.ts         # Idempotent seed script
 │   └── src/framework-data/ # Full framework requirement trees (ISO, SOC2, NIST)
@@ -66,6 +66,7 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - **control_requirement_maps** — Many-to-many: controls ↔ requirements
 - **control_tests** — Control test results with evidence
 - **alerts** — System alerts with severity and acknowledgement
+- **jobs** — Async job queue (status, retries, exponential backoff, dead-letter)
 
 ### pgvector
 - Extension provisioned via `lib/db/src/bootstrap.ts` (runs before drizzle-kit push)
@@ -143,6 +144,57 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - `POST /api/v1/controls/:id/requirements` — Map control to requirements (replace all)
 - `GET /api/v1/controls/:controlId/tests` — List control tests
 - `POST /api/v1/controls/:controlId/tests` — Execute control test (admin, auditor)
+
+### Signals & AI Triage
+- `GET /api/v1/signals` — List signals (filter: status, source, search; paginated)
+- `POST /api/v1/signals` — Create signal (single object or array of up to 100)
+- `GET /api/v1/signals/:id` — Get signal by ID
+- `PATCH /api/v1/signals/:id/status` — Transition signal status (enforced state machine: pending→triaged→finding/dismissed)
+- `POST /api/v1/signals/:signalId/promote` — Promote signal to finding
+
+### Findings
+- `GET /api/v1/findings` — List findings (filter: status, riskId, vendorId; paginated)
+- `POST /api/v1/findings` — Create finding (with optional signal/risk/vendor links)
+- `GET /api/v1/findings/:id` — Get finding by ID
+- `PATCH /api/v1/findings/:id` — Update finding (status transitions enforced)
+
+### Alerts & Monitoring
+- `GET /api/v1/alerts` — List alerts (filter: severity, status, type; paginated)
+- `GET /api/v1/alerts/summary` — Alert summary (active, acknowledged, escalated counts + by severity)
+- `GET /api/v1/alerts/:id` — Get alert by ID
+- `PATCH /api/v1/alerts/:id/acknowledge` — Acknowledge alert (with double-ack protection)
+- `PATCH /api/v1/alerts/:id/resolve` — Resolve alert
+
+### AI Enrichment
+- `POST /api/v1/risks/:riskId/enrich` — Queue AI enrichment of risk description (returns 202 + jobId)
+- `POST /api/v1/vendors/:vendorId/documents/:documentId/summarize` — Queue AI document summarization (returns 202 + jobId)
+- `GET /api/v1/jobs/:id` — Get async job status
+
+### Foresight (Stubs — 501 Not Implemented)
+- `GET /api/v1/foresight/simulations` — List simulations
+- `POST /api/v1/foresight/simulations` — Create simulation
+- `GET /api/v1/foresight/simulations/:id` — Get simulation
+- `GET /api/v1/foresight/risk-graph` — Risk graph
+- `GET /api/v1/foresight/trust-circles` — Trust circles
+
+## Async Job Infrastructure
+
+PostgreSQL-backed job queue (no Redis dependency) with:
+- Exponential backoff retries (1s, 2s, 4s... up to 60s)
+- Dead-letter queue (jobs exceeding maxAttempts move to "dead" status)
+- Three registered workers: ai-triage, ai-enrich, doc-process
+- LiteLLM integration for AI classification/enrichment (graceful fallback when unavailable)
+- Job polling every 5 seconds
+
+## Monitoring Scheduler
+
+Daily automated checks generating alerts:
+1. **KRI breaches** — Critical/warning alerts when KRI values exceed thresholds
+2. **Overdue reviews** — Alerts for reviews past due date
+3. **Failed documents** — Alerts for documents with processing failures
+4. **Failed control tests** — Alerts for control test failures
+5. **Vendor status issues** — Alerts for suspended vendors
+6. **Escalation** — Unacknowledged critical alerts escalate after 4 hours
 
 ## Seed Data
 

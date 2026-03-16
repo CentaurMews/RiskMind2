@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * RiskMind API specification
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import * as zod from "zod";
 
@@ -1322,4 +1322,401 @@ export const CreateControlTestBody = zod.object({
   evidence: zod.string().optional(),
   evidenceUrl: zod.string().optional(),
   notes: zod.string().optional(),
+});
+
+/**
+ * @summary List signals
+ */
+export const listSignalsQueryPageDefault = 1;
+export const listSignalsQueryLimitDefault = 20;
+
+export const ListSignalsQueryParams = zod.object({
+  status: zod.enum(["pending", "triaged", "finding", "dismissed"]).optional(),
+  source: zod.coerce.string().optional(),
+  search: zod.coerce.string().optional(),
+  page: zod.coerce.number().default(listSignalsQueryPageDefault),
+  limit: zod.coerce.number().default(listSignalsQueryLimitDefault),
+});
+
+export const ListSignalsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        tenantId: zod.string().uuid().optional(),
+        source: zod.string().optional(),
+        content: zod.string().optional(),
+        status: zod
+          .enum(["pending", "triaged", "finding", "dismissed"])
+          .optional(),
+        classification: zod.string().nullish(),
+        confidence: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * Send a single signal object or an array of up to 100 signals
+ * @summary Create signal (single or bulk)
+ */
+export const createSignalBodyTwoMax = 100;
+
+export const CreateSignalBody = zod.union([
+  zod.object({
+    source: zod.string(),
+    content: zod.string(),
+  }),
+  zod
+    .array(
+      zod.object({
+        source: zod.string(),
+        content: zod.string(),
+      }),
+    )
+    .max(createSignalBodyTwoMax),
+]);
+
+/**
+ * @summary Get signal by ID
+ */
+export const GetSignalParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetSignalResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  source: zod.string().optional(),
+  content: zod.string().optional(),
+  status: zod.enum(["pending", "triaged", "finding", "dismissed"]).optional(),
+  classification: zod.string().nullish(),
+  confidence: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Transition signal status
+ */
+export const UpdateSignalStatusParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateSignalStatusBody = zod.object({
+  status: zod.enum(["pending", "triaged", "finding", "dismissed"]),
+  classification: zod.string().optional(),
+  confidence: zod.number().optional(),
+});
+
+export const UpdateSignalStatusResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  source: zod.string().optional(),
+  content: zod.string().optional(),
+  status: zod.enum(["pending", "triaged", "finding", "dismissed"]).optional(),
+  classification: zod.string().nullish(),
+  confidence: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Promote signal to finding
+ */
+export const PromoteSignalToFindingParams = zod.object({
+  signalId: zod.coerce.string().uuid(),
+});
+
+export const PromoteSignalToFindingBody = zod.object({
+  title: zod.string().optional(),
+  description: zod.string().optional(),
+  riskId: zod.string().uuid().optional(),
+  vendorId: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary List findings
+ */
+export const listFindingsQueryPageDefault = 1;
+export const listFindingsQueryLimitDefault = 20;
+
+export const ListFindingsQueryParams = zod.object({
+  status: zod
+    .enum(["open", "investigating", "resolved", "false_positive"])
+    .optional(),
+  riskId: zod.coerce.string().uuid().optional(),
+  vendorId: zod.coerce.string().uuid().optional(),
+  page: zod.coerce.number().default(listFindingsQueryPageDefault),
+  limit: zod.coerce.number().default(listFindingsQueryLimitDefault),
+});
+
+export const ListFindingsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        tenantId: zod.string().uuid().optional(),
+        signalId: zod.string().uuid().nullish(),
+        riskId: zod.string().uuid().nullish(),
+        vendorId: zod.string().uuid().nullish(),
+        title: zod.string().optional(),
+        description: zod.string().nullish(),
+        status: zod
+          .enum(["open", "investigating", "resolved", "false_positive"])
+          .optional(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * @summary Create finding
+ */
+export const CreateFindingBody = zod.object({
+  signalId: zod.string().uuid().optional(),
+  riskId: zod.string().uuid().optional(),
+  vendorId: zod.string().uuid().optional(),
+  title: zod.string(),
+  description: zod.string().optional(),
+});
+
+/**
+ * @summary Get finding by ID
+ */
+export const GetFindingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetFindingResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  signalId: zod.string().uuid().nullish(),
+  riskId: zod.string().uuid().nullish(),
+  vendorId: zod.string().uuid().nullish(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  status: zod
+    .enum(["open", "investigating", "resolved", "false_positive"])
+    .optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Update finding
+ */
+export const UpdateFindingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateFindingBody = zod.object({
+  status: zod
+    .enum(["open", "investigating", "resolved", "false_positive"])
+    .optional(),
+  riskId: zod.string().uuid().optional(),
+  vendorId: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  description: zod.string().optional(),
+});
+
+export const UpdateFindingResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  signalId: zod.string().uuid().nullish(),
+  riskId: zod.string().uuid().nullish(),
+  vendorId: zod.string().uuid().nullish(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  status: zod
+    .enum(["open", "investigating", "resolved", "false_positive"])
+    .optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary List alerts
+ */
+export const listAlertsQueryPageDefault = 1;
+export const listAlertsQueryLimitDefault = 20;
+
+export const ListAlertsQueryParams = zod.object({
+  severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  status: zod
+    .enum(["active", "acknowledged", "resolved", "escalated"])
+    .optional(),
+  type: zod.coerce.string().optional(),
+  page: zod.coerce.number().default(listAlertsQueryPageDefault),
+  limit: zod.coerce.number().default(listAlertsQueryLimitDefault),
+});
+
+export const ListAlertsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        tenantId: zod.string().uuid().optional(),
+        type: zod.string().optional(),
+        title: zod.string().optional(),
+        description: zod.string().nullish(),
+        severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+        status: zod
+          .enum(["active", "acknowledged", "resolved", "escalated"])
+          .optional(),
+        acknowledgedBy: zod.string().uuid().nullish(),
+        acknowledgedAt: zod.date().nullish(),
+        context: zod.object({}).passthrough().optional(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * @summary Get alert summary
+ */
+export const GetAlertSummaryResponse = zod.object({
+  active: zod.number().optional(),
+  acknowledged: zod.number().optional(),
+  escalated: zod.number().optional(),
+  bySeverity: zod
+    .object({
+      critical: zod.number().optional(),
+      high: zod.number().optional(),
+      medium: zod.number().optional(),
+      low: zod.number().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Get alert by ID
+ */
+export const GetAlertParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetAlertResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  type: zod.string().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  status: zod
+    .enum(["active", "acknowledged", "resolved", "escalated"])
+    .optional(),
+  acknowledgedBy: zod.string().uuid().nullish(),
+  acknowledgedAt: zod.date().nullish(),
+  context: zod.object({}).passthrough().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Acknowledge an alert
+ */
+export const AcknowledgeAlertParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AcknowledgeAlertResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  type: zod.string().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  status: zod
+    .enum(["active", "acknowledged", "resolved", "escalated"])
+    .optional(),
+  acknowledgedBy: zod.string().uuid().nullish(),
+  acknowledgedAt: zod.date().nullish(),
+  context: zod.object({}).passthrough().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Resolve an alert
+ */
+export const ResolveAlertParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const ResolveAlertResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  type: zod.string().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  severity: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  status: zod
+    .enum(["active", "acknowledged", "resolved", "escalated"])
+    .optional(),
+  acknowledgedBy: zod.string().uuid().nullish(),
+  acknowledgedAt: zod.date().nullish(),
+  context: zod.object({}).passthrough().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Trigger AI enrichment of risk description
+ */
+export const EnrichRiskDescriptionParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Trigger AI summarization of vendor document
+ */
+export const SummarizeVendorDocumentParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+  documentId: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Get job status
+ */
+export const GetJobStatusParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetJobStatusResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().nullish(),
+  queue: zod.string().optional(),
+  type: zod.string().optional(),
+  payload: zod.object({}).passthrough().optional(),
+  result: zod.object({}).passthrough().nullish(),
+  status: zod
+    .enum(["pending", "processing", "completed", "failed", "dead"])
+    .optional(),
+  attempts: zod.number().optional(),
+  maxAttempts: zod.number().optional(),
+  lastError: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+});
+
+/**
+ * @summary Get simulation by ID (not implemented)
+ */
+export const GetSimulationParams = zod.object({
+  id: zod.coerce.string().uuid(),
 });

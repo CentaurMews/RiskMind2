@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * RiskMind API specification
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import type { ReviewStatus } from "./reviewStatus";
 

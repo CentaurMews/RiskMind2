@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.2.0
+  version: 0.3.0
   description: RiskMind API specification
 servers:
   - url: /api
@@ -36,6 +36,18 @@ tags:
     description: Control test operations
   - name: compliance
     description: Compliance scoring and gap analysis
+  - name: signals
+    description: Signal ingestion and triage operations
+  - name: findings
+    description: Finding management operations
+  - name: alerts
+    description: Alert and monitoring operations
+  - name: aiEnrichment
+    description: AI enrichment and document summarization
+  - name: jobs
+    description: Async job status tracking
+  - name: foresight
+    description: Foresight features (not yet implemented)
 paths:
   /v1/health:
     get:
@@ -1138,6 +1150,447 @@ paths:
               schema:
                 $ref: "#/components/schemas/ControlTest"
 
+  /v1/signals:
+    get:
+      operationId: listSignals
+      tags: [signals]
+      summary: List signals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, triaged, finding, dismissed]
+        - name: source
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of signals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalListResponse"
+    post:
+      operationId: createSignal
+      tags: [signals]
+      summary: Create signal (single or bulk)
+      description: Send a single signal object or an array of up to 100 signals
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/CreateSignalRequest"
+                - type: array
+                  items:
+                    $ref: "#/components/schemas/CreateSignalRequest"
+                  maxItems: 100
+      responses:
+        "201":
+          description: Signal(s) created
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Signal"
+                  - $ref: "#/components/schemas/BulkSignalResponse"
+
+  /v1/signals/{id}:
+    get:
+      operationId: getSignal
+      tags: [signals]
+      summary: Get signal by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Signal details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Signal"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/signals/{id}/status:
+    patch:
+      operationId: updateSignalStatus
+      tags: [signals]
+      summary: Transition signal status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSignalStatusRequest"
+      responses:
+        "200":
+          description: Signal status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Signal"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /v1/signals/{signalId}/promote:
+    post:
+      operationId: promoteSignalToFinding
+      tags: [signals, findings]
+      summary: Promote signal to finding
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: signalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromoteSignalRequest"
+      responses:
+        "201":
+          description: Finding created from signal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /v1/findings:
+    get:
+      operationId: listFindings
+      tags: [findings]
+      summary: List findings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, investigating, resolved, false_positive]
+        - name: riskId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: vendorId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of findings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingListResponse"
+    post:
+      operationId: createFinding
+      tags: [findings]
+      summary: Create finding
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFindingRequest"
+      responses:
+        "201":
+          description: Finding created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+
+  /v1/findings/{id}:
+    get:
+      operationId: getFinding
+      tags: [findings]
+      summary: Get finding by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Finding details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateFinding
+      tags: [findings]
+      summary: Update finding
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFindingRequest"
+      responses:
+        "200":
+          description: Finding updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+
+  /v1/alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: List alerts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [critical, high, medium, low]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, acknowledged, resolved, escalated]
+        - name: type
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Paginated list of alerts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertListResponse"
+
+  /v1/alerts/summary:
+    get:
+      operationId: getAlertSummary
+      tags: [alerts]
+      summary: Get alert summary
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Alert summary with counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertSummary"
+
+  /v1/alerts/{id}:
+    get:
+      operationId: getAlert
+      tags: [alerts]
+      summary: Get alert by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Alert details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/alerts/{id}/acknowledge:
+    patch:
+      operationId: acknowledgeAlert
+      tags: [alerts]
+      summary: Acknowledge an alert
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Alert acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /v1/alerts/{id}/resolve:
+    patch:
+      operationId: resolveAlert
+      tags: [alerts]
+      summary: Resolve an alert
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Alert resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /v1/risks/{riskId}/enrich:
+    post:
+      operationId: enrichRiskDescription
+      tags: [aiEnrichment]
+      summary: Trigger AI enrichment of risk description
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      responses:
+        "202":
+          description: Enrichment job queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobAccepted"
+
+  /v1/vendors/{vendorId}/documents/{documentId}/summarize:
+    post:
+      operationId: summarizeVendorDocument
+      tags: [aiEnrichment]
+      summary: Trigger AI summarization of vendor document
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "202":
+          description: Summarization job queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobAccepted"
+
+  /v1/jobs/{id}:
+    get:
+      operationId: getJobStatus
+      tags: [jobs]
+      summary: Get job status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Job details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/foresight/simulations:
+    get:
+      operationId: listSimulations
+      tags: [foresight]
+      summary: List Monte Carlo simulations (not implemented)
+      security:
+        - bearerAuth: []
+      responses:
+        "501":
+          description: Not implemented
+    post:
+      operationId: createSimulation
+      tags: [foresight]
+      summary: Create Monte Carlo simulation (not implemented)
+      security:
+        - bearerAuth: []
+      responses:
+        "501":
+          description: Not implemented
+
+  /v1/foresight/simulations/{id}:
+    get:
+      operationId: getSimulation
+      tags: [foresight]
+      summary: Get simulation by ID (not implemented)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "501":
+          description: Not implemented
+
+  /v1/foresight/risk-graph:
+    get:
+      operationId: getRiskGraph
+      tags: [foresight]
+      summary: Get risk graph (not implemented)
+      security:
+        - bearerAuth: []
+      responses:
+        "501":
+          description: Not implemented
+
+  /v1/foresight/trust-circles:
+    get:
+      operationId: getTrustCircles
+      tags: [foresight]
+      summary: Get trust circles (not implemented)
+      security:
+        - bearerAuth: []
+      responses:
+        "501":
+          description: Not implemented
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1197,6 +1650,12 @@ components:
   responses:
     NotFound:
       description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RFC7807Error"
+    Conflict:
+      description: Conflict - invalid state transition or duplicate
       content:
         application/json:
           schema:
@@ -2193,3 +2652,307 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GapRequirement"
+
+    SignalStatus:
+      type: string
+      enum: [pending, triaged, finding, dismissed]
+
+    Signal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        source:
+          type: string
+        content:
+          type: string
+        status:
+          $ref: "#/components/schemas/SignalStatus"
+        classification:
+          type: string
+          nullable: true
+        confidence:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateSignalRequest:
+      type: object
+      required: [source, content]
+      properties:
+        source:
+          type: string
+        content:
+          type: string
+
+    UpdateSignalStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/SignalStatus"
+        classification:
+          type: string
+        confidence:
+          type: number
+
+    BulkSignalResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Signal"
+        count:
+          type: integer
+
+    SignalListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Signal"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    PromoteSignalRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        riskId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+
+    FindingStatus:
+      type: string
+      enum: [open, investigating, resolved, false_positive]
+
+    Finding:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        signalId:
+          type: string
+          format: uuid
+          nullable: true
+        riskId:
+          type: string
+          format: uuid
+          nullable: true
+        vendorId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/FindingStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateFindingRequest:
+      type: object
+      required: [title]
+      properties:
+        signalId:
+          type: string
+          format: uuid
+        riskId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+
+    UpdateFindingRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/FindingStatus"
+        riskId:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+
+    FindingListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    AlertSeverity:
+      type: string
+      enum: [critical, high, medium, low]
+
+    AlertStatus:
+      type: string
+      enum: [active, acknowledged, resolved, escalated]
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        severity:
+          $ref: "#/components/schemas/AlertSeverity"
+        status:
+          $ref: "#/components/schemas/AlertStatus"
+        acknowledgedBy:
+          type: string
+          format: uuid
+          nullable: true
+        acknowledgedAt:
+          type: string
+          format: date-time
+          nullable: true
+        context:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AlertListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Alert"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    AlertSummary:
+      type: object
+      properties:
+        active:
+          type: integer
+        acknowledged:
+          type: integer
+        escalated:
+          type: integer
+        bySeverity:
+          type: object
+          properties:
+            critical:
+              type: integer
+            high:
+              type: integer
+            medium:
+              type: integer
+            low:
+              type: integer
+
+    JobStatus:
+      type: string
+      enum: [pending, processing, completed, failed, dead]
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+          nullable: true
+        queue:
+          type: string
+        type:
+          type: string
+        payload:
+          type: object
+        result:
+          type: object
+          nullable: true
+        status:
+          $ref: "#/components/schemas/JobStatus"
+        attempts:
+          type: integer
+        maxAttempts:
+          type: integer
+        lastError:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    JobAccepted:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        message:
+          type: string

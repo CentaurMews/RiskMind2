@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * RiskMind API specification
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 export interface HealthStatus {
   status: string;
@@ -590,10 +590,201 @@ export interface GapAnalysis {
   requirements?: GapRequirement[];
 }
 
+export type SignalStatus = (typeof SignalStatus)[keyof typeof SignalStatus];
+
+export const SignalStatus = {
+  pending: "pending",
+  triaged: "triaged",
+  finding: "finding",
+  dismissed: "dismissed",
+} as const;
+
+export interface Signal {
+  id?: string;
+  tenantId?: string;
+  source?: string;
+  content?: string;
+  status?: SignalStatus;
+  classification?: string | null;
+  confidence?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateSignalRequest {
+  source: string;
+  content: string;
+}
+
+export interface UpdateSignalStatusRequest {
+  status: SignalStatus;
+  classification?: string;
+  confidence?: number;
+}
+
+export interface BulkSignalResponse {
+  data?: Signal[];
+  count?: number;
+}
+
+export interface SignalListResponse {
+  data?: Signal[];
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+
+export interface PromoteSignalRequest {
+  title?: string;
+  description?: string;
+  riskId?: string;
+  vendorId?: string;
+}
+
+export type FindingStatus = (typeof FindingStatus)[keyof typeof FindingStatus];
+
+export const FindingStatus = {
+  open: "open",
+  investigating: "investigating",
+  resolved: "resolved",
+  false_positive: "false_positive",
+} as const;
+
+export interface Finding {
+  id?: string;
+  tenantId?: string;
+  signalId?: string | null;
+  riskId?: string | null;
+  vendorId?: string | null;
+  title?: string;
+  description?: string | null;
+  status?: FindingStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateFindingRequest {
+  signalId?: string;
+  riskId?: string;
+  vendorId?: string;
+  title: string;
+  description?: string;
+}
+
+export interface UpdateFindingRequest {
+  status?: FindingStatus;
+  riskId?: string;
+  vendorId?: string;
+  title?: string;
+  description?: string;
+}
+
+export interface FindingListResponse {
+  data?: Finding[];
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+
+export type AlertSeverity = (typeof AlertSeverity)[keyof typeof AlertSeverity];
+
+export const AlertSeverity = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export type AlertStatus = (typeof AlertStatus)[keyof typeof AlertStatus];
+
+export const AlertStatus = {
+  active: "active",
+  acknowledged: "acknowledged",
+  resolved: "resolved",
+  escalated: "escalated",
+} as const;
+
+export type AlertContext = { [key: string]: unknown };
+
+export interface Alert {
+  id?: string;
+  tenantId?: string;
+  type?: string;
+  title?: string;
+  description?: string | null;
+  severity?: AlertSeverity;
+  status?: AlertStatus;
+  acknowledgedBy?: string | null;
+  acknowledgedAt?: string | null;
+  context?: AlertContext;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AlertListResponse {
+  data?: Alert[];
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+
+export type AlertSummaryBySeverity = {
+  critical?: number;
+  high?: number;
+  medium?: number;
+  low?: number;
+};
+
+export interface AlertSummary {
+  active?: number;
+  acknowledged?: number;
+  escalated?: number;
+  bySeverity?: AlertSummaryBySeverity;
+}
+
+export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
+
+export const JobStatus = {
+  pending: "pending",
+  processing: "processing",
+  completed: "completed",
+  failed: "failed",
+  dead: "dead",
+} as const;
+
+export type JobPayload = { [key: string]: unknown };
+
+export type JobResult = { [key: string]: unknown } | null;
+
+export interface Job {
+  id?: string;
+  tenantId?: string | null;
+  queue?: string;
+  type?: string;
+  payload?: JobPayload;
+  result?: JobResult;
+  status?: JobStatus;
+  attempts?: number;
+  maxAttempts?: number;
+  lastError?: string | null;
+  createdAt?: string;
+}
+
+export interface JobAccepted {
+  jobId?: string;
+  status?: string;
+  message?: string;
+}
+
 /**
  * Resource not found
  */
 export type NotFoundResponse = RFC7807Error;
+
+/**
+ * Conflict - invalid state transition or duplicate
+ */
+export type ConflictResponse = RFC7807Error;
 
 export type PageParameter = number;
 
@@ -673,3 +864,67 @@ export type MapControlRequirements200 = {
   controlId?: string;
   requirementIds?: string[];
 };
+
+export type ListSignalsParams = {
+  status?: ListSignalsStatus;
+  source?: string;
+  search?: string;
+  page?: PageParameter;
+  limit?: LimitParameter;
+};
+
+export type ListSignalsStatus =
+  (typeof ListSignalsStatus)[keyof typeof ListSignalsStatus];
+
+export const ListSignalsStatus = {
+  pending: "pending",
+  triaged: "triaged",
+  finding: "finding",
+  dismissed: "dismissed",
+} as const;
+
+export type ListFindingsParams = {
+  status?: ListFindingsStatus;
+  riskId?: string;
+  vendorId?: string;
+  page?: PageParameter;
+  limit?: LimitParameter;
+};
+
+export type ListFindingsStatus =
+  (typeof ListFindingsStatus)[keyof typeof ListFindingsStatus];
+
+export const ListFindingsStatus = {
+  open: "open",
+  investigating: "investigating",
+  resolved: "resolved",
+  false_positive: "false_positive",
+} as const;
+
+export type ListAlertsParams = {
+  severity?: ListAlertsSeverity;
+  status?: ListAlertsStatus;
+  type?: string;
+  page?: PageParameter;
+  limit?: LimitParameter;
+};
+
+export type ListAlertsSeverity =
+  (typeof ListAlertsSeverity)[keyof typeof ListAlertsSeverity];
+
+export const ListAlertsSeverity = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export type ListAlertsStatus =
+  (typeof ListAlertsStatus)[keyof typeof ListAlertsStatus];
+
+export const ListAlertsStatus = {
+  active: "active",
+  acknowledged: "acknowledged",
+  resolved: "resolved",
+  escalated: "escalated",
+} as const;
