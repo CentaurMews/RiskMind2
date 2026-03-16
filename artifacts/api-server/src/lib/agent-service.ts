@@ -503,7 +503,7 @@ async function act(
       storedAction = finding.proposedAction || null;
       const actionType = storedAction ? String(storedAction.type || "") : "";
       const isAutoExecutable = actionType === "create_alert" || actionType === "create_review_flag";
-      findingStatus = isAutoExecutable || finding.severity === "high" || finding.severity === "critical" ? "actioned" : "pending_review";
+      findingStatus = isAutoExecutable ? "actioned" : "pending_review";
     }
 
     const [saved] = await db.insert(agentFindingsTable).values({
@@ -557,22 +557,14 @@ async function act(
           }
         }
 
-        if (finding.severity === "high" || finding.severity === "critical") {
-          await db.insert(alertsTable).values({
-            tenantId,
-            type: "review_flag",
-            title: `[Review] ${finding.title}`,
-            description: finding.narrative,
-            severity: finding.severity,
-            context: { agentRunId: runId, findingId: saved.id, type: finding.type },
-          });
-
-          await agentAudit(tenantId, runId, "agent_review_flag_created", "alert", saved.id, {
-            severity: finding.severity,
-          });
-        }
       } catch (err) {
         console.error("[Agent] Failed to execute active-mode action:", err instanceof Error ? err.message : err);
+
+        await db.update(agentFindingsTable).set({
+          status: "pending_review",
+          actionedAt: null,
+          updatedAt: new Date(),
+        }).where(eq(agentFindingsTable.id, saved.id));
       }
     }
 
