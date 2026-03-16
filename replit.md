@@ -1,8 +1,8 @@
-# Workspace
+# RiskMind
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+AI-native multi-organization enterprise risk management platform. pnpm workspace monorepo using TypeScript.
 
 ## Stack
 
@@ -11,10 +11,12 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
+- **Database**: PostgreSQL + Drizzle ORM + pgvector
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Auth**: JWT (custom HMAC-SHA256 implementation, no external library)
+- **Password hashing**: PBKDF2 (crypto native)
 
 ## Structure
 
@@ -22,75 +24,121 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
 │   └── api-server/         # Express API server
+│       ├── src/lib/        # JWT, audit, password, errors utilities
+│       ├── src/middlewares/ # Auth + RBAC middleware
+│       └── src/routes/     # Route handlers (health, auth)
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
 │   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+│       └── src/schema/     # 19 table definitions (tenants, users, risks, etc.)
+├── scripts/                # Utility scripts
+│   └── src/seed.ts         # Idempotent seed script
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+├── tsconfig.json
+└── package.json
 ```
+
+## Database Schema
+
+All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-scoped tables have `tenant_id` NOT NULL.
+
+### Tables
+- **tenants** — Root isolation entity (name, slug, settings)
+- **users** — Auth + RBAC (email, hashed_password, role enum)
+- **audit_events** — Immutable action log (no updates/deletes)
+- **risks** — Risk register with pgvector embedding, likelihood/impact scoring
+- **treatments** — Treatment plans under risks (strategy, status, cost)
+- **kris** — Key Risk Indicators with warning/critical thresholds
+- **incidents** — Incidents linked to risks
+- **review_cycles** — Periodic risk review tracking
+- **signals** — Signal pipeline (pending → triaged → finding/dismissed)
+- **findings** — Promoted signals linked to risks/vendors
+- **vendors** — Third-party vendor profiles with lifecycle state machine
+- **questionnaires** — Vendor assessment questionnaires with magic links
+- **documents** — Vendor document uploads with processing status
+- **frameworks** — Compliance frameworks (ISO 27001, SOC 2, NIST CSF seeded)
+- **framework_requirements** — Nested requirements under frameworks
+- **controls** — Security/compliance controls
+- **control_requirement_maps** — Many-to-many: controls ↔ requirements
+- **control_tests** — Control test results with evidence
+- **alerts** — System alerts with severity and acknowledgement
+
+### pgvector Columns
+Embedding columns (vector(1536)) on: risks, vendors, signals, framework_requirements
+
+## Auth & Multi-Tenancy
+
+- JWT tokens (access: 1hr, refresh: 7d) signed with HMAC-SHA256
+- Tenant resolved from JWT payload on every request
+- RBAC roles: admin, risk_manager, risk_owner, auditor, viewer, vendor
+- All API errors use RFC 7807 format
+- All state-changing operations recorded in audit_events
+
+## API Endpoints
+
+### Health
+- `GET /api/v1/health` — DB connectivity status
+
+### Auth
+- `POST /api/v1/auth/login` — Email/password login, returns JWT pair
+- `POST /api/v1/auth/refresh` — Exchange refresh token
+- `GET /api/v1/auth/me` — Current user profile (requires auth)
+
+## Seed Data
+
+Run: `pnpm --filter @workspace/scripts run seed`
+
+Creates:
+- Tenant: Acme Corp (slug: acme)
+- 5 users (one per role): admin@acme.com, riskmanager@acme.com, riskowner@acme.com, auditor@acme.com, viewer@acme.com
+- Password for all: `password123`
+- 10 risks across 6 categories
+- 5 vendors across 4 tiers
+- 3 signals in different pipeline states
+- 2 alerts (1 critical, 1 medium)
+- 3 compliance frameworks: ISO 27001:2022 (25 reqs), SOC 2 Type II (29 reqs), NIST CSF 2.0 (27 reqs)
 
 ## TypeScript & Composite Projects
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references.
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+- **Always typecheck from the root** — run `pnpm run typecheck`
+- **`emitDeclarationOnly`** — only `.d.ts` files emitted; JS bundling by esbuild/tsx/vite
+- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references`
 
 ## Root Scripts
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
+- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages
 - `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
 
 ## Packages
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+Express 5 API server with auth, RBAC, audit logging, and RFC 7807 errors.
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
+- App: `src/app.ts` — mounts CORS, JSON parsing, routes at `/api`
+- Routes: `src/routes/` — health, auth (more to come)
+- Middleware: `src/middlewares/` — auth (JWT validation), rbac (role checks)
+- Lib: `src/lib/` — jwt, password, audit, errors utilities
 - Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
 
 ### `lib/db` (`@workspace/db`)
 
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
+Database layer using Drizzle ORM with PostgreSQL + pgvector.
 
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+- `src/index.ts` — Pool + Drizzle instance
+- `src/schema/` — 19 table definitions across domain modules
+- Push: `pnpm --filter @workspace/db run push`
 
 ### `lib/api-spec` (`@workspace/api-spec`)
 
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
+OpenAPI 3.1 spec and Orval codegen config. Codegen: `pnpm --filter @workspace/api-spec run codegen`
 
 ### `scripts` (`@workspace/scripts`)
 
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+Utility scripts including seed. Run: `pnpm --filter @workspace/scripts run seed`

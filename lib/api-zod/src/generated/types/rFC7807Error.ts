@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
-  database?: string;
+export interface RFC7807Error {
+  type: string;
+  title: string;
+  status: number;
+  detail?: string;
 }
