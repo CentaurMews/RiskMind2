@@ -1,6 +1,7 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import router from "./routes";
+import { sendError } from "./lib/errors";
 
 const app: Express = express();
 
@@ -10,13 +11,17 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
-app.use((_req, res) => {
-  res.status(404).json({
-    type: "https://riskmind.app/errors/not-found",
-    title: "Not Found",
-    status: 404,
-    detail: "The requested endpoint does not exist",
-  });
+app.use((_req: Request, res: Response) => {
+  sendError(res, 404, "Not Found", "The requested endpoint does not exist");
+});
+
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err && typeof err === "object" && "type" in err && (err as Record<string, unknown>).type === "entity.parse.failed") {
+    sendError(res, 400, "Bad Request", "Invalid JSON in request body");
+    return;
+  }
+  console.error("Unhandled error:", err);
+  sendError(res, 500, "Internal Server Error", "An unexpected error occurred");
 });
 
 export default app;
