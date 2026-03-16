@@ -113,6 +113,17 @@ router.post("/v1/signals/:signalId/promote", requireRole("admin", "risk_manager"
 
     const { title, description, riskId, vendorId } = req.body;
 
+    if (riskId) {
+      const [r] = await db.select({ id: risksTable.id }).from(risksTable)
+        .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId))).limit(1);
+      if (!r) { notFound(res, "Risk not found in this tenant"); return; }
+    }
+    if (vendorId) {
+      const [v] = await db.select({ id: vendorsTable.id }).from(vendorsTable)
+        .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId))).limit(1);
+      if (!v) { notFound(res, "Vendor not found in this tenant"); return; }
+    }
+
     const [finding] = await db.insert(findingsTable).values({
       tenantId,
       signalId,
@@ -166,6 +177,17 @@ router.patch("/v1/findings/:id", requireRole("admin", "risk_manager", "auditor")
         conflict(res, `Cannot transition from '${existing.status}' to '${status}'. Allowed: ${(allowed || []).join(", ") || "none"}`);
         return;
       }
+    }
+
+    if (riskId) {
+      const [r] = await db.select({ id: risksTable.id }).from(risksTable)
+        .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId))).limit(1);
+      if (!r) { notFound(res, "Risk not found in this tenant"); return; }
+    }
+    if (vendorId) {
+      const [v] = await db.select({ id: vendorsTable.id }).from(vendorsTable)
+        .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId))).limit(1);
+      if (!v) { notFound(res, "Vendor not found in this tenant"); return; }
     }
 
     const [updated] = await db.update(findingsTable).set({

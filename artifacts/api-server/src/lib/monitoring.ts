@@ -2,7 +2,7 @@ import { db, alertsTable, krisTable, reviewCyclesTable, documentsTable, controlT
 import { eq, and, sql, lt, inArray } from "drizzle-orm";
 import { recordAuditDirect } from "./audit";
 
-const ESCALATION_WINDOW_MS = 4 * 60 * 60 * 1000;
+const ESCALATION_WINDOW_MS = Number(process.env.ESCALATION_WINDOW_HOURS || "4") * 60 * 60 * 1000;
 
 async function getTenantIds(): Promise<string[]> {
   const rows = await db.selectDistinct({ tenantId: krisTable.tenantId }).from(krisTable);
