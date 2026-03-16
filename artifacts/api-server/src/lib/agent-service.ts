@@ -582,8 +582,10 @@ async function act(
       findingStatus = "pending_review";
       storedAction = finding.proposedAction || null;
     } else {
-      findingStatus = "actioned";
       storedAction = finding.proposedAction || null;
+      const actionType = storedAction ? String(storedAction.type || "") : "";
+      const isAutoExecutable = actionType === "create_alert" || actionType === "create_review_flag";
+      findingStatus = isAutoExecutable || finding.severity === "high" || finding.severity === "critical" ? "actioned" : "pending_review";
     }
 
     const [saved] = await db.insert(agentFindingsTable).values({
@@ -662,7 +664,11 @@ async function act(
   return savedCount;
 }
 
-export async function runAgentCycle(tenantId: string, policyTier: "observe" | "advisory" | "active" = "observe"): Promise<string> {
+export async function runAgentCycle(
+  tenantId: string,
+  policyTier: "observe" | "advisory" | "active" = "observe",
+  scheduleInfo?: { schedule?: string; triggeredBy?: "scheduler" | "manual" },
+): Promise<string> {
   const startTime = Date.now();
 
   const [run] = await db.insert(agentRunsTable).values({
@@ -796,6 +802,8 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
         localFindings: localFindings.length,
         llmFindings: llmFindings.length,
         llmAvailable: available,
+        schedule: scheduleInfo?.schedule || null,
+        triggeredBy: scheduleInfo?.triggeredBy || "manual",
       },
     }).where(eq(agentRunsTable.id, run.id));
 
@@ -804,6 +812,7 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
       findingCount: savedCount,
       durationMs,
       llmAvailable: available,
+      triggeredBy: scheduleInfo?.triggeredBy || "manual",
     });
 
     console.log(`[Agent] Run ${run.id} completed for tenant ${tenantId}: ${savedCount} findings in ${durationMs}ms`);

@@ -71,7 +71,7 @@ async function checkAndRunTenants(): Promise<void> {
 
       try {
         lastRunTimestamps.set(tenant.id, Date.now());
-        await runAgentCycle(tenant.id, policyTier);
+        await runAgentCycle(tenant.id, policyTier, { schedule, triggeredBy: "scheduler" });
       } catch (err) {
         console.error(`[Agent Scheduler] Error for tenant ${tenant.id}:`, err instanceof Error ? err.message : err);
       }

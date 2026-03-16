@@ -112,7 +112,7 @@ router.post("/v1/agent/runs", requireRole("admin"), async (req: Request, res: Re
 
     await recordAudit(req, "agent_run_triggered", "agent_run", undefined, { policyTier, manual: true });
 
-    const runId = await runAgentCycle(tenantId, policyTier);
+    const runId = await runAgentCycle(tenantId, policyTier, { triggeredBy: "manual" });
 
     const [run] = await db.select().from(agentRunsTable)
       .where(eq(agentRunsTable.id, runId)).limit(1);
