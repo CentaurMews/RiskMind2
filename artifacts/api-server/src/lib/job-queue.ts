@@ -39,10 +39,10 @@ async function claimAndProcessJob(queue: string, handler: JobHandler): Promise<b
     await client.query("BEGIN");
 
     const claimResult = await client.query(
-      `UPDATE jobs SET status = 'processing', started_at = NOW(), attempts = attempts + 1
+      `UPDATE jobs SET job_status = 'processing', started_at = NOW(), attempts = attempts + 1
        WHERE id = (
          SELECT id FROM jobs
-         WHERE queue = $1 AND status = 'pending' AND scheduled_at <= NOW()
+         WHERE queue = $1 AND job_status = 'pending' AND scheduled_at <= NOW()
          ORDER BY scheduled_at ASC
          LIMIT 1
          FOR UPDATE SKIP LOCKED

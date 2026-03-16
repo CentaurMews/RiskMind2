@@ -8,6 +8,8 @@ import signalsRouter from "./signals";
 import findingsRouter from "./findings";
 import alertsRouter from "./alerts";
 import aiEnrichmentRouter from "./ai-enrichment";
+import settingsRouter from "./settings";
+import interviewsRouter from "./interviews";
 import foresightRouter from "./foresight";
 import { authMiddleware } from "../middlewares/auth";
 
@@ -29,6 +31,8 @@ router.use(signalsRouter);
 router.use(findingsRouter);
 router.use(alertsRouter);
 router.use(aiEnrichmentRouter);
+router.use(settingsRouter);
+router.use(interviewsRouter);
 router.use(foresightRouter);
 
 export default router;

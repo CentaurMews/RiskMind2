@@ -50,6 +50,10 @@ tags:
     description: MCP (Model Context Protocol) Streamable HTTP endpoint for AI agent integrations
   - name: foresight
     description: Foresight features (not yet implemented)
+  - name: settings
+    description: LLM provider configuration and platform settings
+  - name: interviews
+    description: AI-powered interview sessions for risk creation and control assessment
 paths:
   /v1/health:
     get:
@@ -1593,6 +1597,361 @@ paths:
         "501":
           description: Not implemented
 
+  /v1/settings/llm-providers:
+    get:
+      operationId: listLlmProviders
+      tags: [settings]
+      summary: List LLM provider configurations
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of LLM provider configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LlmProvider"
+    post:
+      operationId: createLlmProvider
+      tags: [settings]
+      summary: Create a new LLM provider configuration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLlmProvider"
+      responses:
+        "201":
+          description: Created LLM provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmProvider"
+
+  /v1/settings/llm-providers/{id}:
+    get:
+      operationId: getLlmProvider
+      tags: [settings]
+      summary: Get LLM provider by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: LLM provider configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmProvider"
+        "404":
+          description: Not found
+    put:
+      operationId: updateLlmProvider
+      tags: [settings]
+      summary: Update LLM provider configuration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLlmProvider"
+      responses:
+        "200":
+          description: Updated LLM provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmProvider"
+    delete:
+      operationId: deleteLlmProvider
+      tags: [settings]
+      summary: Delete LLM provider configuration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+
+  /v1/settings/llm-providers/{id}/test:
+    post:
+      operationId: testLlmProvider
+      tags: [settings]
+      summary: Test LLM provider connection
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  latencyMs:
+                    type: number
+
+  /v1/interviews:
+    post:
+      operationId: startInterview
+      tags: [interviews]
+      summary: Start a new AI interview session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [risk_creation, control_assessment]
+      responses:
+        "201":
+          description: Interview session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewSession"
+
+  /v1/interviews/{id}:
+    get:
+      operationId: getInterview
+      tags: [interviews]
+      summary: Get interview session by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Interview session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewSession"
+
+  /v1/interviews/{id}/message:
+    post:
+      operationId: sendInterviewMessage
+      tags: [interviews]
+      summary: Send a message in an interview session (SSE streaming response)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        "200":
+          description: SSE stream of AI response chunks
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /v1/interviews/{id}/commit:
+    post:
+      operationId: commitInterview
+      tags: [interviews]
+      summary: Commit interview draft data to create a record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Committed result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  resultId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  type:
+                    type: string
+
+  /v1/interviews/{id}/abandon:
+    post:
+      operationId: abandonInterview
+      tags: [interviews]
+      summary: Abandon an active interview session
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Abandoned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+
+  /v1/risks/{riskId}/treatment-suggestions:
+    post:
+      operationId: getTreatmentSuggestions
+      tags: [interviews]
+      summary: Get AI-generated treatment suggestions for a risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: riskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Treatment suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  riskId:
+                    type: string
+                    format: uuid
+                  treatments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        description:
+                          type: string
+                        effort:
+                          type: string
+                        riskReduction:
+                          type: number
+
+  /v1/compliance/gap-remediation:
+    post:
+      operationId: getGapRemediation
+      tags: [interviews]
+      summary: Get AI-generated gap remediation steps
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gaps]
+              properties:
+                frameworkId:
+                  type: string
+                gaps:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Remediation suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  frameworkId:
+                    type: string
+                  remediations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gap:
+                          type: string
+                        priority:
+                          type: string
+                        steps:
+                          type: string
+                        effortDays:
+                          type: number
+                        suggestedControls:
+                          type: array
+                          items:
+                            type: string
+
   /mcp:
     post:
       operationId: mcpStreamableHttp
@@ -3081,3 +3440,131 @@ components:
           type: string
         message:
           type: string
+
+    LlmProviderType:
+      type: string
+      enum: [openai_compat, anthropic]
+
+    LlmUseCase:
+      type: string
+      enum: [general, embeddings]
+
+    LlmProvider:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        providerType:
+          $ref: "#/components/schemas/LlmProviderType"
+        baseUrl:
+          type: string
+          nullable: true
+        model:
+          type: string
+        isDefault:
+          type: boolean
+        useCase:
+          $ref: "#/components/schemas/LlmUseCase"
+        isActive:
+          type: boolean
+        hasApiKey:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateLlmProvider:
+      type: object
+      required: [name, providerType, model]
+      properties:
+        name:
+          type: string
+        providerType:
+          $ref: "#/components/schemas/LlmProviderType"
+        baseUrl:
+          type: string
+        apiKey:
+          type: string
+        model:
+          type: string
+        isDefault:
+          type: boolean
+        useCase:
+          $ref: "#/components/schemas/LlmUseCase"
+
+    UpdateLlmProvider:
+      type: object
+      properties:
+        name:
+          type: string
+        providerType:
+          $ref: "#/components/schemas/LlmProviderType"
+        baseUrl:
+          type: string
+        apiKey:
+          type: string
+        model:
+          type: string
+        isDefault:
+          type: boolean
+        useCase:
+          $ref: "#/components/schemas/LlmUseCase"
+        isActive:
+          type: boolean
+
+    InterviewType:
+      type: string
+      enum: [risk_creation, control_assessment]
+
+    InterviewStatus:
+      type: string
+      enum: [active, committed, abandoned]
+
+    InterviewSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        type:
+          $ref: "#/components/schemas/InterviewType"
+        status:
+          $ref: "#/components/schemas/InterviewStatus"
+        transcript:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+              timestamp:
+                type: string
+        draftData:
+          type: object
+        resultId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

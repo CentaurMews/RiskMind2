@@ -67,6 +67,8 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - **control_tests** — Control test results with evidence
 - **alerts** — System alerts with severity and acknowledgement
 - **jobs** — Async job queue (status, retries, exponential backoff, dead-letter)
+- **llm_configs** — Multi-provider LLM configurations per tenant (openai_compat/anthropic, AES-256-GCM encrypted API keys, model, default flag, use_case)
+- **interview_sessions** — AI interview sessions (risk_creation/control_assessment, transcript, draft data, commit/abandon lifecycle)
 
 ### pgvector
 - Extension provisioned via `lib/db/src/bootstrap.ts` (runs before drizzle-kit push)
@@ -170,6 +172,25 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - `POST /api/v1/vendors/:vendorId/documents/:documentId/summarize` — Queue AI document summarization (returns 202 + jobId)
 - `GET /api/v1/jobs/:id` — Get async job status
 
+### Settings (LLM Provider Configuration)
+- `GET /api/v1/settings/llm-providers` — List LLM provider configs (admin only)
+- `GET /api/v1/settings/llm-providers/:id` — Get LLM provider by ID
+- `POST /api/v1/settings/llm-providers` — Create LLM provider (name, providerType, apiKey, model, isDefault, useCase)
+- `PUT /api/v1/settings/llm-providers/:id` — Update LLM provider
+- `DELETE /api/v1/settings/llm-providers/:id` — Delete LLM provider
+- `POST /api/v1/settings/llm-providers/:id/test` — Test LLM provider connection
+
+### AI Interview Sessions
+- `POST /api/v1/interviews` — Start AI interview (type: risk_creation | control_assessment)
+- `GET /api/v1/interviews/:id` — Get interview session
+- `POST /api/v1/interviews/:id/message` — Send message (SSE streaming response)
+- `POST /api/v1/interviews/:id/commit` — Commit draft to create risk/control record
+- `POST /api/v1/interviews/:id/abandon` — Abandon interview session
+
+### AI-Powered Suggestions
+- `POST /api/v1/risks/:riskId/treatment-suggestions` — Get AI-generated treatment suggestions
+- `POST /api/v1/compliance/gap-remediation` — Get AI-generated gap remediation steps
+
 ### Foresight (Stubs — 501 Not Implemented)
 - `GET /api/v1/foresight/simulations` — List simulations
 - `POST /api/v1/foresight/simulations` — Create simulation
@@ -194,8 +215,18 @@ PostgreSQL-backed job queue (no Redis dependency) with:
 - Exponential backoff retries (1s, 2s, 4s... up to 60s)
 - Dead-letter queue (jobs exceeding maxAttempts move to "dead" status)
 - Three registered workers: ai-triage, ai-enrich, doc-process
-- LiteLLM integration for AI classification/enrichment (graceful fallback when unavailable)
+- LLMService integration (multi-provider: OpenAI-compatible + Anthropic) for AI classification/enrichment
+- Graceful fallback when no LLM provider is configured (manual mode)
 - Job polling every 5 seconds
+
+## LLM Service Architecture
+
+- **Multi-provider**: OpenAI SDK (`openai` package) for openai_compat providers, Anthropic SDK (`@anthropic-ai/sdk`) for Anthropic
+- **Tenant-scoped**: Each tenant configures their own LLM providers via Settings API
+- **Encrypted keys**: API keys stored with AES-256-GCM encryption (ENCRYPTION_KEY env var, 32-byte base64)
+- **Auto-routing**: LLMService resolves tenant's default config, builds appropriate client, routes calls
+- **Streaming**: SSE streaming support for interview message responses
+- **Graceful degradation**: All AI features return helpful errors when no provider is configured
 
 ## Monitoring Scheduler
 

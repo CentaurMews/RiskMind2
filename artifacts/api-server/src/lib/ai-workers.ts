@@ -1,35 +1,7 @@
 import { db, signalsTable, risksTable, documentsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { registerWorker, enqueueJob } from "./job-queue";
-
-const LITELLM_BASE_URL = process.env.LITELLM_BASE_URL;
-const LITELLM_API_KEY = process.env.LITELLM_API_KEY;
-
-function isLiteLLMAvailable(): boolean {
-  return !!(LITELLM_BASE_URL && LITELLM_API_KEY);
-}
-
-async function callLiteLLM(messages: Array<{ role: string; content: string }>, model = "gpt-4o-mini"): Promise<string> {
-  if (!LITELLM_BASE_URL || !LITELLM_API_KEY) {
-    throw new Error("LiteLLM not configured");
-  }
-
-  const resp = await fetch(`${LITELLM_BASE_URL}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${LITELLM_API_KEY}`,
-    },
-    body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: 1024 }),
-  });
-
-  if (!resp.ok) {
-    throw new Error(`LiteLLM API error: ${resp.status} ${resp.statusText}`);
-  }
-
-  const data = await resp.json() as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0]?.message?.content || "";
-}
+import { complete, isAvailable, LLMUnavailableError } from "./llm-service";
 
 async function findSimilarRisks(embedding: number[], tenantId: string, threshold = 0.8) {
   if (!embedding.length) return [];
@@ -47,6 +19,10 @@ async function findSimilarRisks(embedding: number[], tenantId: string, threshold
   return results;
 }
 
+async function callLLM(tenantId: string, messages: Array<{ role: "system" | "user" | "assistant"; content: string }>): Promise<string> {
+  return complete(tenantId, { messages, temperature: 0.3, maxTokens: 1024 });
+}
+
 export function registerAIWorkers() {
   registerWorker("ai-triage", async (job) => {
     const { signalId } = job.payload as { signalId: string };
@@ -57,13 +33,15 @@ export function registerAIWorkers() {
     if (!signal) return { status: "not_found" };
     if (signal.status !== "pending") return { status: "already_processed" };
 
-    if (!isLiteLLMAvailable()) {
-      console.log(`[AI Triage] LiteLLM unavailable, signal ${signalId} stays pending for manual triage`);
-      return { status: "manual_fallback", reason: "LiteLLM not configured" };
+    const tenantId = signal.tenantId;
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      console.log(`[AI Triage] LLM unavailable for tenant, signal ${signalId} stays pending for manual triage`);
+      return { status: "manual_fallback", reason: "No LLM provider configured" };
     }
 
     try {
-      const response = await callLiteLLM([
+      const response = await callLLM(tenantId, [
         {
           role: "system",
           content: "You are a risk management signal classifier. Given a signal, classify it into one of: cyber_threat, compliance_violation, vendor_risk, operational_risk, financial_risk, reputational_risk, other. Also provide a confidence score between 0.0 and 1.0. Respond in JSON: {\"classification\": \"...\", \"confidence\": 0.0}",
@@ -79,7 +57,7 @@ export function registerAIWorkers() {
         classification = parsed.classification || "other";
         confidence = Number(parsed.confidence) || 0.5;
       } catch {
-        console.warn(`[AI Triage] Failed to parse LiteLLM response for signal ${signalId}`);
+        console.warn(`[AI Triage] Failed to parse LLM response for signal ${signalId}`);
       }
 
       await db.update(signalsTable).set({
@@ -107,6 +85,9 @@ export function registerAIWorkers() {
 
       return { status: "triaged", classification, confidence, correlatedRisks };
     } catch (err) {
+      if (err instanceof LLMUnavailableError) {
+        return { status: "manual_fallback", reason: err.message };
+      }
       console.error(`[AI Triage] Error processing signal ${signalId}:`, err);
       return { status: "manual_fallback", reason: "AI classification failed" };
     }
@@ -120,12 +101,14 @@ export function registerAIWorkers() {
 
     if (!risk) return { status: "not_found" };
 
-    if (!isLiteLLMAvailable()) {
-      return { status: "unavailable", reason: "LiteLLM not configured" };
+    const tenantId = risk.tenantId;
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      return { status: "unavailable", reason: "No LLM provider configured" };
     }
 
     try {
-      const response = await callLiteLLM([
+      const response = await callLLM(tenantId, [
         {
           role: "system",
           content: "You are a risk management expert. Given a risk title and description, provide an enriched description with: 1) potential impact analysis, 2) suggested mitigation strategies, 3) related industry standards or frameworks. Keep it concise (max 500 words).",
@@ -158,16 +141,18 @@ export function registerAIWorkers() {
       updatedAt: new Date(),
     }).where(eq(documentsTable.id, documentId));
 
-    if (!isLiteLLMAvailable()) {
+    const tenantId = doc.tenantId;
+    const available = await isAvailable(tenantId);
+    if (!available) {
       await db.update(documentsTable).set({
         status: "uploaded",
         updatedAt: new Date(),
       }).where(eq(documentsTable.id, documentId));
-      return { status: "unavailable", reason: "LiteLLM not configured" };
+      return { status: "unavailable", reason: "No LLM provider configured" };
     }
 
     try {
-      const response = await callLiteLLM([
+      const response = await callLLM(tenantId, [
         {
           role: "system",
           content: "You are a document analyst for vendor risk management. Summarize the key points, risks, and compliance-relevant information from this document metadata. Provide a structured summary.",
