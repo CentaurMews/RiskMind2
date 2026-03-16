@@ -4,7 +4,8 @@ import { useLogin } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TriangleAlert, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import logo from "@assets/risk_mind_1773670829732.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -41,7 +42,7 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-br from-sidebar-accent/50 to-sidebar pointer-events-none" />
         <div className="relative z-10 max-w-lg">
           <div className="flex items-center mb-8">
-            <TriangleAlert className="h-10 w-10 mr-3 text-white" />
+            <img src={logo} alt="RiskMind" className="h-10 w-10 mr-3 invert" />
             <span className="font-bold text-3xl tracking-tight">RiskMind</span>
           </div>
           <h1 className="text-4xl font-bold mb-4 tracking-tight">Enterprise Risk Intelligence.</h1>
@@ -55,7 +56,7 @@ export default function Login() {
       <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-24">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 lg:hidden flex items-center justify-center">
-            <TriangleAlert className="h-8 w-8 mr-2" />
+            <img src={logo} alt="RiskMind" className="h-8 w-8 mr-2" />
             <span className="font-bold text-2xl tracking-tight">RiskMind</span>
           </div>
           

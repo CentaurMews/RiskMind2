@@ -3,8 +3,9 @@ import { Link, useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
 import { 
   LayoutDashboard, ShieldAlert, Users, ShieldCheck, 
-  Bell, Settings, LogOut, Loader2, Menu, ChevronRight, Activity, Binoculars, TriangleAlert, PanelLeftClose, PanelLeft
+  Bell, Settings, LogOut, Loader2, Menu, ChevronRight, Activity, Binoculars, PanelLeftClose, PanelLeft
 } from "lucide-react";
+import logo from "@assets/risk_mind_1773670829732.png";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -99,7 +100,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="flex items-center h-14 px-4 border-b border-sidebar-border shrink-0 justify-between">
           {(!isCollapsed || isMobileOpen) && (
             <>
-              <TriangleAlert className="h-5 w-5 mr-2 text-white shrink-0" />
+              <img src={logo} alt="RiskMind" className="h-5 w-5 mr-2 invert shrink-0" />
               <span className="font-bold text-lg tracking-tight flex-1">RiskMind</span>
             </>
           )}
@@ -111,7 +112,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             {isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
           {isCollapsed && !isMobileOpen && (
-            <TriangleAlert className="h-5 w-5 text-white mx-auto" />
+            <img src={logo} alt="RiskMind" className="h-5 w-5 invert mx-auto" />
           )}
         </div>
 
