@@ -47,16 +47,6 @@ export async function handleMcpRequest(req: Request, res: Response) {
   try {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
-    if (req.method === "DELETE") {
-      if (sessionId && sessions.has(sessionId)) {
-        const session = sessions.get(sessionId)!;
-        await session.transport.close();
-        sessions.delete(sessionId);
-      }
-      res.status(200).end();
-      return;
-    }
-
     const auth = extractAuth(req);
     if (!auth) {
       res.status(401).json({
@@ -65,6 +55,16 @@ export async function handleMcpRequest(req: Request, res: Response) {
         status: 401,
         detail: "Missing or invalid Authorization header. JWT Bearer token required for all MCP requests.",
       });
+      return;
+    }
+
+    if (req.method === "DELETE") {
+      if (sessionId && sessions.has(sessionId)) {
+        const session = sessions.get(sessionId)!;
+        await session.transport.close();
+        sessions.delete(sessionId);
+      }
+      res.status(200).end();
       return;
     }
 

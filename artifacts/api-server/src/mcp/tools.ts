@@ -12,10 +12,34 @@ import {
   frameworkRequirementsTable,
   controlRequirementMapsTable,
 } from "@workspace/db";
+import {
+  ListRisksQueryParams,
+  CreateRiskBody,
+  UpdateRiskBody,
+  ListVendorsQueryParams,
+  CreateVendorBody,
+  ListControlsQueryParams,
+  CreateControlBody,
+} from "@workspace/api-zod";
 import { recordAuditDirect } from "../lib/audit";
 import { getMcpAuthBySessionId, type McpAuthContext } from "./handler";
 
-function rfc7807(status: number, title: string, detail: string) {
+function rfc7807(status: number, title: string, detail: string, auditCtx?: { tenantId: string; userId: string; tool: string }) {
+  if (auditCtx) {
+    audit(auditCtx.tenantId, auditCtx.userId, `mcp_denied`, auditCtx.tool, undefined, { status, title, detail }).catch(() => {});
+  }
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify({
+      type: `https://riskmind.app/errors/${title.toLowerCase().replace(/\s+/g, "-")}`,
+      title,
+      status,
+      detail,
+    }) }],
+    isError: true,
+  };
+}
+
+function authError(status: number, title: string, detail: string) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify({
       type: `https://riskmind.app/errors/${title.toLowerCase().replace(/\s+/g, "-")}`,
@@ -43,16 +67,10 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "list_risks",
     "List risks in the risk register with optional filters for status, category, and search",
-    {
-      status: z.enum(["draft", "open", "mitigated", "accepted", "closed"]).optional(),
-      category: z.enum(["operational", "financial", "compliance", "strategic", "technology", "reputational"]).optional(),
-      search: z.string().optional(),
-      page: z.number().int().min(1).default(1),
-      limit: z.number().int().min(1).max(100).default(20),
-    },
+    ListRisksQueryParams.pick({ status: true, category: true, search: true, page: true, limit: true }).shape,
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(risksTable.tenantId, user.tenantId)];
       if (args.status) conditions.push(eq(risksTable.status, args.status));
@@ -73,17 +91,10 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "create_risk",
     "Create a new risk entry in the risk register",
-    {
-      title: z.string().min(1),
-      description: z.string().optional(),
-      category: z.enum(["operational", "financial", "compliance", "strategic", "technology", "reputational"]),
-      likelihood: z.number().int().min(1).max(5),
-      impact: z.number().int().min(1).max(5),
-      status: z.enum(["draft", "open", "mitigated", "accepted", "closed"]).default("draft"),
-    },
+    CreateRiskBody.extend({ likelihood: z.number().int().min(1).max(5), impact: z.number().int().min(1).max(5) }).shape,
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
       const [risk] = await db.insert(risksTable).values({
@@ -105,18 +116,14 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "update_risk",
     "Update an existing risk entry",
-    {
+    UpdateRiskBody.extend({
       riskId: z.string().uuid(),
-      title: z.string().optional(),
-      description: z.string().optional(),
-      category: z.enum(["operational", "financial", "compliance", "strategic", "technology", "reputational"]).optional(),
       likelihood: z.number().int().min(1).max(5).optional(),
       impact: z.number().int().min(1).max(5).optional(),
-      status: z.enum(["draft", "open", "mitigated", "accepted", "closed"]).optional(),
-    },
+    }).shape,
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
       const { riskId, ...updates } = args;
@@ -140,15 +147,10 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "list_vendors",
     "List third-party vendors with optional status filter",
-    {
-      status: z.enum(["onboarding", "approved", "active", "suspended", "offboarded"]).optional(),
-      search: z.string().optional(),
-      page: z.number().int().min(1).default(1),
-      limit: z.number().int().min(1).max(100).default(20),
-    },
+    ListVendorsQueryParams.pick({ status: true, search: true, page: true, limit: true }).shape,
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(vendorsTable.tenantId, user.tenantId)];
       if (args.status) conditions.push(eq(vendorsTable.status, args.status));
@@ -168,17 +170,10 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "create_vendor",
     "Register a new third-party vendor",
-    {
-      name: z.string().min(1),
-      description: z.string().optional(),
-      category: z.string().optional(),
-      tier: z.enum(["critical", "high", "medium", "low"]),
-      contactName: z.string().optional(),
-      contactEmail: z.string().email().optional(),
-    },
+    CreateVendorBody.shape,
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
       const [vendor] = await db.insert(vendorsTable).values({
@@ -208,7 +203,7 @@ export function registerMcpTools(mcp: McpServer) {
     },
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(signalsTable.tenantId, user.tenantId)];
       if (args.status) conditions.push(eq(signalsTable.status, args.status));
@@ -234,7 +229,7 @@ export function registerMcpTools(mcp: McpServer) {
     },
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager", "auditor")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
       const [signal] = await db.select().from(signalsTable)
@@ -263,7 +258,7 @@ export function registerMcpTools(mcp: McpServer) {
     },
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(alertsTable.tenantId, user.tenantId)];
       if (args.severity) conditions.push(eq(alertsTable.severity, args.severity));
@@ -289,7 +284,7 @@ export function registerMcpTools(mcp: McpServer) {
     },
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager", "auditor")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
       const [alert] = await db.select().from(alertsTable)
@@ -317,7 +312,7 @@ export function registerMcpTools(mcp: McpServer) {
     },
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
 
       const [framework] = await db.select().from(frameworksTable)
         .where(and(eq(frameworksTable.id, args.frameworkId), eq(frameworksTable.tenantId, user.tenantId))).limit(1);
@@ -357,7 +352,7 @@ export function registerMcpTools(mcp: McpServer) {
     },
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
 
       const [framework] = await db.select().from(frameworksTable)
         .where(and(eq(frameworksTable.id, args.frameworkId), eq(frameworksTable.tenantId, user.tenantId))).limit(1);
@@ -388,15 +383,10 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "list_controls",
     "List compliance controls with optional status filter",
-    {
-      status: z.enum(["active", "inactive", "planned"]).optional(),
-      search: z.string().optional(),
-      page: z.number().int().min(1).default(1),
-      limit: z.number().int().min(1).max(100).default(20),
-    },
+    ListControlsQueryParams.extend({ search: z.string().optional() }).shape,
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
 
       const conditions = [eq(controlsTable.tenantId, user.tenantId)];
       if (args.status) conditions.push(eq(controlsTable.status, args.status));
@@ -416,15 +406,10 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "create_control",
     "Create a new compliance control",
-    {
-      title: z.string().min(1),
-      description: z.string().optional(),
-      status: z.enum(["active", "inactive", "planned"]).default("planned"),
-      ownerId: z.string().uuid().optional(),
-    },
+    CreateControlBody.omit({ requirementIds: true }).shape,
     async (args, extra) => {
       const user = getAuth(extra);
-      if (!user) return rfc7807(401, "Unauthorized", "Authentication required");
+      if (!user) return authError(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
 
       const [control] = await db.insert(controlsTable).values({
