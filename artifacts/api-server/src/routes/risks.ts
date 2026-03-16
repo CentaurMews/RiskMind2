@@ -64,6 +64,8 @@ router.get("/v1/risks", async (req, res) => {
           impact: risksTable.impact,
           residualLikelihood: risksTable.residualLikelihood,
           residualImpact: risksTable.residualImpact,
+          targetLikelihood: risksTable.targetLikelihood,
+          targetImpact: risksTable.targetImpact,
           createdAt: risksTable.createdAt,
           updatedAt: risksTable.updatedAt,
         })
@@ -128,6 +130,8 @@ router.get("/v1/risks/:id", async (req, res) => {
         impact: risksTable.impact,
         residualLikelihood: risksTable.residualLikelihood,
         residualImpact: risksTable.residualImpact,
+        targetLikelihood: risksTable.targetLikelihood,
+        targetImpact: risksTable.targetImpact,
         createdAt: risksTable.createdAt,
         updatedAt: risksTable.updatedAt,
       })
@@ -212,7 +216,7 @@ router.get("/v1/risks/:riskId/sources", async (req, res) => {
 
 router.put("/v1/risks/:id", requireRole("admin", "risk_manager", "risk_owner"), async (req, res) => {
   try {
-    const { title, description, category, status, ownerId, likelihood, impact, residualLikelihood, residualImpact } = req.body;
+    const { title, description, category, status, ownerId, likelihood, impact, residualLikelihood, residualImpact, targetLikelihood, targetImpact } = req.body;
     const [risk] = await db
       .update(risksTable)
       .set({
@@ -225,6 +229,8 @@ router.put("/v1/risks/:id", requireRole("admin", "risk_manager", "risk_owner"), 
         ...(impact !== undefined && { impact }),
         ...(residualLikelihood !== undefined && { residualLikelihood }),
         ...(residualImpact !== undefined && { residualImpact }),
+        ...(targetLikelihood !== undefined && { targetLikelihood }),
+        ...(targetImpact !== undefined && { targetImpact }),
         updatedAt: new Date(),
       })
       .where(and(eq(risksTable.id, p(req, "id")), eq(risksTable.tenantId, req.user!.tenantId)))

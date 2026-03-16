@@ -18,4 +18,6 @@ export interface UpdateRiskRequest {
   impact?: number;
   residualLikelihood?: number;
   residualImpact?: number;
+  targetLikelihood?: number;
+  targetImpact?: number;
 }

@@ -140,6 +140,8 @@ export interface Risk {
   impact?: number;
   residualLikelihood?: number | null;
   residualImpact?: number | null;
+  targetLikelihood?: number | null;
+  targetImpact?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -199,6 +201,8 @@ export interface UpdateRiskRequest {
   impact?: number;
   residualLikelihood?: number;
   residualImpact?: number;
+  targetLikelihood?: number;
+  targetImpact?: number;
 }
 
 export interface RiskListResponse {
@@ -1227,6 +1231,58 @@ export type CommitInterview200 = {
 
 export type AbandonInterview200 = {
   status?: string;
+};
+
+export type AiScoreSuggestions200Inherent = {
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  likelihood?: number;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  impact?: number;
+};
+
+export type AiScoreSuggestions200Residual = {
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  likelihood?: number;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  impact?: number;
+};
+
+export type AiScoreSuggestions200Target = {
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  likelihood?: number;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  impact?: number;
+};
+
+export type AiScoreSuggestions200 = {
+  riskId?: string;
+  inherent?: AiScoreSuggestions200Inherent;
+  residual?: AiScoreSuggestions200Residual;
+  target?: AiScoreSuggestions200Target;
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
+  confidence?: number;
+  rationale?: string;
 };
 
 export type SuggestTreatments200TreatmentsItem = {

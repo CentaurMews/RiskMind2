@@ -33,6 +33,8 @@ export const risksTable = pgTable("risks", {
   impact: integer("impact").notNull().default(1),
   residualLikelihood: integer("residual_likelihood"),
   residualImpact: integer("residual_impact"),
+  targetLikelihood: integer("target_likelihood"),
+  targetImpact: integer("target_impact"),
   embedding: vector("embedding", { dimensions: 1536 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

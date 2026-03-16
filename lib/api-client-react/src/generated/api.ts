@@ -23,6 +23,7 @@ import type {
   AgentRun,
   AiGapRemediation200,
   AiGapRemediationBody,
+  AiScoreSuggestions200,
   Alert,
   AlertListResponse,
   AlertSummary,
@@ -7735,6 +7736,90 @@ export const useAiEnrichRisk = <
   TContext
 > => {
   return useMutation(getAiEnrichRiskMutationOptions(options));
+};
+
+/**
+ * @summary Get AI-generated score suggestions for inherent, residual, and target risk scores
+ */
+export const getAiScoreSuggestionsUrl = (id: string) => {
+  return `/api/v1/risks/${id}/ai/score-suggestions`;
+};
+
+export const aiScoreSuggestions = async (
+  id: string,
+  options?: RequestInit,
+): Promise<AiScoreSuggestions200> => {
+  return customFetch<AiScoreSuggestions200>(getAiScoreSuggestionsUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAiScoreSuggestionsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiScoreSuggestions>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiScoreSuggestions>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["aiScoreSuggestions"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiScoreSuggestions>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiScoreSuggestions(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiScoreSuggestionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiScoreSuggestions>>
+>;
+
+export type AiScoreSuggestionsMutationError = ErrorType<void>;
+
+/**
+ * @summary Get AI-generated score suggestions for inherent, residual, and target risk scores
+ */
+export const useAiScoreSuggestions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiScoreSuggestions>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof aiScoreSuggestions>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getAiScoreSuggestionsMutationOptions(options));
 };
 
 /**
