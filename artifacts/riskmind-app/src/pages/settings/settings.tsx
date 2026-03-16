@@ -20,7 +20,7 @@ const ROLES: { value: UpdateUserRoleBodyRole; label: string }[] = [
 ];
 
 export default function Settings() {
-  const { data: user } = useGetMe();
+  const { data: user, isLoading: userLoading } = useGetMe();
   const { data: providers, isLoading: providersLoading } = useListLlmProviders();
   const { data: agentConfig, isLoading: agentLoading } = useGetAgentConfig();
   const { data: usersList, isLoading: usersLoading } = useListUsers({ query: { queryKey: ["/api/v1/users"], retry: false } });
@@ -33,6 +33,14 @@ export default function Settings() {
       },
     },
   });
+
+  if (userLoading) {
+    return (
+      <AppLayout>
+        <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
+      </AppLayout>
+    );
+  }
 
   if (user?.role !== 'admin') {
     return (
