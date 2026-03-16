@@ -285,28 +285,39 @@ async function detectClusters(tenantId: string): Promise<Finding[]> {
         WHERE tenant_id = ${tenantId} AND embedding IS NOT NULL
       ),
       signal_embeddings AS (
-        SELECT id, content, classification, embedding
+        SELECT id, content AS label, classification AS source_type, 'signal' AS entity_type, embedding
         FROM signals
         WHERE tenant_id = ${tenantId} AND embedding IS NOT NULL
           AND created_at > now() - interval '30 days'
       ),
+      vendor_embeddings AS (
+        SELECT id, name AS label, category AS source_type, 'vendor' AS entity_type, embedding
+        FROM vendors
+        WHERE tenant_id = ${tenantId} AND embedding IS NOT NULL
+      ),
+      all_sources AS (
+        SELECT * FROM signal_embeddings
+        UNION ALL
+        SELECT * FROM vendor_embeddings
+      ),
       similarities AS (
         SELECT
           r.id AS risk_id, r.title AS risk_title, r.category,
-          s.id AS signal_id, s.content AS signal_content, s.classification,
+          s.id AS source_id, s.label AS source_label, s.source_type, s.entity_type,
           1 - (r.embedding <=> s.embedding) AS similarity
         FROM risk_embeddings r
-        CROSS JOIN signal_embeddings s
+        CROSS JOIN all_sources s
         WHERE 1 - (r.embedding <=> s.embedding) > 0.75
       )
       SELECT risk_id, risk_title, category,
         json_agg(json_build_object(
-          'signalId', signal_id,
-          'content', LEFT(signal_content, 200),
-          'classification', classification,
+          'sourceId', source_id,
+          'label', LEFT(source_label, 200),
+          'sourceType', source_type,
+          'entityType', entity_type,
           'similarity', ROUND(similarity::numeric, 3)
-        ) ORDER BY similarity DESC) AS related_signals,
-        COUNT(*) AS signal_count
+        ) ORDER BY similarity DESC) AS related_sources,
+        COUNT(*) AS source_count
       FROM similarities
       GROUP BY risk_id, risk_title, category
       HAVING COUNT(*) >= 2
@@ -315,27 +326,30 @@ async function detectClusters(tenantId: string): Promise<Finding[]> {
     `);
 
     for (const row of clusters.rows as Array<Record<string, unknown>>) {
-      const signals = row.related_signals as Array<Record<string, unknown>>;
+      const sources = row.related_sources as Array<Record<string, unknown>>;
       const entities: LinkedEntity[] = [
         { type: "risk", id: row.risk_id as string, label: row.risk_title as string },
-        ...signals.slice(0, 5).map(s => ({
-          type: "signal",
-          id: s.signalId as string,
-          label: (s.content as string).substring(0, 80),
+        ...sources.slice(0, 5).map(s => ({
+          type: String(s.entityType) as string,
+          id: s.sourceId as string,
+          label: (s.label as string).substring(0, 80),
         })),
       ];
 
+      const hasVendors = sources.some(s => s.entityType === "vendor");
+      const clusterLabel = hasVendors ? "risks, signals, and vendor issues" : "risks and signals";
+
       findings.push({
         type: "cluster",
-        severity: (signals.length >= 5 ? "high" : "medium") as Finding["severity"],
-        title: `Threat cluster: ${row.risk_title} — ${row.signal_count} correlated signals`,
-        narrative: `Risk "${row.risk_title}" (${row.category}) has ${row.signal_count} semantically correlated signal(s) detected in the past 30 days. These form a coherent threat cluster that may indicate an emerging risk pattern not yet explicitly linked in the data model.`,
+        severity: (sources.length >= 5 ? "high" : "medium") as Finding["severity"],
+        title: `Threat cluster: ${row.risk_title} — ${row.source_count} correlated sources`,
+        narrative: `Risk "${row.risk_title}" (${row.category}) has ${row.source_count} semantically correlated source(s) across ${clusterLabel} detected in the past 30 days. These form a coherent threat cluster that may indicate an emerging risk pattern.`,
         linkedEntities: entities,
         proposedAction: {
           type: "create_alert",
           title: `Threat cluster detected: ${row.risk_title}`,
-          severity: signals.length >= 5 ? "high" : "medium",
-          context: { riskId: row.risk_id, signalCount: row.signal_count },
+          severity: sources.length >= 5 ? "high" : "medium",
+          context: { riskId: row.risk_id, sourceCount: row.source_count },
         },
       });
     }
@@ -687,7 +701,38 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
         model = "configured";
         tokenEstimate = JSON.stringify(data).length / 4;
       } catch (err) {
-        console.error("[Agent] LLM reasoning failed, continuing with local findings:", err instanceof Error ? err.message : err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error("[Agent] LLM reasoning failed, skipping run:", errMsg);
+
+        const durationMs = Date.now() - startTime;
+        await db.update(agentRunsTable).set({
+          status: "skipped",
+          durationMs,
+          findingCount: 0,
+          completedAt: new Date(),
+          context: {
+            reason: `LLM provider unreachable: ${errMsg}`,
+            llmAvailable: false,
+            localFindingsDetected: localFindings.length,
+            observationSummary: {
+              risks: data.risks.length,
+              kris: data.kris.length,
+              vendors: data.vendors.length,
+              signals: data.signals.length,
+              alerts: data.alerts.length,
+              controls: data.controls.length,
+              unmappedRequirements: data.unmappedRequirements.length,
+            },
+          },
+        }).where(eq(agentRunsTable.id, run.id));
+
+        await recordAuditDirect(tenantId, null, "agent_run_skipped", "agent_run", run.id, {
+          policyTier,
+          reason: `LLM provider unreachable: ${errMsg}`,
+          localFindingsDetected: localFindings.length,
+        });
+
+        return run.id;
       }
     } else {
       const durationMs = Date.now() - startTime;

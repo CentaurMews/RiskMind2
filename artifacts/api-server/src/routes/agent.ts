@@ -172,9 +172,10 @@ router.post("/v1/agent/findings/:id/approve", requireRole("admin", "risk_manager
       }
     }
 
+    const actionSucceeded = !actionResult || actionResult.type !== "action_failed";
     const [updated] = await db.update(agentFindingsTable).set({
-      status: "actioned",
-      actionedAt: new Date(),
+      status: actionSucceeded ? "actioned" : "pending_review",
+      actionedAt: actionSucceeded ? new Date() : null,
       updatedAt: new Date(),
     }).where(eq(agentFindingsTable.id, findingId)).returning();
 
