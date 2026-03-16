@@ -1720,3 +1720,657 @@ export const GetJobStatusResponse = zod.object({
 export const GetSimulationParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
+
+/**
+ * @summary List LLM provider configurations
+ */
+export const ListLlmProvidersResponseItem = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  name: zod.string().optional(),
+  providerType: zod.enum(["openai_compat", "anthropic"]).optional(),
+  baseUrl: zod.string().nullish(),
+  model: zod.string().optional(),
+  isDefault: zod.boolean().optional(),
+  useCase: zod.enum(["general", "embeddings"]).optional(),
+  isActive: zod.boolean().optional(),
+  hasApiKey: zod.boolean().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+export const ListLlmProvidersResponse = zod.array(ListLlmProvidersResponseItem);
+
+/**
+ * @summary Create a new LLM provider configuration
+ */
+export const CreateLlmProviderBody = zod.object({
+  name: zod.string(),
+  providerType: zod.enum(["openai_compat", "anthropic"]),
+  baseUrl: zod.string().optional(),
+  apiKey: zod.string().optional(),
+  model: zod.string(),
+  isDefault: zod.boolean().optional(),
+  useCase: zod.enum(["general", "embeddings"]).optional(),
+});
+
+/**
+ * @summary Get LLM provider by ID
+ */
+export const GetLlmProviderParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetLlmProviderResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  name: zod.string().optional(),
+  providerType: zod.enum(["openai_compat", "anthropic"]).optional(),
+  baseUrl: zod.string().nullish(),
+  model: zod.string().optional(),
+  isDefault: zod.boolean().optional(),
+  useCase: zod.enum(["general", "embeddings"]).optional(),
+  isActive: zod.boolean().optional(),
+  hasApiKey: zod.boolean().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Update LLM provider configuration
+ */
+export const UpdateLlmProviderParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateLlmProviderBody = zod.object({
+  name: zod.string().optional(),
+  providerType: zod.enum(["openai_compat", "anthropic"]).optional(),
+  baseUrl: zod.string().optional(),
+  apiKey: zod.string().optional(),
+  model: zod.string().optional(),
+  isDefault: zod.boolean().optional(),
+  useCase: zod.enum(["general", "embeddings"]).optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateLlmProviderResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  name: zod.string().optional(),
+  providerType: zod.enum(["openai_compat", "anthropic"]).optional(),
+  baseUrl: zod.string().nullish(),
+  model: zod.string().optional(),
+  isDefault: zod.boolean().optional(),
+  useCase: zod.enum(["general", "embeddings"]).optional(),
+  isActive: zod.boolean().optional(),
+  hasApiKey: zod.boolean().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Delete LLM provider configuration
+ */
+export const DeleteLlmProviderParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Test LLM provider connection
+ */
+export const TestLlmProviderParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const TestLlmProviderResponse = zod.object({
+  success: zod.boolean().optional(),
+  message: zod.string().optional(),
+  latencyMs: zod.number().optional(),
+});
+
+/**
+ * @summary Start a new AI interview session
+ */
+export const StartInterviewBody = zod.object({
+  type: zod.enum(["risk_creation", "control_assessment"]),
+});
+
+/**
+ * @summary Get interview session by ID
+ */
+export const GetInterviewParams = zod.object({
+  sessionId: zod.coerce.string().uuid(),
+});
+
+export const GetInterviewResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  userId: zod.string().uuid().optional(),
+  type: zod.enum(["risk_creation", "control_assessment"]).optional(),
+  status: zod.enum(["active", "committed", "abandoned"]).optional(),
+  transcript: zod
+    .array(
+      zod.object({
+        role: zod.string().optional(),
+        content: zod.string().optional(),
+        timestamp: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  draftData: zod.object({}).passthrough().optional(),
+  resultId: zod.string().uuid().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Send a message in an interview session (SSE streaming response)
+ */
+export const SendInterviewMessageParams = zod.object({
+  sessionId: zod.coerce.string().uuid(),
+});
+
+export const SendInterviewMessageBody = zod.object({
+  content: zod.string(),
+});
+
+/**
+ * @summary Commit interview draft data to create a record
+ */
+export const CommitInterviewParams = zod.object({
+  sessionId: zod.coerce.string().uuid(),
+});
+
+export const CommitInterviewResponse = zod.object({
+  status: zod.string().optional(),
+  resultId: zod.string().uuid().nullish(),
+  type: zod.string().optional(),
+});
+
+/**
+ * @summary Abandon an active interview session
+ */
+export const AbandonInterviewParams = zod.object({
+  sessionId: zod.coerce.string().uuid(),
+});
+
+export const AbandonInterviewResponse = zod.object({
+  status: zod.string().optional(),
+});
+
+/**
+ * @summary Queue AI enrichment of risk description
+ */
+export const AiEnrichRiskParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Get AI-generated treatment suggestions for a risk
+ */
+export const SuggestTreatmentsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const SuggestTreatmentsResponse = zod.object({
+  riskId: zod.string().uuid().optional(),
+  treatments: zod
+    .array(
+      zod.object({
+        type: zod.string().optional(),
+        description: zod.string().optional(),
+        effort: zod.string().optional(),
+        riskReduction: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get AI-generated gap remediation steps
+ */
+export const AiGapRemediationParams = zod.object({
+  frameworkId: zod.coerce.string().uuid(),
+});
+
+export const AiGapRemediationBody = zod.object({
+  gaps: zod.array(zod.string()),
+});
+
+export const AiGapRemediationResponse = zod.object({
+  frameworkId: zod.string().optional(),
+  remediations: zod
+    .array(
+      zod.object({
+        gap: zod.string().optional(),
+        priority: zod.string().optional(),
+        steps: zod.string().optional(),
+        effortDays: zod.number().optional(),
+        suggestedControls: zod.array(zod.string()).optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary List recent agent runs
+ */
+export const listAgentRunsQueryPageDefault = 1;
+export const listAgentRunsQueryLimitDefault = 20;
+
+export const ListAgentRunsQueryParams = zod.object({
+  page: zod.coerce.number().default(listAgentRunsQueryPageDefault),
+  limit: zod.coerce.number().default(listAgentRunsQueryLimitDefault),
+});
+
+export const ListAgentRunsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        tenantId: zod.string().uuid().optional(),
+        status: zod
+          .enum(["running", "completed", "failed", "skipped"])
+          .optional(),
+        policyTier: zod.enum(["observe", "advisory", "active"]).optional(),
+        model: zod.string().nullish(),
+        tokenCount: zod.number().optional(),
+        durationMs: zod.number().nullish(),
+        findingCount: zod.number().optional(),
+        error: zod.string().nullish(),
+        context: zod.object({}).passthrough().optional(),
+        startedAt: zod.date().optional(),
+        completedAt: zod.date().nullish(),
+        createdAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * @summary Paginated findings feed with filters
+ */
+export const listAgentFindingsQueryPageDefault = 1;
+export const listAgentFindingsQueryLimitDefault = 20;
+
+export const ListAgentFindingsQueryParams = zod.object({
+  type: zod
+    .enum([
+      "cascade_chain",
+      "cluster",
+      "predictive_signal",
+      "anomaly",
+      "cross_domain",
+      "recommendation",
+    ])
+    .optional(),
+  severity: zod.enum(["critical", "high", "medium", "low", "info"]).optional(),
+  status: zod
+    .enum(["pending_review", "acknowledged", "dismissed", "actioned"])
+    .optional(),
+  page: zod.coerce.number().default(listAgentFindingsQueryPageDefault),
+  limit: zod.coerce.number().default(listAgentFindingsQueryLimitDefault),
+});
+
+export const ListAgentFindingsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        tenantId: zod.string().uuid().optional(),
+        runId: zod.string().uuid().optional(),
+        type: zod
+          .enum([
+            "cascade_chain",
+            "cluster",
+            "predictive_signal",
+            "anomaly",
+            "cross_domain",
+            "recommendation",
+          ])
+          .optional(),
+        severity: zod
+          .enum(["critical", "high", "medium", "low", "info"])
+          .optional(),
+        title: zod.string().optional(),
+        narrative: zod.string().optional(),
+        linkedEntities: zod
+          .array(
+            zod.object({
+              type: zod.string().optional(),
+              id: zod.string().optional(),
+              label: zod.string().optional(),
+            }),
+          )
+          .optional(),
+        proposedAction: zod.object({}).passthrough().nullish(),
+        status: zod
+          .enum(["pending_review", "acknowledged", "dismissed", "actioned"])
+          .optional(),
+        dismissedReason: zod.string().nullish(),
+        actionedAt: zod.date().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * @summary Get pending approval queue (findings with status pending_review)
+ */
+export const getAgentQueueQueryPageDefault = 1;
+export const getAgentQueueQueryLimitDefault = 20;
+
+export const GetAgentQueueQueryParams = zod.object({
+  page: zod.coerce.number().default(getAgentQueueQueryPageDefault),
+  limit: zod.coerce.number().default(getAgentQueueQueryLimitDefault),
+});
+
+export const GetAgentQueueResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        tenantId: zod.string().uuid().optional(),
+        runId: zod.string().uuid().optional(),
+        type: zod
+          .enum([
+            "cascade_chain",
+            "cluster",
+            "predictive_signal",
+            "anomaly",
+            "cross_domain",
+            "recommendation",
+          ])
+          .optional(),
+        severity: zod
+          .enum(["critical", "high", "medium", "low", "info"])
+          .optional(),
+        title: zod.string().optional(),
+        narrative: zod.string().optional(),
+        linkedEntities: zod
+          .array(
+            zod.object({
+              type: zod.string().optional(),
+              id: zod.string().optional(),
+              label: zod.string().optional(),
+            }),
+          )
+          .optional(),
+        proposedAction: zod.object({}).passthrough().nullish(),
+        status: zod
+          .enum(["pending_review", "acknowledged", "dismissed", "actioned"])
+          .optional(),
+        dismissedReason: zod.string().nullish(),
+        actionedAt: zod.date().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+  total: zod.number().optional(),
+  page: zod.number().optional(),
+  limit: zod.number().optional(),
+});
+
+/**
+ * @summary Approve a pending agent finding
+ */
+export const ApproveAgentFindingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const ApproveAgentFindingResponse = zod
+  .object({
+    id: zod.string().uuid().optional(),
+    tenantId: zod.string().uuid().optional(),
+    runId: zod.string().uuid().optional(),
+    type: zod
+      .enum([
+        "cascade_chain",
+        "cluster",
+        "predictive_signal",
+        "anomaly",
+        "cross_domain",
+        "recommendation",
+      ])
+      .optional(),
+    severity: zod
+      .enum(["critical", "high", "medium", "low", "info"])
+      .optional(),
+    title: zod.string().optional(),
+    narrative: zod.string().optional(),
+    linkedEntities: zod
+      .array(
+        zod.object({
+          type: zod.string().optional(),
+          id: zod.string().optional(),
+          label: zod.string().optional(),
+        }),
+      )
+      .optional(),
+    proposedAction: zod.object({}).passthrough().nullish(),
+    status: zod
+      .enum(["pending_review", "acknowledged", "dismissed", "actioned"])
+      .optional(),
+    dismissedReason: zod.string().nullish(),
+    actionedAt: zod.date().nullish(),
+    createdAt: zod.date().optional(),
+    updatedAt: zod.date().optional(),
+  })
+  .and(
+    zod.object({
+      actionResult: zod
+        .object({
+          type: zod.string().optional(),
+          id: zod.string().uuid().optional(),
+        })
+        .nullish()
+        .describe(
+          "Result of executing the proposed action. Null if no action was proposed. Includes type and id for created entities, or error details if execution failed. Duplicate alerts return type ending in _already_exists with existing alert id.",
+        ),
+    }),
+  );
+
+/**
+ * @summary Dismiss a pending agent finding
+ */
+export const DismissAgentFindingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const DismissAgentFindingBody = zod.object({
+  reason: zod.string().optional(),
+});
+
+export const DismissAgentFindingResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  runId: zod.string().uuid().optional(),
+  type: zod
+    .enum([
+      "cascade_chain",
+      "cluster",
+      "predictive_signal",
+      "anomaly",
+      "cross_domain",
+      "recommendation",
+    ])
+    .optional(),
+  severity: zod.enum(["critical", "high", "medium", "low", "info"]).optional(),
+  title: zod.string().optional(),
+  narrative: zod.string().optional(),
+  linkedEntities: zod
+    .array(
+      zod.object({
+        type: zod.string().optional(),
+        id: zod.string().optional(),
+        label: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  proposedAction: zod.object({}).passthrough().nullish(),
+  status: zod
+    .enum(["pending_review", "acknowledged", "dismissed", "actioned"])
+    .optional(),
+  dismissedReason: zod.string().nullish(),
+  actionedAt: zod.date().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Get agent configuration for the tenant
+ */
+export const GetAgentConfigResponse = zod.object({
+  enabled: zod.boolean().optional(),
+  policyTier: zod.enum(["observe", "advisory", "active"]).optional(),
+  schedule: zod.string().optional(),
+  lastRun: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      tenantId: zod.string().uuid().optional(),
+      status: zod
+        .enum(["running", "completed", "failed", "skipped"])
+        .optional(),
+      policyTier: zod.enum(["observe", "advisory", "active"]).optional(),
+      model: zod.string().nullish(),
+      tokenCount: zod.number().optional(),
+      durationMs: zod.number().nullish(),
+      findingCount: zod.number().optional(),
+      error: zod.string().nullish(),
+      context: zod.object({}).passthrough().optional(),
+      startedAt: zod.date().optional(),
+      completedAt: zod.date().nullish(),
+      createdAt: zod.date().optional(),
+    })
+    .optional(),
+  tokenUsage: zod
+    .object({
+      totalTokens: zod.number().optional(),
+      totalRuns: zod.number().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Update agent configuration
+ */
+export const UpdateAgentConfigBody = zod.object({
+  enabled: zod.boolean().optional(),
+  policyTier: zod.enum(["observe", "advisory", "active"]).optional(),
+  schedule: zod.string().optional(),
+});
+
+export const UpdateAgentConfigResponse = zod.object({
+  enabled: zod.boolean().optional(),
+  policyTier: zod.enum(["observe", "advisory", "active"]).optional(),
+  schedule: zod.string().optional(),
+  lastRun: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      tenantId: zod.string().uuid().optional(),
+      status: zod
+        .enum(["running", "completed", "failed", "skipped"])
+        .optional(),
+      policyTier: zod.enum(["observe", "advisory", "active"]).optional(),
+      model: zod.string().nullish(),
+      tokenCount: zod.number().optional(),
+      durationMs: zod.number().nullish(),
+      findingCount: zod.number().optional(),
+      error: zod.string().nullish(),
+      context: zod.object({}).passthrough().optional(),
+      startedAt: zod.date().optional(),
+      completedAt: zod.date().nullish(),
+      createdAt: zod.date().optional(),
+    })
+    .optional(),
+  tokenUsage: zod
+    .object({
+      totalTokens: zod.number().optional(),
+      totalRuns: zod.number().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Model Context Protocol (MCP) Streamable HTTP endpoint for AI agent integrations.
+Mounted at `/mcp` (root path, not under `/api`).
+
+**Protocol**: JSON-RPC 2.0 over HTTP with SSE streaming responses.
+
+**Session lifecycle**:
+1. `POST /mcp` with `initialize` JSON-RPC method (Accept: application/json, text/event-stream)
+2. Response includes `mcp-session-id` header
+3. Send `notifications/initialized` with session ID
+4. Call `tools/call` or `tools/list` with session ID
+
+**Authentication**: JWT Bearer token in Authorization header (same tokens as REST API).
+
+**Available tools** (13 total):
+- `list_risks` — List risks with status/category/search filters
+- `create_risk` — Create risk (admin, risk_manager)
+- `update_risk` — Update risk (admin, risk_manager)
+- `list_vendors` — List vendors with status/search filters
+- `create_vendor` — Register vendor (admin, risk_manager)
+- `list_signals` — List signals with status/source filters
+- `triage_signal` — Triage pending signal (admin, risk_manager, auditor)
+- `list_alerts` — List alerts with severity/status filters
+- `acknowledge_alert` — Acknowledge alert (admin, risk_manager, auditor)
+- `get_compliance_score` — Framework compliance score
+- `run_gap_analysis` — Framework gap analysis
+- `list_controls` — List controls with status filter
+- `create_control` — Create control (admin, risk_manager)
+
+**Error format**: RFC 7807 JSON in tool result content with `isError: true`.
+All tool calls record audit events with `mcp_*` action prefix.
+
+ * @summary MCP Streamable HTTP endpoint
+ */
+export const McpStreamableHttpHeader = zod.object({
+  "mcp-session-id": zod
+    .string()
+    .uuid()
+    .optional()
+    .describe(
+      "Session ID returned from initialization (required for non-init requests)",
+    ),
+  Accept: zod
+    .enum(["application/json, text/event-stream"])
+    .describe("Must accept both application\/json and text\/event-stream"),
+});
+
+export const McpStreamableHttpBody = zod.object({
+  jsonrpc: zod.enum(["2.0"]),
+  id: zod.union([zod.string(), zod.number()]).optional(),
+  method: zod.enum([
+    "initialize",
+    "notifications/initialized",
+    "tools/list",
+    "tools/call",
+  ]),
+  params: zod.object({}).passthrough().optional(),
+});
+
+/**
+ * Server-Sent Events stream for MCP server notifications. Requires active session.
+ * @summary MCP SSE notification stream
+ */
+export const McpSseStreamHeader = zod.object({
+  "mcp-session-id": zod.string().uuid(),
+});
+
+/**
+ * Close and clean up an active MCP session.
+ * @summary Tear down MCP session
+ */
+export const McpSessionTeardownHeader = zod.object({
+  "mcp-session-id": zod.string().uuid(),
+});

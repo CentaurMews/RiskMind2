@@ -776,6 +776,211 @@ export interface JobAccepted {
   message?: string;
 }
 
+export type LlmProviderType =
+  (typeof LlmProviderType)[keyof typeof LlmProviderType];
+
+export const LlmProviderType = {
+  openai_compat: "openai_compat",
+  anthropic: "anthropic",
+} as const;
+
+export type LlmUseCase = (typeof LlmUseCase)[keyof typeof LlmUseCase];
+
+export const LlmUseCase = {
+  general: "general",
+  embeddings: "embeddings",
+} as const;
+
+export interface LlmProvider {
+  id?: string;
+  tenantId?: string;
+  name?: string;
+  providerType?: LlmProviderType;
+  baseUrl?: string | null;
+  model?: string;
+  isDefault?: boolean;
+  useCase?: LlmUseCase;
+  isActive?: boolean;
+  hasApiKey?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateLlmProvider {
+  name: string;
+  providerType: LlmProviderType;
+  baseUrl?: string;
+  apiKey?: string;
+  model: string;
+  isDefault?: boolean;
+  useCase?: LlmUseCase;
+}
+
+export interface UpdateLlmProvider {
+  name?: string;
+  providerType?: LlmProviderType;
+  baseUrl?: string;
+  apiKey?: string;
+  model?: string;
+  isDefault?: boolean;
+  useCase?: LlmUseCase;
+  isActive?: boolean;
+}
+
+export type InterviewType = (typeof InterviewType)[keyof typeof InterviewType];
+
+export const InterviewType = {
+  risk_creation: "risk_creation",
+  control_assessment: "control_assessment",
+} as const;
+
+export type InterviewStatus =
+  (typeof InterviewStatus)[keyof typeof InterviewStatus];
+
+export const InterviewStatus = {
+  active: "active",
+  committed: "committed",
+  abandoned: "abandoned",
+} as const;
+
+export type InterviewSessionTranscriptItem = {
+  role?: string;
+  content?: string;
+  timestamp?: string;
+};
+
+export type InterviewSessionDraftData = { [key: string]: unknown };
+
+export interface InterviewSession {
+  id?: string;
+  tenantId?: string;
+  userId?: string;
+  type?: InterviewType;
+  status?: InterviewStatus;
+  transcript?: InterviewSessionTranscriptItem[];
+  draftData?: InterviewSessionDraftData;
+  resultId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type AgentRunStatus =
+  (typeof AgentRunStatus)[keyof typeof AgentRunStatus];
+
+export const AgentRunStatus = {
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+  skipped: "skipped",
+} as const;
+
+export type AgentRunPolicyTier =
+  (typeof AgentRunPolicyTier)[keyof typeof AgentRunPolicyTier];
+
+export const AgentRunPolicyTier = {
+  observe: "observe",
+  advisory: "advisory",
+  active: "active",
+} as const;
+
+export type AgentRunContext = { [key: string]: unknown };
+
+export interface AgentRun {
+  id?: string;
+  tenantId?: string;
+  status?: AgentRunStatus;
+  policyTier?: AgentRunPolicyTier;
+  model?: string | null;
+  tokenCount?: number;
+  durationMs?: number | null;
+  findingCount?: number;
+  error?: string | null;
+  context?: AgentRunContext;
+  startedAt?: string;
+  completedAt?: string | null;
+  createdAt?: string;
+}
+
+export type AgentFindingType =
+  (typeof AgentFindingType)[keyof typeof AgentFindingType];
+
+export const AgentFindingType = {
+  cascade_chain: "cascade_chain",
+  cluster: "cluster",
+  predictive_signal: "predictive_signal",
+  anomaly: "anomaly",
+  cross_domain: "cross_domain",
+  recommendation: "recommendation",
+} as const;
+
+export type AgentFindingSeverity =
+  (typeof AgentFindingSeverity)[keyof typeof AgentFindingSeverity];
+
+export const AgentFindingSeverity = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+  low: "low",
+  info: "info",
+} as const;
+
+export type AgentFindingLinkedEntitiesItem = {
+  type?: string;
+  id?: string;
+  label?: string;
+};
+
+export type AgentFindingProposedAction = { [key: string]: unknown } | null;
+
+export type AgentFindingStatus =
+  (typeof AgentFindingStatus)[keyof typeof AgentFindingStatus];
+
+export const AgentFindingStatus = {
+  pending_review: "pending_review",
+  acknowledged: "acknowledged",
+  dismissed: "dismissed",
+  actioned: "actioned",
+} as const;
+
+export interface AgentFinding {
+  id?: string;
+  tenantId?: string;
+  runId?: string;
+  type?: AgentFindingType;
+  severity?: AgentFindingSeverity;
+  title?: string;
+  narrative?: string;
+  linkedEntities?: AgentFindingLinkedEntitiesItem[];
+  proposedAction?: AgentFindingProposedAction;
+  status?: AgentFindingStatus;
+  dismissedReason?: string | null;
+  actionedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type AgentConfigPolicyTier =
+  (typeof AgentConfigPolicyTier)[keyof typeof AgentConfigPolicyTier];
+
+export const AgentConfigPolicyTier = {
+  observe: "observe",
+  advisory: "advisory",
+  active: "active",
+} as const;
+
+export type AgentConfigTokenUsage = {
+  totalTokens?: number;
+  totalRuns?: number;
+};
+
+export interface AgentConfig {
+  enabled?: boolean;
+  policyTier?: AgentConfigPolicyTier;
+  schedule?: string;
+  lastRun?: AgentRun;
+  tokenUsage?: AgentConfigTokenUsage;
+}
+
 /**
  * Resource not found
  */
@@ -928,3 +1133,194 @@ export const ListAlertsStatus = {
   resolved: "resolved",
   escalated: "escalated",
 } as const;
+
+export type TestLlmProvider200 = {
+  success?: boolean;
+  message?: string;
+  latencyMs?: number;
+};
+
+export type StartInterviewBodyType =
+  (typeof StartInterviewBodyType)[keyof typeof StartInterviewBodyType];
+
+export const StartInterviewBodyType = {
+  risk_creation: "risk_creation",
+  control_assessment: "control_assessment",
+} as const;
+
+export type StartInterviewBody = {
+  type: StartInterviewBodyType;
+};
+
+export type SendInterviewMessageBody = {
+  content: string;
+};
+
+export type CommitInterview200 = {
+  status?: string;
+  resultId?: string | null;
+  type?: string;
+};
+
+export type AbandonInterview200 = {
+  status?: string;
+};
+
+export type SuggestTreatments200TreatmentsItem = {
+  type?: string;
+  description?: string;
+  effort?: string;
+  riskReduction?: number;
+};
+
+export type SuggestTreatments200 = {
+  riskId?: string;
+  treatments?: SuggestTreatments200TreatmentsItem[];
+};
+
+export type AiGapRemediationBody = {
+  gaps: string[];
+};
+
+export type AiGapRemediation200RemediationsItem = {
+  gap?: string;
+  priority?: string;
+  steps?: string;
+  effortDays?: number;
+  suggestedControls?: string[];
+};
+
+export type AiGapRemediation200 = {
+  frameworkId?: string;
+  remediations?: AiGapRemediation200RemediationsItem[];
+};
+
+export type ListAgentRunsParams = {
+  page?: number;
+  limit?: number;
+};
+
+export type ListAgentRuns200 = {
+  data?: AgentRun[];
+  total?: number;
+  page?: number;
+  limit?: number;
+};
+
+export type ListAgentFindingsParams = {
+  type?: ListAgentFindingsType;
+  severity?: ListAgentFindingsSeverity;
+  status?: ListAgentFindingsStatus;
+  page?: number;
+  limit?: number;
+};
+
+export type ListAgentFindingsType =
+  (typeof ListAgentFindingsType)[keyof typeof ListAgentFindingsType];
+
+export const ListAgentFindingsType = {
+  cascade_chain: "cascade_chain",
+  cluster: "cluster",
+  predictive_signal: "predictive_signal",
+  anomaly: "anomaly",
+  cross_domain: "cross_domain",
+  recommendation: "recommendation",
+} as const;
+
+export type ListAgentFindingsSeverity =
+  (typeof ListAgentFindingsSeverity)[keyof typeof ListAgentFindingsSeverity];
+
+export const ListAgentFindingsSeverity = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+  low: "low",
+  info: "info",
+} as const;
+
+export type ListAgentFindingsStatus =
+  (typeof ListAgentFindingsStatus)[keyof typeof ListAgentFindingsStatus];
+
+export const ListAgentFindingsStatus = {
+  pending_review: "pending_review",
+  acknowledged: "acknowledged",
+  dismissed: "dismissed",
+  actioned: "actioned",
+} as const;
+
+export type ListAgentFindings200 = {
+  data?: AgentFinding[];
+  total?: number;
+  page?: number;
+  limit?: number;
+};
+
+export type GetAgentQueueParams = {
+  page?: number;
+  limit?: number;
+};
+
+export type GetAgentQueue200 = {
+  data?: AgentFinding[];
+  total?: number;
+  page?: number;
+  limit?: number;
+};
+
+/**
+ * Result of executing the proposed action. Null if no action was proposed. Includes type and id for created entities, or error details if execution failed. Duplicate alerts return type ending in _already_exists with existing alert id.
+ */
+export type ApproveAgentFinding200ActionResult = {
+  type?: string;
+  id?: string;
+} | null;
+
+export type ApproveAgentFinding200 = AgentFinding & {
+  /** Result of executing the proposed action. Null if no action was proposed. Includes type and id for created entities, or error details if execution failed. Duplicate alerts return type ending in _already_exists with existing alert id. */
+  actionResult?: ApproveAgentFinding200ActionResult;
+};
+
+export type DismissAgentFindingBody = {
+  reason?: string;
+};
+
+export type UpdateAgentConfigBodyPolicyTier =
+  (typeof UpdateAgentConfigBodyPolicyTier)[keyof typeof UpdateAgentConfigBodyPolicyTier];
+
+export const UpdateAgentConfigBodyPolicyTier = {
+  observe: "observe",
+  advisory: "advisory",
+  active: "active",
+} as const;
+
+export type UpdateAgentConfigBody = {
+  enabled?: boolean;
+  policyTier?: UpdateAgentConfigBodyPolicyTier;
+  schedule?: string;
+};
+
+export type McpStreamableHttpBodyJsonrpc =
+  (typeof McpStreamableHttpBodyJsonrpc)[keyof typeof McpStreamableHttpBodyJsonrpc];
+
+export const McpStreamableHttpBodyJsonrpc = {
+  "20": "2.0",
+} as const;
+
+export type McpStreamableHttpBodyMethod =
+  (typeof McpStreamableHttpBodyMethod)[keyof typeof McpStreamableHttpBodyMethod];
+
+export const McpStreamableHttpBodyMethod = {
+  initialize: "initialize",
+  "notifications/initialized": "notifications/initialized",
+  "tools/list": "tools/list",
+  "tools/call": "tools/call",
+} as const;
+
+export type McpStreamableHttpBodyParams = { [key: string]: unknown };
+
+export type McpStreamableHttpBody = {
+  jsonrpc: McpStreamableHttpBodyJsonrpc;
+  id?: string | number;
+  method: McpStreamableHttpBodyMethod;
+  params?: McpStreamableHttpBodyParams;
+};

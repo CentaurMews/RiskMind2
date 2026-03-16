@@ -17,11 +17,19 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AbandonInterview200,
+  AgentConfig,
+  AgentFinding,
+  AgentRun,
+  AiGapRemediation200,
+  AiGapRemediationBody,
   Alert,
   AlertListResponse,
   AlertSummary,
+  ApproveAgentFinding200,
   BulkSignalResponse,
   CalculateVendorRiskScore200,
+  CommitInterview200,
   CompleteReviewBody,
   ComplianceScore,
   ConflictResponse,
@@ -36,6 +44,7 @@ import type {
   CreateFindingRequest,
   CreateIncidentRequest,
   CreateKRIRequest,
+  CreateLlmProvider,
   CreateQuestionnaireRequest,
   CreateReviewRequest,
   CreateRiskRequest,
@@ -43,6 +52,7 @@ import type {
   CreateTreatmentRequest,
   CreateVendorRequest,
   DeleteResponse,
+  DismissAgentFindingBody,
   Document,
   DocumentListResponse,
   Finding,
@@ -52,25 +62,34 @@ import type {
   GapAnalysis,
   GenerateMagicLink200,
   GenerateMagicLinkBody,
+  GetAgentQueue200,
+  GetAgentQueueParams,
   HealthStatus,
   HeatmapResponse,
   Incident,
   IncidentListResponse,
+  InterviewSession,
   Job,
   JobAccepted,
   KRIListResponse,
   KRIWithBreach,
   Kri,
+  ListAgentFindings200,
+  ListAgentFindingsParams,
+  ListAgentRuns200,
+  ListAgentRunsParams,
   ListAlertsParams,
   ListControlsParams,
   ListFindingsParams,
   ListRisksParams,
   ListSignalsParams,
   ListVendorsParams,
+  LlmProvider,
   LoginRequest,
   LoginResponse,
   MapControlRequirements200,
   MapControlRequirementsBody,
+  McpStreamableHttpBody,
   NotFoundResponse,
   PromoteSignalRequest,
   Questionnaire,
@@ -82,16 +101,22 @@ import type {
   ReviewListResponse,
   Risk,
   RiskListResponse,
+  SendInterviewMessageBody,
   Signal,
   SignalListResponse,
+  StartInterviewBody,
+  SuggestTreatments200,
+  TestLlmProvider200,
   TokenPair,
   TransitionVendorBody,
   Treatment,
   TreatmentListResponse,
+  UpdateAgentConfigBody,
   UpdateControlRequest,
   UpdateDocumentRequest,
   UpdateFindingRequest,
   UpdateIncidentRequest,
+  UpdateLlmProvider,
   UpdateRiskRequest,
   UpdateSignalStatusRequest,
   UserProfile,
@@ -6451,3 +6476,2161 @@ export function useGetTrustCircles<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List LLM provider configurations
+ */
+export const getListLlmProvidersUrl = () => {
+  return `/api/v1/settings/llm-providers`;
+};
+
+export const listLlmProviders = async (
+  options?: RequestInit,
+): Promise<LlmProvider[]> => {
+  return customFetch<LlmProvider[]>(getListLlmProvidersUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLlmProvidersQueryKey = () => {
+  return [`/api/v1/settings/llm-providers`] as const;
+};
+
+export const getListLlmProvidersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLlmProviders>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listLlmProviders>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListLlmProvidersQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listLlmProviders>>
+  > = ({ signal }) => listLlmProviders({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLlmProviders>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLlmProvidersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLlmProviders>>
+>;
+export type ListLlmProvidersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List LLM provider configurations
+ */
+
+export function useListLlmProviders<
+  TData = Awaited<ReturnType<typeof listLlmProviders>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listLlmProviders>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLlmProvidersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new LLM provider configuration
+ */
+export const getCreateLlmProviderUrl = () => {
+  return `/api/v1/settings/llm-providers`;
+};
+
+export const createLlmProvider = async (
+  createLlmProvider: CreateLlmProvider,
+  options?: RequestInit,
+): Promise<LlmProvider> => {
+  return customFetch<LlmProvider>(getCreateLlmProviderUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLlmProvider),
+  });
+};
+
+export const getCreateLlmProviderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLlmProvider>>,
+    TError,
+    { data: BodyType<CreateLlmProvider> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createLlmProvider>>,
+  TError,
+  { data: BodyType<CreateLlmProvider> },
+  TContext
+> => {
+  const mutationKey = ["createLlmProvider"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createLlmProvider>>,
+    { data: BodyType<CreateLlmProvider> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createLlmProvider(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateLlmProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createLlmProvider>>
+>;
+export type CreateLlmProviderMutationBody = BodyType<CreateLlmProvider>;
+export type CreateLlmProviderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new LLM provider configuration
+ */
+export const useCreateLlmProvider = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLlmProvider>>,
+    TError,
+    { data: BodyType<CreateLlmProvider> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createLlmProvider>>,
+  TError,
+  { data: BodyType<CreateLlmProvider> },
+  TContext
+> => {
+  return useMutation(getCreateLlmProviderMutationOptions(options));
+};
+
+/**
+ * @summary Get LLM provider by ID
+ */
+export const getGetLlmProviderUrl = (id: string) => {
+  return `/api/v1/settings/llm-providers/${id}`;
+};
+
+export const getLlmProvider = async (
+  id: string,
+  options?: RequestInit,
+): Promise<LlmProvider> => {
+  return customFetch<LlmProvider>(getGetLlmProviderUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLlmProviderQueryKey = (id: string) => {
+  return [`/api/v1/settings/llm-providers/${id}`] as const;
+};
+
+export const getGetLlmProviderQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLlmProvider>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLlmProvider>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLlmProviderQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLlmProvider>>> = ({
+    signal,
+  }) => getLlmProvider(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLlmProvider>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLlmProviderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLlmProvider>>
+>;
+export type GetLlmProviderQueryError = ErrorType<void>;
+
+/**
+ * @summary Get LLM provider by ID
+ */
+
+export function useGetLlmProvider<
+  TData = Awaited<ReturnType<typeof getLlmProvider>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLlmProvider>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLlmProviderQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update LLM provider configuration
+ */
+export const getUpdateLlmProviderUrl = (id: string) => {
+  return `/api/v1/settings/llm-providers/${id}`;
+};
+
+export const updateLlmProvider = async (
+  id: string,
+  updateLlmProvider: UpdateLlmProvider,
+  options?: RequestInit,
+): Promise<LlmProvider> => {
+  return customFetch<LlmProvider>(getUpdateLlmProviderUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateLlmProvider),
+  });
+};
+
+export const getUpdateLlmProviderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLlmProvider>>,
+    TError,
+    { id: string; data: BodyType<UpdateLlmProvider> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateLlmProvider>>,
+  TError,
+  { id: string; data: BodyType<UpdateLlmProvider> },
+  TContext
+> => {
+  const mutationKey = ["updateLlmProvider"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateLlmProvider>>,
+    { id: string; data: BodyType<UpdateLlmProvider> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateLlmProvider(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateLlmProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateLlmProvider>>
+>;
+export type UpdateLlmProviderMutationBody = BodyType<UpdateLlmProvider>;
+export type UpdateLlmProviderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update LLM provider configuration
+ */
+export const useUpdateLlmProvider = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLlmProvider>>,
+    TError,
+    { id: string; data: BodyType<UpdateLlmProvider> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateLlmProvider>>,
+  TError,
+  { id: string; data: BodyType<UpdateLlmProvider> },
+  TContext
+> => {
+  return useMutation(getUpdateLlmProviderMutationOptions(options));
+};
+
+/**
+ * @summary Delete LLM provider configuration
+ */
+export const getDeleteLlmProviderUrl = (id: string) => {
+  return `/api/v1/settings/llm-providers/${id}`;
+};
+
+export const deleteLlmProvider = async (
+  id: string,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteLlmProviderUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteLlmProviderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLlmProvider>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLlmProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["deleteLlmProvider"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLlmProvider>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteLlmProvider(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteLlmProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteLlmProvider>>
+>;
+
+export type DeleteLlmProviderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete LLM provider configuration
+ */
+export const useDeleteLlmProvider = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLlmProvider>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteLlmProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getDeleteLlmProviderMutationOptions(options));
+};
+
+/**
+ * @summary Test LLM provider connection
+ */
+export const getTestLlmProviderUrl = (id: string) => {
+  return `/api/v1/settings/llm-providers/${id}/test`;
+};
+
+export const testLlmProvider = async (
+  id: string,
+  options?: RequestInit,
+): Promise<TestLlmProvider200> => {
+  return customFetch<TestLlmProvider200>(getTestLlmProviderUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getTestLlmProviderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testLlmProvider>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testLlmProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["testLlmProvider"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testLlmProvider>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return testLlmProvider(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TestLlmProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof testLlmProvider>>
+>;
+
+export type TestLlmProviderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Test LLM provider connection
+ */
+export const useTestLlmProvider = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testLlmProvider>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof testLlmProvider>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getTestLlmProviderMutationOptions(options));
+};
+
+/**
+ * @summary Start a new AI interview session
+ */
+export const getStartInterviewUrl = () => {
+  return `/api/v1/ai/interview/start`;
+};
+
+export const startInterview = async (
+  startInterviewBody: StartInterviewBody,
+  options?: RequestInit,
+): Promise<InterviewSession> => {
+  return customFetch<InterviewSession>(getStartInterviewUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(startInterviewBody),
+  });
+};
+
+export const getStartInterviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startInterview>>,
+    TError,
+    { data: BodyType<StartInterviewBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startInterview>>,
+  TError,
+  { data: BodyType<StartInterviewBody> },
+  TContext
+> => {
+  const mutationKey = ["startInterview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startInterview>>,
+    { data: BodyType<StartInterviewBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return startInterview(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StartInterviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof startInterview>>
+>;
+export type StartInterviewMutationBody = BodyType<StartInterviewBody>;
+export type StartInterviewMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Start a new AI interview session
+ */
+export const useStartInterview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startInterview>>,
+    TError,
+    { data: BodyType<StartInterviewBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof startInterview>>,
+  TError,
+  { data: BodyType<StartInterviewBody> },
+  TContext
+> => {
+  return useMutation(getStartInterviewMutationOptions(options));
+};
+
+/**
+ * @summary Get interview session by ID
+ */
+export const getGetInterviewUrl = (sessionId: string) => {
+  return `/api/v1/ai/interview/${sessionId}`;
+};
+
+export const getInterview = async (
+  sessionId: string,
+  options?: RequestInit,
+): Promise<InterviewSession> => {
+  return customFetch<InterviewSession>(getGetInterviewUrl(sessionId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetInterviewQueryKey = (sessionId: string) => {
+  return [`/api/v1/ai/interview/${sessionId}`] as const;
+};
+
+export const getGetInterviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getInterview>>,
+  TError = ErrorType<unknown>,
+>(
+  sessionId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getInterview>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetInterviewQueryKey(sessionId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getInterview>>> = ({
+    signal,
+  }) => getInterview(sessionId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!sessionId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getInterview>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetInterviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getInterview>>
+>;
+export type GetInterviewQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get interview session by ID
+ */
+
+export function useGetInterview<
+  TData = Awaited<ReturnType<typeof getInterview>>,
+  TError = ErrorType<unknown>,
+>(
+  sessionId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getInterview>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetInterviewQueryOptions(sessionId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Send a message in an interview session (SSE streaming response)
+ */
+export const getSendInterviewMessageUrl = (sessionId: string) => {
+  return `/api/v1/ai/interview/${sessionId}/message`;
+};
+
+export const sendInterviewMessage = async (
+  sessionId: string,
+  sendInterviewMessageBody: SendInterviewMessageBody,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getSendInterviewMessageUrl(sessionId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sendInterviewMessageBody),
+  });
+};
+
+export const getSendInterviewMessageMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendInterviewMessage>>,
+    TError,
+    { sessionId: string; data: BodyType<SendInterviewMessageBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendInterviewMessage>>,
+  TError,
+  { sessionId: string; data: BodyType<SendInterviewMessageBody> },
+  TContext
+> => {
+  const mutationKey = ["sendInterviewMessage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendInterviewMessage>>,
+    { sessionId: string; data: BodyType<SendInterviewMessageBody> }
+  > = (props) => {
+    const { sessionId, data } = props ?? {};
+
+    return sendInterviewMessage(sessionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendInterviewMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendInterviewMessage>>
+>;
+export type SendInterviewMessageMutationBody =
+  BodyType<SendInterviewMessageBody>;
+export type SendInterviewMessageMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Send a message in an interview session (SSE streaming response)
+ */
+export const useSendInterviewMessage = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendInterviewMessage>>,
+    TError,
+    { sessionId: string; data: BodyType<SendInterviewMessageBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendInterviewMessage>>,
+  TError,
+  { sessionId: string; data: BodyType<SendInterviewMessageBody> },
+  TContext
+> => {
+  return useMutation(getSendInterviewMessageMutationOptions(options));
+};
+
+/**
+ * @summary Commit interview draft data to create a record
+ */
+export const getCommitInterviewUrl = (sessionId: string) => {
+  return `/api/v1/ai/interview/${sessionId}/commit`;
+};
+
+export const commitInterview = async (
+  sessionId: string,
+  options?: RequestInit,
+): Promise<CommitInterview200> => {
+  return customFetch<CommitInterview200>(getCommitInterviewUrl(sessionId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCommitInterviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof commitInterview>>,
+    TError,
+    { sessionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof commitInterview>>,
+  TError,
+  { sessionId: string },
+  TContext
+> => {
+  const mutationKey = ["commitInterview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof commitInterview>>,
+    { sessionId: string }
+  > = (props) => {
+    const { sessionId } = props ?? {};
+
+    return commitInterview(sessionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CommitInterviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof commitInterview>>
+>;
+
+export type CommitInterviewMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Commit interview draft data to create a record
+ */
+export const useCommitInterview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof commitInterview>>,
+    TError,
+    { sessionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof commitInterview>>,
+  TError,
+  { sessionId: string },
+  TContext
+> => {
+  return useMutation(getCommitInterviewMutationOptions(options));
+};
+
+/**
+ * @summary Abandon an active interview session
+ */
+export const getAbandonInterviewUrl = (sessionId: string) => {
+  return `/api/v1/ai/interview/${sessionId}/abandon`;
+};
+
+export const abandonInterview = async (
+  sessionId: string,
+  options?: RequestInit,
+): Promise<AbandonInterview200> => {
+  return customFetch<AbandonInterview200>(getAbandonInterviewUrl(sessionId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAbandonInterviewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof abandonInterview>>,
+    TError,
+    { sessionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof abandonInterview>>,
+  TError,
+  { sessionId: string },
+  TContext
+> => {
+  const mutationKey = ["abandonInterview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof abandonInterview>>,
+    { sessionId: string }
+  > = (props) => {
+    const { sessionId } = props ?? {};
+
+    return abandonInterview(sessionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AbandonInterviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof abandonInterview>>
+>;
+
+export type AbandonInterviewMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Abandon an active interview session
+ */
+export const useAbandonInterview = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof abandonInterview>>,
+    TError,
+    { sessionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof abandonInterview>>,
+  TError,
+  { sessionId: string },
+  TContext
+> => {
+  return useMutation(getAbandonInterviewMutationOptions(options));
+};
+
+/**
+ * @summary Queue AI enrichment of risk description
+ */
+export const getAiEnrichRiskUrl = (id: string) => {
+  return `/api/v1/risks/${id}/ai/enrich`;
+};
+
+export const aiEnrichRisk = async (
+  id: string,
+  options?: RequestInit,
+): Promise<JobAccepted> => {
+  return customFetch<JobAccepted>(getAiEnrichRiskUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAiEnrichRiskMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiEnrichRisk>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiEnrichRisk>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["aiEnrichRisk"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiEnrichRisk>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiEnrichRisk(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiEnrichRiskMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiEnrichRisk>>
+>;
+
+export type AiEnrichRiskMutationError = ErrorType<void>;
+
+/**
+ * @summary Queue AI enrichment of risk description
+ */
+export const useAiEnrichRisk = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiEnrichRisk>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof aiEnrichRisk>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getAiEnrichRiskMutationOptions(options));
+};
+
+/**
+ * @summary Get AI-generated treatment suggestions for a risk
+ */
+export const getSuggestTreatmentsUrl = (id: string) => {
+  return `/api/v1/risks/${id}/ai/suggest-treatments`;
+};
+
+export const suggestTreatments = async (
+  id: string,
+  options?: RequestInit,
+): Promise<SuggestTreatments200> => {
+  return customFetch<SuggestTreatments200>(getSuggestTreatmentsUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSuggestTreatmentsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof suggestTreatments>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof suggestTreatments>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["suggestTreatments"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof suggestTreatments>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return suggestTreatments(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SuggestTreatmentsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof suggestTreatments>>
+>;
+
+export type SuggestTreatmentsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Get AI-generated treatment suggestions for a risk
+ */
+export const useSuggestTreatments = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof suggestTreatments>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof suggestTreatments>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getSuggestTreatmentsMutationOptions(options));
+};
+
+/**
+ * @summary Get AI-generated gap remediation steps
+ */
+export const getAiGapRemediationUrl = (frameworkId: string) => {
+  return `/api/v1/compliance/${frameworkId}/gap-analysis/ai-remediate`;
+};
+
+export const aiGapRemediation = async (
+  frameworkId: string,
+  aiGapRemediationBody: AiGapRemediationBody,
+  options?: RequestInit,
+): Promise<AiGapRemediation200> => {
+  return customFetch<AiGapRemediation200>(getAiGapRemediationUrl(frameworkId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(aiGapRemediationBody),
+  });
+};
+
+export const getAiGapRemediationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiGapRemediation>>,
+    TError,
+    { frameworkId: string; data: BodyType<AiGapRemediationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiGapRemediation>>,
+  TError,
+  { frameworkId: string; data: BodyType<AiGapRemediationBody> },
+  TContext
+> => {
+  const mutationKey = ["aiGapRemediation"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiGapRemediation>>,
+    { frameworkId: string; data: BodyType<AiGapRemediationBody> }
+  > = (props) => {
+    const { frameworkId, data } = props ?? {};
+
+    return aiGapRemediation(frameworkId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiGapRemediationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiGapRemediation>>
+>;
+export type AiGapRemediationMutationBody = BodyType<AiGapRemediationBody>;
+export type AiGapRemediationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Get AI-generated gap remediation steps
+ */
+export const useAiGapRemediation = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiGapRemediation>>,
+    TError,
+    { frameworkId: string; data: BodyType<AiGapRemediationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof aiGapRemediation>>,
+  TError,
+  { frameworkId: string; data: BodyType<AiGapRemediationBody> },
+  TContext
+> => {
+  return useMutation(getAiGapRemediationMutationOptions(options));
+};
+
+/**
+ * @summary List recent agent runs
+ */
+export const getListAgentRunsUrl = (params?: ListAgentRunsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/agent/runs?${stringifiedParams}`
+    : `/api/v1/agent/runs`;
+};
+
+export const listAgentRuns = async (
+  params?: ListAgentRunsParams,
+  options?: RequestInit,
+): Promise<ListAgentRuns200> => {
+  return customFetch<ListAgentRuns200>(getListAgentRunsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAgentRunsQueryKey = (params?: ListAgentRunsParams) => {
+  return [`/api/v1/agent/runs`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAgentRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAgentRuns>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAgentRunsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAgentRuns>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAgentRunsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgentRuns>>> = ({
+    signal,
+  }) => listAgentRuns(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAgentRuns>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAgentRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAgentRuns>>
+>;
+export type ListAgentRunsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List recent agent runs
+ */
+
+export function useListAgentRuns<
+  TData = Awaited<ReturnType<typeof listAgentRuns>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAgentRunsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAgentRuns>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAgentRunsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Manually trigger an agent run (admin only)
+ */
+export const getTriggerAgentRunUrl = () => {
+  return `/api/v1/agent/runs`;
+};
+
+export const triggerAgentRun = async (
+  options?: RequestInit,
+): Promise<AgentRun> => {
+  return customFetch<AgentRun>(getTriggerAgentRunUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getTriggerAgentRunMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof triggerAgentRun>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof triggerAgentRun>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["triggerAgentRun"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof triggerAgentRun>>,
+    void
+  > = () => {
+    return triggerAgentRun(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TriggerAgentRunMutationResult = NonNullable<
+  Awaited<ReturnType<typeof triggerAgentRun>>
+>;
+
+export type TriggerAgentRunMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Manually trigger an agent run (admin only)
+ */
+export const useTriggerAgentRun = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof triggerAgentRun>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof triggerAgentRun>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getTriggerAgentRunMutationOptions(options));
+};
+
+/**
+ * @summary Paginated findings feed with filters
+ */
+export const getListAgentFindingsUrl = (params?: ListAgentFindingsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/agent/findings?${stringifiedParams}`
+    : `/api/v1/agent/findings`;
+};
+
+export const listAgentFindings = async (
+  params?: ListAgentFindingsParams,
+  options?: RequestInit,
+): Promise<ListAgentFindings200> => {
+  return customFetch<ListAgentFindings200>(getListAgentFindingsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAgentFindingsQueryKey = (
+  params?: ListAgentFindingsParams,
+) => {
+  return [`/api/v1/agent/findings`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAgentFindingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAgentFindings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAgentFindingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAgentFindings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAgentFindingsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAgentFindings>>
+  > = ({ signal }) => listAgentFindings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAgentFindings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAgentFindingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAgentFindings>>
+>;
+export type ListAgentFindingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Paginated findings feed with filters
+ */
+
+export function useListAgentFindings<
+  TData = Awaited<ReturnType<typeof listAgentFindings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAgentFindingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAgentFindings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAgentFindingsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get pending approval queue (findings with status pending_review)
+ */
+export const getGetAgentQueueUrl = (params?: GetAgentQueueParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/agent/queue?${stringifiedParams}`
+    : `/api/v1/agent/queue`;
+};
+
+export const getAgentQueue = async (
+  params?: GetAgentQueueParams,
+  options?: RequestInit,
+): Promise<GetAgentQueue200> => {
+  return customFetch<GetAgentQueue200>(getGetAgentQueueUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAgentQueueQueryKey = (params?: GetAgentQueueParams) => {
+  return [`/api/v1/agent/queue`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAgentQueueQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAgentQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAgentQueueParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAgentQueue>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAgentQueueQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentQueue>>> = ({
+    signal,
+  }) => getAgentQueue(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentQueue>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAgentQueueQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAgentQueue>>
+>;
+export type GetAgentQueueQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get pending approval queue (findings with status pending_review)
+ */
+
+export function useGetAgentQueue<
+  TData = Awaited<ReturnType<typeof getAgentQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAgentQueueParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAgentQueue>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAgentQueueQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Approve a pending agent finding
+ */
+export const getApproveAgentFindingUrl = (id: string) => {
+  return `/api/v1/agent/findings/${id}/approve`;
+};
+
+export const approveAgentFinding = async (
+  id: string,
+  options?: RequestInit,
+): Promise<ApproveAgentFinding200> => {
+  return customFetch<ApproveAgentFinding200>(getApproveAgentFindingUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getApproveAgentFindingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveAgentFinding>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveAgentFinding>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["approveAgentFinding"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveAgentFinding>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return approveAgentFinding(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveAgentFindingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveAgentFinding>>
+>;
+
+export type ApproveAgentFindingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Approve a pending agent finding
+ */
+export const useApproveAgentFinding = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveAgentFinding>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof approveAgentFinding>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getApproveAgentFindingMutationOptions(options));
+};
+
+/**
+ * @summary Dismiss a pending agent finding
+ */
+export const getDismissAgentFindingUrl = (id: string) => {
+  return `/api/v1/agent/findings/${id}/dismiss`;
+};
+
+export const dismissAgentFinding = async (
+  id: string,
+  dismissAgentFindingBody: DismissAgentFindingBody,
+  options?: RequestInit,
+): Promise<AgentFinding> => {
+  return customFetch<AgentFinding>(getDismissAgentFindingUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(dismissAgentFindingBody),
+  });
+};
+
+export const getDismissAgentFindingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissAgentFinding>>,
+    TError,
+    { id: string; data: BodyType<DismissAgentFindingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dismissAgentFinding>>,
+  TError,
+  { id: string; data: BodyType<DismissAgentFindingBody> },
+  TContext
+> => {
+  const mutationKey = ["dismissAgentFinding"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dismissAgentFinding>>,
+    { id: string; data: BodyType<DismissAgentFindingBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return dismissAgentFinding(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DismissAgentFindingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dismissAgentFinding>>
+>;
+export type DismissAgentFindingMutationBody = BodyType<DismissAgentFindingBody>;
+export type DismissAgentFindingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Dismiss a pending agent finding
+ */
+export const useDismissAgentFinding = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissAgentFinding>>,
+    TError,
+    { id: string; data: BodyType<DismissAgentFindingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof dismissAgentFinding>>,
+  TError,
+  { id: string; data: BodyType<DismissAgentFindingBody> },
+  TContext
+> => {
+  return useMutation(getDismissAgentFindingMutationOptions(options));
+};
+
+/**
+ * @summary Get agent configuration for the tenant
+ */
+export const getGetAgentConfigUrl = () => {
+  return `/api/v1/agent/config`;
+};
+
+export const getAgentConfig = async (
+  options?: RequestInit,
+): Promise<AgentConfig> => {
+  return customFetch<AgentConfig>(getGetAgentConfigUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAgentConfigQueryKey = () => {
+  return [`/api/v1/agent/config`] as const;
+};
+
+export const getGetAgentConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAgentConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentConfig>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAgentConfigQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentConfig>>> = ({
+    signal,
+  }) => getAgentConfig({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentConfig>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAgentConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAgentConfig>>
+>;
+export type GetAgentConfigQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get agent configuration for the tenant
+ */
+
+export function useGetAgentConfig<
+  TData = Awaited<ReturnType<typeof getAgentConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentConfig>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAgentConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update agent configuration
+ */
+export const getUpdateAgentConfigUrl = () => {
+  return `/api/v1/agent/config`;
+};
+
+export const updateAgentConfig = async (
+  updateAgentConfigBody: UpdateAgentConfigBody,
+  options?: RequestInit,
+): Promise<AgentConfig> => {
+  return customFetch<AgentConfig>(getUpdateAgentConfigUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateAgentConfigBody),
+  });
+};
+
+export const getUpdateAgentConfigMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAgentConfig>>,
+    TError,
+    { data: BodyType<UpdateAgentConfigBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAgentConfig>>,
+  TError,
+  { data: BodyType<UpdateAgentConfigBody> },
+  TContext
+> => {
+  const mutationKey = ["updateAgentConfig"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAgentConfig>>,
+    { data: BodyType<UpdateAgentConfigBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateAgentConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAgentConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAgentConfig>>
+>;
+export type UpdateAgentConfigMutationBody = BodyType<UpdateAgentConfigBody>;
+export type UpdateAgentConfigMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update agent configuration
+ */
+export const useUpdateAgentConfig = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAgentConfig>>,
+    TError,
+    { data: BodyType<UpdateAgentConfigBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAgentConfig>>,
+  TError,
+  { data: BodyType<UpdateAgentConfigBody> },
+  TContext
+> => {
+  return useMutation(getUpdateAgentConfigMutationOptions(options));
+};
+
+/**
+ * Model Context Protocol (MCP) Streamable HTTP endpoint for AI agent integrations.
+Mounted at `/mcp` (root path, not under `/api`).
+
+**Protocol**: JSON-RPC 2.0 over HTTP with SSE streaming responses.
+
+**Session lifecycle**:
+1. `POST /mcp` with `initialize` JSON-RPC method (Accept: application/json, text/event-stream)
+2. Response includes `mcp-session-id` header
+3. Send `notifications/initialized` with session ID
+4. Call `tools/call` or `tools/list` with session ID
+
+**Authentication**: JWT Bearer token in Authorization header (same tokens as REST API).
+
+**Available tools** (13 total):
+- `list_risks` — List risks with status/category/search filters
+- `create_risk` — Create risk (admin, risk_manager)
+- `update_risk` — Update risk (admin, risk_manager)
+- `list_vendors` — List vendors with status/search filters
+- `create_vendor` — Register vendor (admin, risk_manager)
+- `list_signals` — List signals with status/source filters
+- `triage_signal` — Triage pending signal (admin, risk_manager, auditor)
+- `list_alerts` — List alerts with severity/status filters
+- `acknowledge_alert` — Acknowledge alert (admin, risk_manager, auditor)
+- `get_compliance_score` — Framework compliance score
+- `run_gap_analysis` — Framework gap analysis
+- `list_controls` — List controls with status filter
+- `create_control` — Create control (admin, risk_manager)
+
+**Error format**: RFC 7807 JSON in tool result content with `isError: true`.
+All tool calls record audit events with `mcp_*` action prefix.
+
+ * @summary MCP Streamable HTTP endpoint
+ */
+export const getMcpStreamableHttpUrl = () => {
+  return `/api/mcp`;
+};
+
+export const mcpStreamableHttp = async (
+  mcpStreamableHttpBody: McpStreamableHttpBody,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getMcpStreamableHttpUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(mcpStreamableHttpBody),
+  });
+};
+
+export const getMcpStreamableHttpMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof mcpStreamableHttp>>,
+    TError,
+    { data: BodyType<McpStreamableHttpBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof mcpStreamableHttp>>,
+  TError,
+  { data: BodyType<McpStreamableHttpBody> },
+  TContext
+> => {
+  const mutationKey = ["mcpStreamableHttp"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof mcpStreamableHttp>>,
+    { data: BodyType<McpStreamableHttpBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return mcpStreamableHttp(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type McpStreamableHttpMutationResult = NonNullable<
+  Awaited<ReturnType<typeof mcpStreamableHttp>>
+>;
+export type McpStreamableHttpMutationBody = BodyType<McpStreamableHttpBody>;
+export type McpStreamableHttpMutationError = ErrorType<void>;
+
+/**
+ * @summary MCP Streamable HTTP endpoint
+ */
+export const useMcpStreamableHttp = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof mcpStreamableHttp>>,
+    TError,
+    { data: BodyType<McpStreamableHttpBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof mcpStreamableHttp>>,
+  TError,
+  { data: BodyType<McpStreamableHttpBody> },
+  TContext
+> => {
+  return useMutation(getMcpStreamableHttpMutationOptions(options));
+};
+
+/**
+ * Server-Sent Events stream for MCP server notifications. Requires active session.
+ * @summary MCP SSE notification stream
+ */
+export const getMcpSseStreamUrl = () => {
+  return `/api/mcp`;
+};
+
+export const mcpSseStream = async (options?: RequestInit): Promise<string> => {
+  return customFetch<string>(getMcpSseStreamUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getMcpSseStreamQueryKey = () => {
+  return [`/api/mcp`] as const;
+};
+
+export const getMcpSseStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof mcpSseStream>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof mcpSseStream>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getMcpSseStreamQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof mcpSseStream>>> = ({
+    signal,
+  }) => mcpSseStream({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof mcpSseStream>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type McpSseStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof mcpSseStream>>
+>;
+export type McpSseStreamQueryError = ErrorType<unknown>;
+
+/**
+ * @summary MCP SSE notification stream
+ */
+
+export function useMcpSseStream<
+  TData = Awaited<ReturnType<typeof mcpSseStream>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof mcpSseStream>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getMcpSseStreamQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Close and clean up an active MCP session.
+ * @summary Tear down MCP session
+ */
+export const getMcpSessionTeardownUrl = () => {
+  return `/api/mcp`;
+};
+
+export const mcpSessionTeardown = async (
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getMcpSessionTeardownUrl(), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getMcpSessionTeardownMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof mcpSessionTeardown>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof mcpSessionTeardown>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["mcpSessionTeardown"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof mcpSessionTeardown>>,
+    void
+  > = () => {
+    return mcpSessionTeardown(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type McpSessionTeardownMutationResult = NonNullable<
+  Awaited<ReturnType<typeof mcpSessionTeardown>>
+>;
+
+export type McpSessionTeardownMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Tear down MCP session
+ */
+export const useMcpSessionTeardown = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof mcpSessionTeardown>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof mcpSessionTeardown>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getMcpSessionTeardownMutationOptions(options));
+};

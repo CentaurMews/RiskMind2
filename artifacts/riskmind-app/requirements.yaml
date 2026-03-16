@@ -1,0 +1,16 @@
+packages:
+  "framer-motion": "For page transitions and interactive animations"
+  "recharts": "For dashboard KPI charts and data visualizations"
+  "date-fns": "For formatting timestamps"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility function to efficiently merge Tailwind CSS classes"
+  "lucide-react": "Icons"
+
+images:
+  - path: "artifacts/riskmind-app/public/images/logo-mark.png"
+    description: "A minimal, sharp, monochrome geometric logo mark suitable for an enterprise risk management platform, abstract shield or grid, dark grey on transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - Auth token is stored in localStorage as 'accessToken'
+  - We intercept global fetch to inject the Authorization header for all /api requests to make the generated hooks work seamlessly
