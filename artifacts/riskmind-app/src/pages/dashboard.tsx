@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { useListRisks, useListAlerts, useListVendors, useGetComplianceScore } from "@workspace/api-client-react";
+import { useListRisks, useListAlerts, useListVendors, useGetComplianceScore, useGetRiskHeatmap } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldAlert, Bell, Users, ShieldCheck, ArrowUpRight } from "lucide-react";
 import { SeverityBadge, StatusBadge } from "@/components/ui/severity-badge";
@@ -13,11 +13,12 @@ export default function Dashboard() {
   const { data: vendors } = useListVendors();
   
   const { data: compliance } = useGetComplianceScore("fw-default", { query: { queryKey: ["/api/v1/compliance/frameworks/fw-default/score"], retry: false } });
+  const { data: heatmap } = useGetRiskHeatmap();
 
   const activeRisksCount = risks?.total || 0;
   const openAlertsCount = alerts?.total || 0;
   const vendorCount = vendors?.total || 0;
-  const compScore = compliance?.score || 78; // Fallback for UI demo
+  const compScore = compliance?.score ?? 0;
 
   const recentAlerts = alerts?.data?.slice(0, 5) || [];
 
@@ -126,26 +127,31 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
                <div className="aspect-square w-full bg-secondary/50 rounded-lg border flex flex-col relative overflow-hidden">
-                  {/* Abstract placeholder for heatmap visualization to give it a premium look */}
                   <div className="absolute bottom-4 left-4 text-xs font-mono text-muted-foreground rotate-[-90deg] origin-bottom-left">LIKELIHOOD</div>
                   <div className="absolute bottom-0 left-10 text-xs font-mono text-muted-foreground w-full text-center pb-2">IMPACT</div>
                   
                   <div className="flex-1 grid grid-cols-5 grid-rows-5 gap-1 p-8 pb-10 pl-10">
-                    {Array.from({length: 25}).map((_, i) => {
-                      // Fake data distribution for visual effect
-                      const isHigh = i === 4 || i === 9 || i === 14;
-                      const isMed = i === 3 || i === 8 || i === 13 || i === 18 || i === 23;
-                      return (
-                        <div 
-                          key={i} 
-                          className={cn(
-                            "rounded-sm border border-border/50",
-                            isHigh ? "bg-severity-critical/20 border-severity-critical/30" :
-                            isMed ? "bg-severity-medium/20 border-severity-medium/30" : "bg-muted/30"
-                          )} 
-                        />
-                      )
-                    })}
+                    {[5, 4, 3, 2, 1].flatMap(l =>
+                      [1, 2, 3, 4, 5].map(i => {
+                        const cell = heatmap?.cells?.find(c => c.likelihood === l && c.impact === i);
+                        const count = cell?.risks?.length || 0;
+                        const score = l * i;
+                        return (
+                          <div 
+                            key={`${l}-${i}`} 
+                            className={cn(
+                              "rounded-sm border border-border/50 flex items-center justify-center text-xs font-mono",
+                              count === 0 ? "bg-muted/30" :
+                              score >= 15 ? "bg-severity-critical/20 border-severity-critical/30 text-severity-critical font-bold" :
+                              score >= 10 ? "bg-severity-high/20 border-severity-high/30 text-severity-high font-bold" :
+                              score >= 5 ? "bg-severity-medium/20 border-severity-medium/30 font-bold" : "bg-severity-low/20 border-severity-low/30"
+                            )} 
+                          >
+                            {count > 0 ? count : ""}
+                          </div>
+                        )
+                      })
+                    )}
                   </div>
                </div>
             </CardContent>

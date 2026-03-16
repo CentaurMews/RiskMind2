@@ -1,19 +1,35 @@
+import { useState } from "react";
 import { useRoute } from "wouter";
-import { useGetVendor, useListQuestionnaires, useListDocuments, useCalculateVendorRiskScore } from "@workspace/api-client-react";
+import { useGetVendor, useListQuestionnaires, useListDocuments, useCalculateVendorRiskScore, useTransitionVendor, useCreateDocument } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/severity-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Mail, Loader2, FileText, ClipboardList, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, Mail, Loader2, FileText, ClipboardList, RefreshCw, Upload, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+import type { VendorStatus } from "@workspace/api-client-react";
+
+const LIFECYCLE_TRANSITIONS: Record<string, { label: string; target: VendorStatus }[]> = {
+  onboarding: [{ label: "Approve Vendor", target: "approved" }],
+  approved: [{ label: "Activate", target: "active" }],
+  active: [{ label: "Suspend", target: "suspended" }, { label: "Start Offboarding", target: "offboarded" }],
+  suspended: [{ label: "Reactivate", target: "active" }, { label: "Offboard", target: "offboarded" }],
+};
 
 export default function VendorDetail() {
   const [, params] = useRoute("/vendors/:id");
   const id = params?.id || "";
   const queryClient = useQueryClient();
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [docForm, setDocForm] = useState({ fileName: "", mimeType: "application/pdf" });
 
   const { data: vendor, isLoading } = useGetVendor(id);
   const { data: questionnaires } = useListQuestionnaires(id);
@@ -25,8 +41,26 @@ export default function VendorDetail() {
     }
   });
 
+  const transitionMutation = useTransitionVendor({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/v1/vendors/${id}`] })
+    }
+  });
+
+  const uploadMutation = useCreateDocument({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/vendors/${id}/documents`] });
+        setUploadOpen(false);
+        setDocForm({ fileName: "", mimeType: "application/pdf" });
+      }
+    }
+  });
+
   if (isLoading) return <AppLayout><div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div></AppLayout>;
   if (!vendor) return <AppLayout><div className="p-8 text-center text-muted-foreground">Vendor not found</div></AppLayout>;
+
+  const availableTransitions = vendor.status ? LIFECYCLE_TRANSITIONS[vendor.status] || [] : [];
 
   return (
     <AppLayout>
@@ -62,6 +96,23 @@ export default function VendorDetail() {
                     <div className="font-medium mt-1 capitalize">{vendor.tier}</div>
                   </div>
                 </div>
+
+                {availableTransitions.length > 0 && (
+                  <div className="flex gap-2 pt-4 border-t">
+                    {availableTransitions.map((t: { label: string; target: VendorStatus }) => (
+                      <Button
+                        key={t.target}
+                        variant={t.target === "suspended" ? "destructive" : "default"}
+                        size="sm"
+                        disabled={transitionMutation.isPending}
+                        onClick={() => transitionMutation.mutate({ id, data: { targetStatus: t.target } })}
+                      >
+                        {transitionMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ArrowRight className="h-3 w-3 mr-1" />}
+                        {t.label}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -109,7 +160,7 @@ export default function VendorDetail() {
                 <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
                   <ClipboardList className="h-12 w-12 text-muted-foreground/30 mb-4" />
                   <p>No assessments sent to this vendor.</p>
-                  <Button variant="outline" className="mt-4 mt-4">Send Assessment</Button>
+                  <Button variant="outline" className="mt-4">Send Assessment</Button>
                 </div>
               ) : (
                 <div className="divide-y">
@@ -126,11 +177,15 @@ export default function VendorDetail() {
               )}
             </TabsContent>
             <TabsContent value="documents" className="p-0 m-0 border-none outline-none">
-               {documents?.data?.length === 0 ? (
+              <div className="p-4 border-b bg-muted/10 flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" /> Upload Document
+                </Button>
+              </div>
+              {documents?.data?.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
                   <FileText className="h-12 w-12 text-muted-foreground/30 mb-4" />
                   <p>No documents uploaded (SOC2, ISO27001, etc).</p>
-                  <Button variant="outline" className="mt-4">Upload Document</Button>
                 </div>
               ) : (
                 <div className="divide-y">
@@ -152,6 +207,36 @@ export default function VendorDetail() {
           </div>
         </Tabs>
       </div>
+
+      <Sheet open={uploadOpen} onOpenChange={setUploadOpen}>
+        <SheetContent className="sm:max-w-md w-full border-l">
+          <SheetHeader>
+            <SheetTitle>Upload Document</SheetTitle>
+            <SheetDescription>Add a compliance document for this vendor (SOC2, ISO 27001, etc).</SheetDescription>
+          </SheetHeader>
+          <form onSubmit={(e) => { e.preventDefault(); uploadMutation.mutate({ vendorId: id, data: { fileName: docForm.fileName, mimeType: docForm.mimeType } }); }} className="space-y-6 mt-6">
+            <div className="space-y-2">
+              <Label>Document Name</Label>
+              <Input required value={docForm.fileName} onChange={e => setDocForm({...docForm, fileName: e.target.value})} placeholder="SOC2_Type_II_2025.pdf" />
+            </div>
+            <div className="space-y-2">
+              <Label>Document Type</Label>
+              <Select value={docForm.mimeType} onValueChange={(v) => setDocForm({...docForm, mimeType: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="application/pdf">PDF</SelectItem>
+                  <SelectItem value="application/vnd.openxmlformats-officedocument.wordprocessingml.document">DOCX</SelectItem>
+                  <SelectItem value="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">XLSX</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full" disabled={uploadMutation.isPending}>
+              {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Upload className="h-4 w-4 mr-2" />}
+              Upload
+            </Button>
+          </form>
+        </SheetContent>
+      </Sheet>
     </AppLayout>
   );
 }

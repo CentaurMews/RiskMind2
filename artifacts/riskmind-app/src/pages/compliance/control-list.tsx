@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useListControls, useCreateControl } from "@workspace/api-client-react";
+import { useListControls, useCreateControl, useListFrameworks, useMapControlRequirements } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/severity-badge";
-import { Plus, Search, Loader2, Shield } from "lucide-react";
+import { Plus, Search, Loader2, Shield, Link2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,16 +14,27 @@ import { useQueryClient } from "@tanstack/react-query";
 export default function ControlList() {
   const [search, setSearch] = useState("");
   const { data, isLoading } = useListControls();
+  const { data: frameworks } = useListFrameworks();
   const queryClient = useQueryClient();
   
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({ title: "", description: "" });
+  const [mappingControlId, setMappingControlId] = useState<string | null>(null);
 
   const createMutation = useCreateControl({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/v1/controls"] });
         setIsOpen(false);
+      }
+    }
+  });
+
+  const mapMutation = useMapControlRequirements({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/controls"] });
+        setMappingControlId(null);
       }
     }
   });
@@ -37,6 +48,11 @@ export default function ControlList() {
         status: "planned" 
       } 
     });
+  };
+
+  const handleAutoMap = (controlId: string) => {
+    setMappingControlId(controlId);
+    mapMutation.mutate({ id: controlId, data: { requirementIds: [] } });
   };
 
   return (
@@ -102,13 +118,14 @@ export default function ControlList() {
                   <TableHead className="w-[100px]">ID</TableHead>
                   <TableHead>Control Definition</TableHead>
                   <TableHead className="w-[150px]">Status</TableHead>
+                  <TableHead className="w-[150px]">Mapping</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={3} className="text-center py-12"><Loader2 className="animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center py-12"><Loader2 className="animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
                 ) : data?.data?.length === 0 ? (
-                  <TableRow><TableCell colSpan={3} className="text-center py-12 text-muted-foreground">No controls defined.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground">No controls defined.</TableCell></TableRow>
                 ) : (
                   data?.data?.filter(c => c.title?.toLowerCase().includes(search.toLowerCase())).map((control) => (
                     <TableRow key={control.id} className="hover:bg-muted/30">
@@ -118,6 +135,22 @@ export default function ControlList() {
                         <div className="text-sm text-muted-foreground truncate max-w-xl">{control.description}</div>
                       </TableCell>
                       <TableCell><StatusBadge status={control.status} /></TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          disabled={mapMutation.isPending && mappingControlId === control.id}
+                          onClick={() => control.id && handleAutoMap(control.id)}
+                        >
+                          {mapMutation.isPending && mappingControlId === control.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          ) : (
+                            <Link2 className="h-3 w-3 mr-1" />
+                          )}
+                          Auto-Map
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}

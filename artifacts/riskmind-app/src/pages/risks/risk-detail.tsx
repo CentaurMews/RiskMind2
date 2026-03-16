@@ -1,11 +1,11 @@
 import { useRoute } from "wouter";
-import { useGetRisk, useListTreatments, useListKRIs, useAiEnrichRisk, useListIncidents } from "@workspace/api-client-react";
+import { useGetRisk, useListTreatments, useListKRIs, useAiEnrichRisk, useListIncidents, useListReviews } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SeverityBadge, StatusBadge } from "@/components/ui/severity-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Sparkles, AlertCircle, Activity, ShieldCheck, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, Sparkles, AlertCircle, Activity, ShieldCheck, Clock, Loader2, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,11 +19,12 @@ export default function RiskDetail() {
   const { data: treatments } = useListTreatments(id);
   const { data: kris } = useListKRIs(id);
   const { data: incidents } = useListIncidents(id);
+  const { data: reviews } = useListReviews(id);
 
   const enrichMutation = useAiEnrichRisk({
     mutation: {
       onSuccess: () => {
-        // Optimistically could show a toast
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${id}`] });
       }
     }
   });
@@ -82,6 +83,15 @@ export default function RiskDetail() {
               <p className="text-foreground leading-relaxed whitespace-pre-wrap">
                 {risk.description || "No description provided."}
               </p>
+              {enrichMutation.isSuccess && (
+                <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-2">
+                    <Sparkles className="h-4 w-4" />
+                    AI Enrichment
+                  </div>
+                  <p className="text-sm text-foreground/80 leading-relaxed">Enrichment job queued. Results will appear after processing.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -181,8 +191,41 @@ export default function RiskDetail() {
                 </div>
               )}
             </TabsContent>
-            <TabsContent value="history" className="p-12 text-center text-muted-foreground">
-              Review history log goes here.
+            <TabsContent value="history" className="p-0 m-0 border-none outline-none">
+              {!reviews?.data || reviews.data.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground">No review cycles recorded yet.</div>
+              ) : (
+                <div className="divide-y">
+                  {reviews.data.map(review => (
+                    <div key={review.id} className="p-4 hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {review.completedAt ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="font-semibold text-sm">
+                            Review Cycle
+                          </span>
+                          <StatusBadge status={review.completedAt ? "completed" : "pending"} />
+                        </div>
+                        <span className="text-xs font-mono text-muted-foreground">
+                          Due: {review.dueDate ? format(new Date(review.dueDate), 'MMM d, yyyy') : 'Not set'}
+                        </span>
+                      </div>
+                      {review.notes && (
+                        <p className="text-sm text-muted-foreground pl-6">{review.notes}</p>
+                      )}
+                      {review.completedAt && (
+                        <div className="text-xs text-muted-foreground pl-6 mt-1">
+                          Completed: {format(new Date(review.completedAt), 'MMM d, yyyy HH:mm')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </div>
         </Tabs>

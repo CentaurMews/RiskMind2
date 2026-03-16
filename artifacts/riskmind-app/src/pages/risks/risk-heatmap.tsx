@@ -1,14 +1,16 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useGetRiskHeatmap } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import { SeverityBadge } from "@/components/ui/severity-badge";
+import { Link } from "wouter";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 export default function RiskHeatmap() {
   const { data, isLoading } = useGetRiskHeatmap();
+  const [selectedCell, setSelectedCell] = useState<{ likelihood: number; impact: number } | null>(null);
 
-  // Initialize empty 5x5 grid (likelihood: 1-5, impact: 1-5)
-  // X axis = Impact, Y axis = Likelihood (top to bottom = 5 to 1)
-  
   const getCellColor = (count: number, likelihood: number, impact: number) => {
     if (count === 0) return "bg-card hover:bg-muted/50 border-border/50";
     const score = likelihood * impact;
@@ -22,12 +24,23 @@ export default function RiskHeatmap() {
     return data?.cells?.find(c => c.likelihood === l && c.impact === i);
   };
 
+  const selectedCellData = selectedCell ? getCellData(selectedCell.likelihood, selectedCell.impact) : null;
+  const selectedRisks = selectedCellData?.risks || [];
+
+  const computeSeverity = (l: number, i: number) => {
+    const score = l * i;
+    if (score >= 15) return "critical";
+    if (score >= 10) return "high";
+    if (score >= 5) return "medium";
+    return "low";
+  };
+
   return (
     <AppLayout>
       <div className="p-8 max-w-5xl mx-auto space-y-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Risk Heatmap</h1>
-          <p className="text-muted-foreground mt-1">Visual distribution of enterprise risks by likelihood and impact.</p>
+          <p className="text-muted-foreground mt-1">Visual distribution of enterprise risks by likelihood and impact. Click a cell to drill down.</p>
         </div>
 
         <div className="bg-card border rounded-2xl p-8 lg:p-16 shadow-sm overflow-hidden flex flex-col items-center justify-center min-h-[600px] relative">
@@ -35,19 +48,15 @@ export default function RiskHeatmap() {
             <Loader2 className="animate-spin h-8 w-8 text-primary" />
           ) : (
             <div className="relative w-full max-w-3xl">
-              {/* Y Axis Label */}
               <div className="absolute -left-12 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-sm font-bold tracking-widest text-muted-foreground whitespace-nowrap uppercase">
                 Likelihood
               </div>
               
-              {/* X Axis Label */}
               <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-sm font-bold tracking-widest text-muted-foreground uppercase">
                 Impact
               </div>
 
-              {/* Grid */}
               <div className="grid grid-cols-[auto_1fr] gap-4">
-                {/* Y Axis Scale */}
                 <div className="flex flex-col justify-between items-end pr-4 text-xs font-mono text-muted-foreground font-medium py-4">
                   <span>5 (Almost Certain)</span>
                   <span>4 (Likely)</span>
@@ -62,24 +71,25 @@ export default function RiskHeatmap() {
                       const cell = getCellData(l, i);
                       const count = cell?.risks?.length || 0;
                       return (
-                        <div 
+                        <button 
                           key={`${l}-${i}`}
                           className={cn(
                             "rounded-lg border transition-all duration-300 flex items-center justify-center text-2xl cursor-pointer hover:scale-[1.02]",
-                            getCellColor(count, l, i)
+                            getCellColor(count, l, i),
+                            selectedCell?.likelihood === l && selectedCell?.impact === i ? "ring-2 ring-primary ring-offset-2" : ""
                           )}
                           title={`Likelihood: ${l}, Impact: ${i} - ${count} risks`}
+                          onClick={() => count > 0 ? setSelectedCell({ likelihood: l, impact: i }) : undefined}
                         >
                           {count > 0 ? count : ""}
-                        </div>
+                        </button>
                       )
                     })
                   ))}
                 </div>
 
-                <div></div> {/* Empty corner */}
+                <div />
                 
-                {/* X Axis Scale */}
                 <div className="flex justify-between items-start pt-4 text-xs font-mono text-muted-foreground font-medium px-4">
                   <span className="w-0 text-center relative -left-4">1 (Negligible)</span>
                   <span className="w-0 text-center relative -left-4">2 (Minor)</span>
@@ -92,6 +102,39 @@ export default function RiskHeatmap() {
           )}
         </div>
       </div>
+
+      <Sheet open={!!selectedCell} onOpenChange={(open) => { if (!open) setSelectedCell(null); }}>
+        <SheetContent className="sm:max-w-lg w-full border-l overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <SeverityBadge severity={selectedCell ? computeSeverity(selectedCell.likelihood, selectedCell.impact) : "low"} />
+              L{selectedCell?.likelihood} x I{selectedCell?.impact} &mdash; {selectedRisks.length} Risk{selectedRisks.length !== 1 ? "s" : ""}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-3">
+            {selectedRisks.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">No risks in this cell.</div>
+            ) : (
+              selectedRisks.map((risk) => (
+                <Link key={risk.id} href={`/risks/${risk.id}`}>
+                  <div className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-sm group-hover:text-primary transition-colors">{risk.title}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono">L:{risk.likelihood} I:{risk.impact}</span>
+                      <span>&middot;</span>
+                      <span className="capitalize">{risk.category}</span>
+                      <span>&middot;</span>
+                      <span className="capitalize">{risk.status}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </AppLayout>
   );
 }
