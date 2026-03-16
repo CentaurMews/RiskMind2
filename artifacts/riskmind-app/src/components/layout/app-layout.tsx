@@ -19,8 +19,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   
   const { data: user, isLoading, error } = useGetMe({
     query: {
+      queryKey: ["/api/v1/auth/me"],
       retry: false,
-    }
+    },
   });
 
   useEffect(() => {

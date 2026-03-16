@@ -12,7 +12,7 @@ export default function Dashboard() {
   const { data: alerts } = useListAlerts({ status: "active" });
   const { data: vendors } = useListVendors();
   
-  const { data: compliance } = useGetComplianceScore("fw-default", { query: { retry: false } });
+  const { data: compliance } = useGetComplianceScore("fw-default", { query: { queryKey: ["/api/v1/compliance/frameworks/fw-default/score"], retry: false } });
 
   const activeRisksCount = risks?.total || 0;
   const openAlertsCount = alerts?.total || 0;

@@ -72,7 +72,7 @@ export default function VendorList() {
                 </div>
                 <div className="space-y-2">
                   <Label>Criticality Tier</Label>
-                  <Select value={formData.tier} onValueChange={(v: any) => setFormData({...formData, tier: v})}>
+                  <Select value={formData.tier} onValueChange={(v) => setFormData({...formData, tier: v as typeof formData.tier})}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="critical">Critical</SelectItem>

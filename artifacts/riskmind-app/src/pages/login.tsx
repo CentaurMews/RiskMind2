@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,13 @@ export default function Login() {
   const [tenantSlug, setTenantSlug] = useState("acme");
   
   const loginMutation = useLogin();
+
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      setLocation("/dashboard", { replace: true });
+    }
+  }, [setLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

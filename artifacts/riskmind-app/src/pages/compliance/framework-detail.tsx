@@ -54,7 +54,7 @@ export default function FrameworkDetail() {
                     <span>Requirement Coverage</span>
                     <span>{coveragePercent}%</span>
                   </div>
-                  <Progress value={coveragePercent} className="h-2 bg-secondary" indicatorClassName="bg-primary" />
+                  <Progress value={coveragePercent} className="h-2 bg-secondary" />
                 </div>
                 <div>
                   <div className="flex justify-between text-xs mb-1.5 font-medium text-muted-foreground">

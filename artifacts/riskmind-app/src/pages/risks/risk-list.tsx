@@ -94,7 +94,7 @@ export default function RiskList() {
                 </div>
                 <div className="space-y-2">
                   <Label>Category</Label>
-                  <Select value={formData.category} onValueChange={(v: any) => setFormData({...formData, category: v})}>
+                  <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v as typeof formData.category})}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="operational">Operational</SelectItem>

@@ -1,15 +1,20 @@
-import { useListAlerts, useAcknowledgeAlert } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useListAlerts, useAcknowledgeAlert, type ListAlertsSeverity } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SeverityBadge, StatusBadge } from "@/components/ui/severity-badge";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function AlertList() {
-  const { data, isLoading } = useListAlerts();
+  const [severityFilter, setSeverityFilter] = useState<string>("all");
+  const { data, isLoading } = useListAlerts(
+    severityFilter !== "all" ? { severity: severityFilter as ListAlertsSeverity } : undefined
+  );
   const queryClient = useQueryClient();
 
   const ackMutation = useAcknowledgeAlert({
@@ -21,9 +26,23 @@ export default function AlertList() {
   return (
     <AppLayout>
       <div className="p-8 max-w-7xl mx-auto space-y-6 h-full flex flex-col">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Active Alerts</h1>
-          <p className="text-muted-foreground mt-1">System and AI-generated alerts requiring acknowledgment.</p>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Active Alerts</h1>
+            <p className="text-muted-foreground mt-1">System and AI-generated alerts requiring acknowledgment.</p>
+          </div>
+          <Select value={severityFilter} onValueChange={setSeverityFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by severity" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Severities</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <Card className="flex-1 flex flex-col min-h-0 shadow-sm border-t-4 border-t-destructive">
