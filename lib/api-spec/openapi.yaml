@@ -287,6 +287,30 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /v1/risks/{riskId}/sources:
+    get:
+      operationId: listRiskSources
+      tags: [risks]
+      summary: List sources for a risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: riskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of risk sources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskSourceListResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /v1/risks/{riskId}/treatments:
     get:
       operationId: listTreatments
@@ -2661,6 +2685,51 @@ components:
           type: string
           format: date-time
 
+    RiskSourceType:
+      type: string
+      enum:
+        - signal
+        - finding
+        - agent_detection
+
+    RiskSourceInput:
+      type: object
+      properties:
+        sourceType:
+          $ref: "#/components/schemas/RiskSourceType"
+        sourceId:
+          type: string
+          format: uuid
+      required:
+        - sourceType
+        - sourceId
+
+    RiskSource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        riskId:
+          type: string
+          format: uuid
+        sourceType:
+          $ref: "#/components/schemas/RiskSourceType"
+        sourceId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    RiskSourceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskSource"
+
     CreateRiskRequest:
       type: object
       properties:
@@ -2683,6 +2752,10 @@ components:
           type: integer
           minimum: 1
           maximum: 5
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskSourceInput"
       required:
         - title
         - category

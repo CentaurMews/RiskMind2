@@ -182,6 +182,14 @@ export const CreateRiskBody = zod.object({
   ownerId: zod.string().uuid().optional(),
   likelihood: zod.number().min(1).max(createRiskBodyLikelihoodMax).optional(),
   impact: zod.number().min(1).max(createRiskBodyImpactMax).optional(),
+  sources: zod
+    .array(
+      zod.object({
+        sourceType: zod.enum(["signal", "finding", "agent_detection"]),
+        sourceId: zod.string().uuid(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -350,6 +358,29 @@ export const DeleteRiskParams = zod.object({
 export const DeleteRiskResponse = zod.object({
   deleted: zod.boolean().optional(),
   id: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary List sources for a risk
+ */
+export const ListRiskSourcesParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const ListRiskSourcesResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        riskId: zod.string().uuid().optional(),
+        sourceType: zod
+          .enum(["signal", "finding", "agent_detection"])
+          .optional(),
+        sourceId: zod.string().uuid().optional(),
+        createdAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
