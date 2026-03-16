@@ -10,6 +10,9 @@ import {
   frameworkRequirementsTable,
 } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { iso27001Requirements } from "./framework-data/iso27001";
+import { soc2Requirements } from "./framework-data/soc2";
+import { nistCsfRequirements } from "./framework-data/nist-csf";
 
 async function hashPassword(password: string): Promise<string> {
   const bcrypt = await import("bcryptjs");
@@ -182,33 +185,7 @@ async function seed() {
     description: "Information security management systems — Requirements",
   }).returning();
 
-  const isoCount = await seedRequirements(tenant.id, isoFramework.id, [
-    { code: "A.5", title: "Organizational controls" },
-    { code: "A.5.1", title: "Policies for information security", parent: "A.5" },
-    { code: "A.5.2", title: "Information security roles and responsibilities", parent: "A.5" },
-    { code: "A.5.3", title: "Segregation of duties", parent: "A.5" },
-    { code: "A.5.4", title: "Management responsibilities", parent: "A.5" },
-    { code: "A.5.5", title: "Contact with authorities", parent: "A.5" },
-    { code: "A.5.6", title: "Contact with special interest groups", parent: "A.5" },
-    { code: "A.5.7", title: "Threat intelligence", parent: "A.5" },
-    { code: "A.5.8", title: "Information security in project management", parent: "A.5" },
-    { code: "A.6", title: "People controls" },
-    { code: "A.6.1", title: "Screening", parent: "A.6" },
-    { code: "A.6.2", title: "Terms and conditions of employment", parent: "A.6" },
-    { code: "A.6.3", title: "Information security awareness, education and training", parent: "A.6" },
-    { code: "A.7", title: "Physical controls" },
-    { code: "A.7.1", title: "Physical security perimeters", parent: "A.7" },
-    { code: "A.7.2", title: "Physical entry", parent: "A.7" },
-    { code: "A.8", title: "Technological controls" },
-    { code: "A.8.1", title: "User endpoint devices", parent: "A.8" },
-    { code: "A.8.2", title: "Privileged access rights", parent: "A.8" },
-    { code: "A.8.3", title: "Information access restriction", parent: "A.8" },
-    { code: "A.8.4", title: "Access to source code", parent: "A.8" },
-    { code: "A.8.5", title: "Secure authentication", parent: "A.8" },
-    { code: "A.8.6", title: "Capacity management", parent: "A.8" },
-    { code: "A.8.7", title: "Protection against malware", parent: "A.8" },
-    { code: "A.8.8", title: "Management of technical vulnerabilities", parent: "A.8" },
-  ], "ISO 27001:2022 requirement");
+  const isoCount = await seedRequirements(tenant.id, isoFramework.id, iso27001Requirements, "ISO 27001:2022 requirement");
 
   console.log(`Created ISO 27001 framework with ${isoCount} requirements`);
 
@@ -220,37 +197,7 @@ async function seed() {
     description: "Trust Services Criteria for Security, Availability, and Confidentiality",
   }).returning();
 
-  const soc2Count = await seedRequirements(tenant.id, soc2Framework.id, [
-    { code: "CC1", title: "Control Environment" },
-    { code: "CC1.1", title: "COSO Principle 1: Integrity and Ethical Values", parent: "CC1" },
-    { code: "CC1.2", title: "COSO Principle 2: Board Independence", parent: "CC1" },
-    { code: "CC1.3", title: "COSO Principle 3: Management Structure", parent: "CC1" },
-    { code: "CC2", title: "Communication and Information" },
-    { code: "CC2.1", title: "COSO Principle 13: Quality Information", parent: "CC2" },
-    { code: "CC2.2", title: "COSO Principle 14: Internal Communication", parent: "CC2" },
-    { code: "CC2.3", title: "COSO Principle 15: External Communication", parent: "CC2" },
-    { code: "CC3", title: "Risk Assessment" },
-    { code: "CC3.1", title: "COSO Principle 6: Risk Assessment Objectives", parent: "CC3" },
-    { code: "CC3.2", title: "COSO Principle 7: Risk Identification and Analysis", parent: "CC3" },
-    { code: "CC4", title: "Monitoring Activities" },
-    { code: "CC4.1", title: "COSO Principle 16: Ongoing Monitoring", parent: "CC4" },
-    { code: "CC4.2", title: "COSO Principle 17: Evaluation and Communication", parent: "CC4" },
-    { code: "CC5", title: "Control Activities" },
-    { code: "CC5.1", title: "COSO Principle 10: Risk Mitigation", parent: "CC5" },
-    { code: "CC5.2", title: "COSO Principle 11: Technology Controls", parent: "CC5" },
-    { code: "CC6", title: "Logical and Physical Access Controls" },
-    { code: "CC6.1", title: "Logical Access Security", parent: "CC6" },
-    { code: "CC6.2", title: "Access Authentication", parent: "CC6" },
-    { code: "CC6.3", title: "Access Authorization", parent: "CC6" },
-    { code: "CC7", title: "System Operations" },
-    { code: "CC7.1", title: "Infrastructure Monitoring", parent: "CC7" },
-    { code: "CC7.2", title: "Incident Detection", parent: "CC7" },
-    { code: "A1", title: "Availability" },
-    { code: "A1.1", title: "Recovery from Disruptions", parent: "A1" },
-    { code: "C1", title: "Confidentiality" },
-    { code: "C1.1", title: "Confidential Information Identification", parent: "C1" },
-    { code: "C1.2", title: "Confidential Information Disposal", parent: "C1" },
-  ], "SOC 2 Trust Services Criteria");
+  const soc2Count = await seedRequirements(tenant.id, soc2Framework.id, soc2Requirements, "SOC 2 Trust Services Criteria");
 
   console.log(`Created SOC 2 framework with ${soc2Count} requirements`);
 
@@ -262,35 +209,7 @@ async function seed() {
     description: "NIST Cybersecurity Framework 2.0",
   }).returning();
 
-  const nistCount = await seedRequirements(tenant.id, nistFramework.id, [
-    { code: "GV", title: "Govern" },
-    { code: "GV.OC", title: "Organizational Context", parent: "GV" },
-    { code: "GV.RM", title: "Risk Management Strategy", parent: "GV" },
-    { code: "GV.RR", title: "Roles, Responsibilities, and Authorities", parent: "GV" },
-    { code: "GV.PO", title: "Policy", parent: "GV" },
-    { code: "GV.SC", title: "Supply Chain Risk Management", parent: "GV" },
-    { code: "ID", title: "Identify" },
-    { code: "ID.AM", title: "Asset Management", parent: "ID" },
-    { code: "ID.RA", title: "Risk Assessment", parent: "ID" },
-    { code: "ID.IM", title: "Improvement", parent: "ID" },
-    { code: "PR", title: "Protect" },
-    { code: "PR.AA", title: "Identity Management, Authentication, and Access Control", parent: "PR" },
-    { code: "PR.AT", title: "Awareness and Training", parent: "PR" },
-    { code: "PR.DS", title: "Data Security", parent: "PR" },
-    { code: "PR.PS", title: "Platform Security", parent: "PR" },
-    { code: "PR.IR", title: "Technology Infrastructure Resilience", parent: "PR" },
-    { code: "DE", title: "Detect" },
-    { code: "DE.CM", title: "Continuous Monitoring", parent: "DE" },
-    { code: "DE.AE", title: "Adverse Event Analysis", parent: "DE" },
-    { code: "RS", title: "Respond" },
-    { code: "RS.MA", title: "Incident Management", parent: "RS" },
-    { code: "RS.AN", title: "Incident Analysis", parent: "RS" },
-    { code: "RS.CO", title: "Incident Response Reporting and Communication", parent: "RS" },
-    { code: "RS.MI", title: "Incident Mitigation", parent: "RS" },
-    { code: "RC", title: "Recover" },
-    { code: "RC.RP", title: "Incident Recovery Plan Execution", parent: "RC" },
-    { code: "RC.CO", title: "Incident Recovery Communication", parent: "RC" },
-  ], "NIST CSF 2.0");
+  const nistCount = await seedRequirements(tenant.id, nistFramework.id, nistCsfRequirements, "NIST CSF 2.0");
 
   console.log(`Created NIST CSF 2.0 framework with ${nistCount} requirements`);
 
