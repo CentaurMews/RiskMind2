@@ -4,6 +4,7 @@ import { startJobProcessor } from "./lib/job-queue";
 import { registerAIWorkers } from "./lib/ai-workers";
 import { startMonitoringScheduler } from "./lib/monitoring";
 import { startAgentScheduler } from "./lib/agent-scheduler";
+import { seedDemoDataIfEmpty } from "./lib/seed";
 
 const rawPort = process.env["PORT"];
 
@@ -21,6 +22,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function start() {
   await ensureExtensions();
+  await seedDemoDataIfEmpty();
 
   registerAIWorkers();
   startJobProcessor();
