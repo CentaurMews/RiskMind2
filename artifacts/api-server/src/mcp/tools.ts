@@ -22,6 +22,9 @@ import {
   CreateControlBody,
   ListSignalsQueryParams,
   ListAlertsQueryParams,
+  AcknowledgeAlertParams,
+  GetComplianceScoreParams,
+  GetGapAnalysisParams,
 } from "@workspace/api-zod";
 import { recordAuditDirect } from "../lib/audit";
 import { getMcpAuthBySessionId, type McpAuthContext } from "./handler";
@@ -273,9 +276,7 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "acknowledge_alert",
     "Acknowledge an active alert",
-    {
-      alertId: z.string().uuid(),
-    },
+    { alertId: AcknowledgeAlertParams.shape.id },
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
@@ -301,9 +302,7 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "get_compliance_score",
     "Get compliance score for a framework showing coverage of requirements by controls",
-    {
-      frameworkId: z.string().uuid(),
-    },
+    GetComplianceScoreParams.shape,
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
@@ -341,9 +340,7 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "run_gap_analysis",
     "Run gap analysis for a compliance framework, identifying requirements without mapped controls",
-    {
-      frameworkId: z.string().uuid(),
-    },
+    GetGapAnalysisParams.shape,
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
