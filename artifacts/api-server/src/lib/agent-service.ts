@@ -18,6 +18,21 @@ import {
 import { complete, isAvailable } from "./llm-service";
 import { recordAuditDirect } from "./audit";
 
+async function agentAudit(
+  tenantId: string,
+  agentRunId: string,
+  action: string,
+  entityType: string,
+  entityId: string | undefined,
+  payload?: Record<string, unknown>,
+) {
+  await recordAuditDirect(tenantId, null, action, entityType, entityId, {
+    ...payload,
+    actor: "agent",
+    agentRunId,
+  });
+}
+
 interface TenantAgentConfig {
   agentEnabled?: boolean;
   agentPolicyTier?: "observe" | "advisory" | "active";
@@ -584,8 +599,7 @@ async function act(
       actionedAt: policyTier === "active" ? new Date() : null,
     }).returning();
 
-    await recordAuditDirect(tenantId, null, "agent_finding_created", "agent_finding", saved.id, {
-      agentRunId: runId,
+    await agentAudit(tenantId, runId, "agent_finding_created", "agent_finding", saved.id, {
       type: finding.type,
       severity: finding.severity,
       policyTier,
@@ -596,21 +610,7 @@ async function act(
       try {
         const actionType = String(storedAction.type || "");
 
-        if (actionType === "create_signal") {
-          const [signal] = await db.insert(signalsTable).values({
-            tenantId,
-            source: "agent",
-            content: String(storedAction.content || finding.title),
-            status: "pending",
-            classification: String(storedAction.classification || "agent_generated"),
-            confidence: "0.7000",
-          }).returning();
-
-          await recordAuditDirect(tenantId, null, "agent_auto_signal", "signal", signal.id, {
-            agentRunId: runId,
-            findingId: saved.id,
-          });
-        } else if (actionType === "create_alert" || actionType === "create_review_flag") {
+        if (actionType === "create_alert" || actionType === "create_review_flag") {
           const alertType = actionType === "create_review_flag" ? "review_flag" : "agent_insight";
           const [existing] = await db.select({ id: alertsTable.id }).from(alertsTable)
             .where(and(
@@ -630,8 +630,7 @@ async function act(
               context: { agentRunId: runId, findingId: saved.id, linkedEntities: finding.linkedEntities },
             }).returning();
 
-            await recordAuditDirect(tenantId, null, "agent_auto_" + alertType, "alert", alert.id, {
-              agentRunId: runId,
+            await agentAudit(tenantId, runId, "agent_auto_" + alertType, "alert", alert.id, {
               findingId: saved.id,
               severity: finding.severity,
             });
@@ -648,8 +647,7 @@ async function act(
             context: { agentRunId: runId, findingId: saved.id, type: finding.type },
           });
 
-          await recordAuditDirect(tenantId, null, "agent_review_flag_created", "alert", saved.id, {
-            agentRunId: runId,
+          await agentAudit(tenantId, runId, "agent_review_flag_created", "alert", saved.id, {
             severity: finding.severity,
           });
         }
@@ -720,7 +718,7 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
           },
         }).where(eq(agentRunsTable.id, run.id));
 
-        await recordAuditDirect(tenantId, null, "agent_run_skipped", "agent_run", run.id, {
+        await agentAudit(tenantId, run.id, "agent_run_skipped", "agent_run", run.id, {
           policyTier,
           reason: `LLM provider unreachable: ${errMsg}`,
           localFindingsDetected: localFindings.length,
@@ -754,7 +752,7 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
         },
       }).where(eq(agentRunsTable.id, run.id));
 
-      await recordAuditDirect(tenantId, null, "agent_run_skipped", "agent_run", run.id, {
+      await agentAudit(tenantId, run.id, "agent_run_skipped", "agent_run", run.id, {
         policyTier,
         reason: skipReason,
         localFindingsDetected: localFindings.length,
@@ -801,7 +799,7 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
       },
     }).where(eq(agentRunsTable.id, run.id));
 
-    await recordAuditDirect(tenantId, null, "agent_run_completed", "agent_run", run.id, {
+    await agentAudit(tenantId, run.id, "agent_run_completed", "agent_run", run.id, {
       policyTier,
       findingCount: savedCount,
       durationMs,
@@ -822,7 +820,7 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
       completedAt: new Date(),
     }).where(eq(agentRunsTable.id, run.id));
 
-    await recordAuditDirect(tenantId, null, "agent_run_failed", "agent_run", run.id, {
+    await agentAudit(tenantId, run.id, "agent_run_failed", "agent_run", run.id, {
       error: errorMsg,
       policyTier,
     });
