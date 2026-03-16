@@ -89,6 +89,7 @@ router.post("/v1/signals/:signalId/promote", requireRole("admin", "risk_manager"
     if (!signal) { notFound(res, "Signal not found"); return; }
     if (signal.status === "finding") { conflict(res, "Signal has already been promoted to a finding"); return; }
     if (signal.status === "dismissed") { conflict(res, "Cannot promote a dismissed signal"); return; }
+    if (signal.status === "pending") { conflict(res, "Signal must be triaged before promotion. Current status: pending"); return; }
 
     const { title, description, riskId, vendorId } = req.body;
 

@@ -1,5 +1,5 @@
-import { db, jobsTable } from "@workspace/db";
-import { eq, and, sql, lte } from "drizzle-orm";
+import { db, jobsTable, pool } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 
 type JobHandler = (job: { id: string; tenantId: string | null; type: string; payload: unknown }) => Promise<unknown>;
 
@@ -33,19 +33,31 @@ export async function enqueueJob(
   return job;
 }
 
-async function processNextJob(): Promise<boolean> {
-  for (const [queue, handler] of handlers) {
-    const [job] = await db
-      .update(jobsTable)
-      .set({ status: "processing", startedAt: new Date(), attempts: sql`${jobsTable.attempts} + 1` })
-      .where(and(
-        eq(jobsTable.queue, queue),
-        eq(jobsTable.status, "pending"),
-        lte(jobsTable.scheduledAt, new Date()),
-      ))
-      .returning();
+async function claimAndProcessJob(queue: string, handler: JobHandler): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-    if (!job) continue;
+    const claimResult = await client.query(
+      `UPDATE jobs SET status = 'processing', started_at = NOW(), attempts = attempts + 1
+       WHERE id = (
+         SELECT id FROM jobs
+         WHERE queue = $1 AND status = 'pending' AND scheduled_at <= NOW()
+         ORDER BY scheduled_at ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING id, tenant_id AS "tenantId", type, payload, attempts, max_attempts AS "maxAttempts"`,
+      [queue]
+    );
+
+    if (claimResult.rows.length === 0) {
+      await client.query("COMMIT");
+      return false;
+    }
+
+    const job = claimResult.rows[0];
+    await client.query("COMMIT");
 
     try {
       const result = await handler({
@@ -60,12 +72,9 @@ async function processNextJob(): Promise<boolean> {
         result: result as Record<string, unknown>,
         completedAt: new Date(),
       }).where(eq(jobsTable.id, job.id));
-
-      return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      const newAttempts = job.attempts + 1;
-      const isDead = newAttempts >= job.maxAttempts;
+      const isDead = job.attempts >= job.maxAttempts;
 
       if (isDead) {
         await db.update(jobsTable).set({
@@ -74,7 +83,7 @@ async function processNextJob(): Promise<boolean> {
           completedAt: new Date(),
         }).where(eq(jobsTable.id, job.id));
       } else {
-        const backoffMs = Math.min(1000 * Math.pow(2, newAttempts), 60000);
+        const backoffMs = Math.min(1000 * Math.pow(2, job.attempts), 60000);
         await db.update(jobsTable).set({
           status: "pending",
           lastError: errorMsg,
@@ -82,9 +91,22 @@ async function processNextJob(): Promise<boolean> {
         }).where(eq(jobsTable.id, job.id));
       }
 
-      console.error(`Job ${job.id} (${queue}/${job.type}) failed attempt ${newAttempts}:`, errorMsg);
-      return true;
+      console.error(`Job ${job.id} (${queue}/${job.type}) failed attempt ${job.attempts}:`, errorMsg);
     }
+
+    return true;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function processNextJob(): Promise<boolean> {
+  for (const [queue, handler] of handlers) {
+    const processed = await claimAndProcessJob(queue, handler);
+    if (processed) return true;
   }
   return false;
 }

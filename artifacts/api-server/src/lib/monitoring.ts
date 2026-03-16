@@ -1,4 +1,4 @@
-import { db, alertsTable, krisTable, reviewCyclesTable, documentsTable, controlTestsTable, vendorsTable } from "@workspace/db";
+import { db, alertsTable, krisTable, reviewCyclesTable, documentsTable, controlTestsTable, vendorsTable, controlsTable, controlRequirementMapsTable, frameworkRequirementsTable, frameworksTable } from "@workspace/db";
 import { eq, and, sql, lt, inArray } from "drizzle-orm";
 import { recordAuditDirect } from "./audit";
 
@@ -108,6 +108,43 @@ export async function checkVendorStatusIssues() {
   return alertCount;
 }
 
+export async function checkComplianceDrift() {
+  const frameworks = await db.select().from(frameworksTable);
+  let alertCount = 0;
+
+  for (const fw of frameworks) {
+    const totalReqs = await db.select({ count: sql<number>`count(*)::int` })
+      .from(frameworkRequirementsTable)
+      .where(eq(frameworkRequirementsTable.frameworkId, fw.id));
+
+    const coveredReqs = await db.select({ count: sql<number>`count(DISTINCT ${controlRequirementMapsTable.requirementId})::int` })
+      .from(controlRequirementMapsTable)
+      .innerJoin(frameworkRequirementsTable, eq(controlRequirementMapsTable.requirementId, frameworkRequirementsTable.id))
+      .innerJoin(controlsTable, eq(controlRequirementMapsTable.controlId, controlsTable.id))
+      .where(and(
+        eq(frameworkRequirementsTable.frameworkId, fw.id),
+        eq(controlsTable.status, "active"),
+      ));
+
+    const total = totalReqs[0].count;
+    const covered = coveredReqs[0].count;
+
+    if (total > 0) {
+      const coveragePercent = (covered / total) * 100;
+      if (coveragePercent < 50) {
+        const tenantIds = await db.selectDistinct({ tenantId: controlsTable.tenantId }).from(controlsTable);
+        for (const { tenantId } of tenantIds) {
+          await createAlert(tenantId, "compliance_drift", `Low compliance coverage: ${fw.name}`, "high",
+            `Framework "${fw.name}" has only ${coveragePercent.toFixed(1)}% requirement coverage (${covered}/${total})`,
+            { frameworkId: fw.id, coveragePercent, covered, total });
+          alertCount++;
+        }
+      }
+    }
+  }
+  return alertCount;
+}
+
 export async function escalateUnacknowledgedAlerts() {
   const cutoff = new Date(Date.now() - ESCALATION_WINDOW_MS);
   const unacked = await db.select().from(alertsTable)
@@ -138,6 +175,7 @@ export async function runAllMonitoringChecks() {
     expiredDocuments: await checkExpiredDocuments(),
     failedControlTests: await checkFailedControlTests(),
     vendorStatusIssues: await checkVendorStatusIssues(),
+    complianceDrift: await checkComplianceDrift(),
     escalations: await escalateUnacknowledgedAlerts(),
   };
 

@@ -89,7 +89,23 @@ export function registerAIWorkers() {
         updatedAt: new Date(),
       }).where(eq(signalsTable.id, signalId));
 
-      return { status: "triaged", classification, confidence };
+      let correlatedRisks: Array<{ id: string; title: string; similarity: number }> = [];
+      if (confidence >= 0.7 && signal.embedding) {
+        try {
+          correlatedRisks = await findSimilarRisks(
+            signal.embedding as unknown as number[],
+            signal.tenantId,
+            0.7
+          );
+          if (correlatedRisks.length > 0) {
+            console.log(`[AI Triage] Signal ${signalId} correlated with ${correlatedRisks.length} risks`);
+          }
+        } catch (corrErr) {
+          console.warn(`[AI Triage] pgvector correlation failed for signal ${signalId}:`, corrErr);
+        }
+      }
+
+      return { status: "triaged", classification, confidence, correlatedRisks };
     } catch (err) {
       console.error(`[AI Triage] Error processing signal ${signalId}:`, err);
       return { status: "manual_fallback", reason: "AI classification failed" };
