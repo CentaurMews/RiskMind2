@@ -154,15 +154,28 @@ router.post("/v1/agent/findings/:id/approve", requireRole("admin", "risk_manager
           actionResult = { type: "signal_created", id: signal.id };
         } else if (actionType === "create_alert" || actionType === "create_review_flag") {
           const alertType = actionType === "create_review_flag" ? "review_flag" : "agent_insight";
-          const [alert] = await db.insert(alertsTable).values({
-            tenantId,
-            type: alertType,
-            title: String(proposedAction.title || finding.title),
-            severity: (["critical", "high", "medium", "low"].includes(String(proposedAction.severity)) ? String(proposedAction.severity) : "medium") as "critical" | "high" | "medium" | "low",
-            status: "active",
-            context: { findingId, agentRunId: finding.runId, ...(proposedAction.context as object || {}) },
-          }).returning();
-          actionResult = { type: alertType + "_created", id: alert.id };
+
+          const existing = await db.select({ id: alertsTable.id }).from(alertsTable)
+            .where(and(
+              eq(alertsTable.tenantId, tenantId),
+              eq(alertsTable.type, alertType as any),
+              eq(alertsTable.status, "active"),
+              sql`${alertsTable.context}->>'findingId' = ${findingId}`,
+            )).limit(1);
+
+          if (existing.length > 0) {
+            actionResult = { type: alertType + "_already_exists", id: existing[0].id };
+          } else {
+            const [alert] = await db.insert(alertsTable).values({
+              tenantId,
+              type: alertType,
+              title: String(proposedAction.title || finding.title),
+              severity: (["critical", "high", "medium", "low"].includes(String(proposedAction.severity)) ? String(proposedAction.severity) : "medium") as "critical" | "high" | "medium" | "low",
+              status: "active",
+              context: { findingId, agentRunId: finding.runId, ...(proposedAction.context as object || {}) },
+            }).returning();
+            actionResult = { type: alertType + "_created", id: alert.id };
+          }
         } else if (actionType === "create_treatment") {
           actionResult = { type: "treatment_noted", detail: "Treatment proposal noted for manual implementation" };
         }

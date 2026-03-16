@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { eq, and, sql, ilike, inArray } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   db,
   risksTable,
@@ -8,9 +8,6 @@ import {
   signalsTable,
   alertsTable,
   controlsTable,
-  frameworksTable,
-  frameworkRequirementsTable,
-  controlRequirementMapsTable,
 } from "@workspace/db";
 import {
   ListRisksQueryParams,
@@ -28,6 +25,7 @@ import {
 } from "@workspace/api-zod";
 import { recordAuditDirect } from "../lib/audit";
 import { getMcpAuthBySessionId, type McpAuthContext } from "./handler";
+import { invokeTool } from "../lib/tool-registry";
 
 function rfc7807(status: number, title: string, detail: string, auditCtx?: { tenantId: string; userId: string; tool: string }) {
   if (auditCtx) {
@@ -81,19 +79,17 @@ export function registerMcpTools(mcp: McpServer) {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
 
-      const conditions = [eq(risksTable.tenantId, user.tenantId)];
-      if (args.status) conditions.push(eq(risksTable.status, args.status));
-      if (args.category) conditions.push(eq(risksTable.category, args.category));
-      if (args.search) conditions.push(ilike(risksTable.title, `%${args.search}%`));
-
-      const offset = (args.page - 1) * args.limit;
-      const [risks, countResult] = await Promise.all([
-        db.select().from(risksTable).where(and(...conditions)).limit(args.limit).offset(offset).orderBy(risksTable.createdAt),
-        db.select({ count: sql<number>`count(*)::int` }).from(risksTable).where(and(...conditions)),
-      ]);
+      const result = await invokeTool("list_risks", {
+        tenantId: user.tenantId,
+        status: args.status,
+        category: args.category,
+        search: args.search,
+        page: args.page,
+        limit: args.limit,
+      });
 
       await audit(user.tenantId, user.userId, "mcp_list", "risk");
-      return { content: [{ type: "text" as const, text: JSON.stringify({ data: risks, total: countResult[0].count, page: args.page, limit: args.limit }) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, total: result.total, page: args.page, limit: args.limit }) }] };
     }
   );
 
@@ -161,18 +157,16 @@ export function registerMcpTools(mcp: McpServer) {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
 
-      const conditions = [eq(vendorsTable.tenantId, user.tenantId)];
-      if (args.status) conditions.push(eq(vendorsTable.status, args.status));
-      if (args.search) conditions.push(ilike(vendorsTable.name, `%${args.search}%`));
-
-      const offset = (args.page - 1) * args.limit;
-      const [vendors, countResult] = await Promise.all([
-        db.select().from(vendorsTable).where(and(...conditions)).limit(args.limit).offset(offset).orderBy(vendorsTable.createdAt),
-        db.select({ count: sql<number>`count(*)::int` }).from(vendorsTable).where(and(...conditions)),
-      ]);
+      const result = await invokeTool("list_vendors", {
+        tenantId: user.tenantId,
+        status: args.status,
+        search: args.search,
+        page: args.page,
+        limit: args.limit,
+      });
 
       await audit(user.tenantId, user.userId, "mcp_list", "vendor");
-      return { content: [{ type: "text" as const, text: JSON.stringify({ data: vendors, total: countResult[0].count, page: args.page, limit: args.limit }) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, total: result.total, page: args.page, limit: args.limit }) }] };
     }
   );
 
@@ -208,19 +202,17 @@ export function registerMcpTools(mcp: McpServer) {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
 
-      const conditions = [eq(signalsTable.tenantId, user.tenantId)];
-      if (args.status) conditions.push(eq(signalsTable.status, args.status));
-      if (args.source) conditions.push(eq(signalsTable.source, args.source));
-      if (args.search) conditions.push(ilike(signalsTable.content, `%${args.search}%`));
-
-      const offset = (args.page - 1) * args.limit;
-      const [signals, countResult] = await Promise.all([
-        db.select().from(signalsTable).where(and(...conditions)).limit(args.limit).offset(offset).orderBy(signalsTable.createdAt),
-        db.select({ count: sql<number>`count(*)::int` }).from(signalsTable).where(and(...conditions)),
-      ]);
+      const result = await invokeTool("list_signals", {
+        tenantId: user.tenantId,
+        status: args.status,
+        source: args.source,
+        search: args.search,
+        page: args.page,
+        limit: args.limit,
+      });
 
       await audit(user.tenantId, user.userId, "mcp_list", "signal");
-      return { content: [{ type: "text" as const, text: JSON.stringify({ data: signals, total: countResult[0].count, page: args.page, limit: args.limit }) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, total: result.total, page: args.page, limit: args.limit }) }] };
     }
   );
 
@@ -257,19 +249,18 @@ export function registerMcpTools(mcp: McpServer) {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
 
-      const conditions = [eq(alertsTable.tenantId, user.tenantId)];
-      if (args.severity) conditions.push(eq(alertsTable.severity, args.severity));
-      if (args.status) conditions.push(eq(alertsTable.status, args.status));
-      if (args.type) conditions.push(eq(alertsTable.type, args.type));
-
-      const offset = (args.page - 1) * args.limit;
-      const [alerts, countResult] = await Promise.all([
-        db.select().from(alertsTable).where(and(...conditions)).limit(args.limit).offset(offset).orderBy(alertsTable.createdAt),
-        db.select({ count: sql<number>`count(*)::int` }).from(alertsTable).where(and(...conditions)),
-      ]);
+      const result = await invokeTool("list_alerts", {
+        tenantId: user.tenantId,
+        severity: args.severity,
+        status: args.status,
+        type: args.type,
+        page: args.page,
+        limit: args.limit,
+        alertStatuses: args.status ? [args.status] : undefined,
+      });
 
       await audit(user.tenantId, user.userId, "mcp_list", "alert");
-      return { content: [{ type: "text" as const, text: JSON.stringify({ data: alerts, total: countResult[0].count, page: args.page, limit: args.limit }) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, total: result.total, page: args.page, limit: args.limit }) }] };
     }
   );
 
@@ -307,29 +298,26 @@ export function registerMcpTools(mcp: McpServer) {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
 
-      const [framework] = await db.select().from(frameworksTable)
-        .where(and(eq(frameworksTable.id, args.frameworkId), eq(frameworksTable.tenantId, user.tenantId))).limit(1);
+      const gapResult = await invokeTool("run_gap_analysis", {
+        tenantId: user.tenantId,
+        frameworkId: args.frameworkId,
+      });
+
+      const totalRequirements = gapResult.total || 0;
+      const gapCount = gapResult.data.length;
+      const coveredRequirements = totalRequirements - gapCount;
+
+      const { db: dbLocal } = await import("@workspace/db");
+      const { frameworksTable: ft } = await import("@workspace/db");
+      const [framework] = await dbLocal.select().from(ft)
+        .where(and(eq(ft.id, args.frameworkId), eq(ft.tenantId, user.tenantId))).limit(1);
       if (!framework) return deny(user, "get_compliance_score", 404, "Not Found", "Framework not found");
-
-      const requirements = await db.select().from(frameworkRequirementsTable)
-        .where(and(eq(frameworkRequirementsTable.frameworkId, args.frameworkId), eq(frameworkRequirementsTable.tenantId, user.tenantId)));
-
-      if (requirements.length === 0) {
-        await audit(user.tenantId, user.userId, "mcp_compliance_score", "framework", args.frameworkId);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ framework: framework.name, totalRequirements: 0, coveredRequirements: 0, score: 0 }) }] };
-      }
-
-      const reqIds = requirements.map(r => r.id);
-      const mappings = await db.select().from(controlRequirementMapsTable)
-        .where(and(inArray(controlRequirementMapsTable.requirementId, reqIds), eq(controlRequirementMapsTable.tenantId, user.tenantId)));
-
-      const coveredReqIds = new Set(mappings.map(m => m.requirementId));
 
       const score = {
         framework: framework.name,
-        totalRequirements: requirements.length,
-        coveredRequirements: coveredReqIds.size,
-        score: Math.round((coveredReqIds.size / requirements.length) * 100),
+        totalRequirements,
+        coveredRequirements,
+        score: totalRequirements > 0 ? Math.round((coveredRequirements / totalRequirements) * 100) : 0,
       };
 
       await audit(user.tenantId, user.userId, "mcp_compliance_score", "framework", args.frameworkId);
@@ -345,29 +333,24 @@ export function registerMcpTools(mcp: McpServer) {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
 
-      const [framework] = await db.select().from(frameworksTable)
-        .where(and(eq(frameworksTable.id, args.frameworkId), eq(frameworksTable.tenantId, user.tenantId))).limit(1);
+      const { db: dbLocal } = await import("@workspace/db");
+      const { frameworksTable: ft } = await import("@workspace/db");
+      const [framework] = await dbLocal.select().from(ft)
+        .where(and(eq(ft.id, args.frameworkId), eq(ft.tenantId, user.tenantId))).limit(1);
       if (!framework) return deny(user, "run_gap_analysis", 404, "Not Found", "Framework not found");
 
-      const requirements = await db.select().from(frameworkRequirementsTable)
-        .where(and(eq(frameworkRequirementsTable.frameworkId, args.frameworkId), eq(frameworkRequirementsTable.tenantId, user.tenantId)));
-
-      if (requirements.length === 0) {
-        await audit(user.tenantId, user.userId, "mcp_gap_analysis", "framework", args.frameworkId);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ framework: framework.name, gaps: [], totalRequirements: 0, gapCount: 0 }) }] };
-      }
-
-      const reqIds = requirements.map(r => r.id);
-      const mappings = await db.select().from(controlRequirementMapsTable)
-        .where(and(inArray(controlRequirementMapsTable.requirementId, reqIds), eq(controlRequirementMapsTable.tenantId, user.tenantId)));
-
-      const coveredReqIds = new Set(mappings.map(m => m.requirementId));
-      const gaps = requirements
-        .filter(r => !coveredReqIds.has(r.id))
-        .map(r => ({ id: r.id, code: r.code, title: r.title, description: r.description }));
+      const gapResult = await invokeTool("run_gap_analysis", {
+        tenantId: user.tenantId,
+        frameworkId: args.frameworkId,
+      });
 
       await audit(user.tenantId, user.userId, "mcp_gap_analysis", "framework", args.frameworkId);
-      return { content: [{ type: "text" as const, text: JSON.stringify({ framework: framework.name, gaps, totalRequirements: requirements.length, gapCount: gaps.length }) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({
+        framework: framework.name,
+        gaps: gapResult.data,
+        totalRequirements: gapResult.total || 0,
+        gapCount: gapResult.data.length,
+      }) }] };
     }
   );
 
@@ -379,18 +362,16 @@ export function registerMcpTools(mcp: McpServer) {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
 
-      const conditions = [eq(controlsTable.tenantId, user.tenantId)];
-      if (args.status) conditions.push(eq(controlsTable.status, args.status));
-      if (args.search) conditions.push(ilike(controlsTable.title, `%${args.search}%`));
-
-      const offset = (args.page - 1) * args.limit;
-      const [controls, countResult] = await Promise.all([
-        db.select().from(controlsTable).where(and(...conditions)).limit(args.limit).offset(offset).orderBy(controlsTable.createdAt),
-        db.select({ count: sql<number>`count(*)::int` }).from(controlsTable).where(and(...conditions)),
-      ]);
+      const result = await invokeTool("list_controls", {
+        tenantId: user.tenantId,
+        status: args.status,
+        search: args.search,
+        page: args.page,
+        limit: args.limit,
+      });
 
       await audit(user.tenantId, user.userId, "mcp_list", "control");
-      return { content: [{ type: "text" as const, text: JSON.stringify({ data: controls, total: countResult[0].count, page: args.page, limit: args.limit }) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, total: result.total, page: args.page, limit: args.limit }) }] };
     }
   );
 

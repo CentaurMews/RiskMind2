@@ -1,4 +1,4 @@
-import { eq, and, sql, gt, inArray } from "drizzle-orm";
+import { eq, and, sql, gt, inArray, ilike } from "drizzle-orm";
 import {
   db,
   risksTable,
@@ -9,11 +9,13 @@ import {
   controlsTable,
   frameworksTable,
   frameworkRequirementsTable,
+  controlRequirementMapsTable,
   controlTestsTable,
 } from "@workspace/db";
 
 export interface ToolResult {
   data: Array<Record<string, unknown>>;
+  total?: number;
 }
 
 export type ToolName =
@@ -30,50 +32,138 @@ export type ToolName =
 export interface ToolCallParams {
   tenantId: string;
   since?: Date;
+  status?: string;
+  category?: string;
+  source?: string;
+  search?: string;
+  type?: string;
+  severity?: string;
+  frameworkId?: string;
+  page?: number;
+  limit?: number;
+  alertStatuses?: string[];
 }
 
-const toolHandlers: Record<ToolName, (params: ToolCallParams) => Promise<ToolResult>> = {
-  list_risks: async ({ tenantId }) => ({
-    data: await db.select({
-      id: risksTable.id, title: risksTable.title, description: risksTable.description,
-      category: risksTable.category, status: risksTable.status,
-      likelihood: risksTable.likelihood, impact: risksTable.impact,
-      residualLikelihood: risksTable.residualLikelihood, residualImpact: risksTable.residualImpact,
-    }).from(risksTable).where(eq(risksTable.tenantId, tenantId)),
-  }),
+type ToolHandler = (params: ToolCallParams) => Promise<ToolResult>;
 
-  list_vendors: async ({ tenantId }) => ({
-    data: await db.select({
-      id: vendorsTable.id, name: vendorsTable.name, tier: vendorsTable.tier,
-      status: vendorsTable.status, riskScore: vendorsTable.riskScore, category: vendorsTable.category,
-    }).from(vendorsTable).where(eq(vendorsTable.tenantId, tenantId)),
-  }),
+const toolHandlers: Record<ToolName, ToolHandler> = {
+  list_risks: async ({ tenantId, status, category, search, page, limit: lim }) => {
+    const conditions: ReturnType<typeof eq>[] = [eq(risksTable.tenantId, tenantId)];
+    if (status) conditions.push(eq(risksTable.status, status as any));
+    if (category) conditions.push(eq(risksTable.category, category as any));
+    if (search) conditions.push(ilike(risksTable.title, `%${search}%`));
 
-  list_signals: async ({ tenantId, since }) => ({
-    data: await db.select({
-      id: signalsTable.id, source: signalsTable.source, content: signalsTable.content,
-      status: signalsTable.status, classification: signalsTable.classification,
-      confidence: signalsTable.confidence,
-    }).from(signalsTable)
-      .where(and(
-        eq(signalsTable.tenantId, tenantId),
-        since ? gt(signalsTable.createdAt, since) : undefined,
-      )),
-  }),
+    if (page && lim) {
+      const offset = (page - 1) * lim;
+      const [data, countResult] = await Promise.all([
+        db.select().from(risksTable).where(and(...conditions)).limit(lim).offset(offset).orderBy(risksTable.createdAt),
+        db.select({ count: sql<number>`count(*)::int` }).from(risksTable).where(and(...conditions)),
+      ]);
+      return { data, total: countResult[0].count };
+    }
 
-  list_alerts: async ({ tenantId }) => ({
-    data: await db.select({
-      id: alertsTable.id, type: alertsTable.type, title: alertsTable.title,
-      severity: alertsTable.severity, status: alertsTable.status, context: alertsTable.context,
-    }).from(alertsTable)
-      .where(and(eq(alertsTable.tenantId, tenantId), inArray(alertsTable.status, ["active", "escalated"]))),
-  }),
+    return {
+      data: await db.select({
+        id: risksTable.id, title: risksTable.title, description: risksTable.description,
+        category: risksTable.category, status: risksTable.status,
+        likelihood: risksTable.likelihood, impact: risksTable.impact,
+        residualLikelihood: risksTable.residualLikelihood, residualImpact: risksTable.residualImpact,
+      }).from(risksTable).where(and(...conditions)),
+    };
+  },
 
-  list_controls: async ({ tenantId }) => ({
-    data: await db.select({
-      id: controlsTable.id, title: controlsTable.title, status: controlsTable.status,
-    }).from(controlsTable).where(eq(controlsTable.tenantId, tenantId)),
-  }),
+  list_vendors: async ({ tenantId, status, search, page, limit: lim }) => {
+    const conditions: ReturnType<typeof eq>[] = [eq(vendorsTable.tenantId, tenantId)];
+    if (status) conditions.push(eq(vendorsTable.status, status as any));
+    if (search) conditions.push(ilike(vendorsTable.name, `%${search}%`));
+
+    if (page && lim) {
+      const offset = (page - 1) * lim;
+      const [data, countResult] = await Promise.all([
+        db.select().from(vendorsTable).where(and(...conditions)).limit(lim).offset(offset).orderBy(vendorsTable.createdAt),
+        db.select({ count: sql<number>`count(*)::int` }).from(vendorsTable).where(and(...conditions)),
+      ]);
+      return { data, total: countResult[0].count };
+    }
+
+    return {
+      data: await db.select({
+        id: vendorsTable.id, name: vendorsTable.name, tier: vendorsTable.tier,
+        status: vendorsTable.status, riskScore: vendorsTable.riskScore, category: vendorsTable.category,
+      }).from(vendorsTable).where(and(...conditions)),
+    };
+  },
+
+  list_signals: async ({ tenantId, since, status, source, search, page, limit: lim }) => {
+    const conditions: ReturnType<typeof eq>[] = [eq(signalsTable.tenantId, tenantId)];
+    if (status) conditions.push(eq(signalsTable.status, status as any));
+    if (source) conditions.push(eq(signalsTable.source, source));
+    if (search) conditions.push(ilike(signalsTable.content, `%${search}%`));
+    if (since) conditions.push(gt(signalsTable.createdAt, since));
+
+    if (page && lim) {
+      const offset = (page - 1) * lim;
+      const [data, countResult] = await Promise.all([
+        db.select().from(signalsTable).where(and(...conditions)).limit(lim).offset(offset).orderBy(signalsTable.createdAt),
+        db.select({ count: sql<number>`count(*)::int` }).from(signalsTable).where(and(...conditions)),
+      ]);
+      return { data, total: countResult[0].count };
+    }
+
+    return {
+      data: await db.select({
+        id: signalsTable.id, source: signalsTable.source, content: signalsTable.content,
+        status: signalsTable.status, classification: signalsTable.classification,
+        confidence: signalsTable.confidence,
+      }).from(signalsTable).where(and(...conditions)),
+    };
+  },
+
+  list_alerts: async ({ tenantId, severity, status, type, alertStatuses, page, limit: lim }) => {
+    const conditions: ReturnType<typeof eq>[] = [eq(alertsTable.tenantId, tenantId)];
+    if (severity) conditions.push(eq(alertsTable.severity, severity as any));
+    if (status) conditions.push(eq(alertsTable.status, status as any));
+    if (type) conditions.push(eq(alertsTable.type, type as any));
+    if (alertStatuses) conditions.push(inArray(alertsTable.status, alertStatuses as any));
+
+    if (page && lim) {
+      const offset = (page - 1) * lim;
+      const [data, countResult] = await Promise.all([
+        db.select().from(alertsTable).where(and(...conditions)).limit(lim).offset(offset).orderBy(alertsTable.createdAt),
+        db.select({ count: sql<number>`count(*)::int` }).from(alertsTable).where(and(...conditions)),
+      ]);
+      return { data, total: countResult[0].count };
+    }
+
+    return {
+      data: await db.select({
+        id: alertsTable.id, type: alertsTable.type, title: alertsTable.title,
+        severity: alertsTable.severity, status: alertsTable.status, context: alertsTable.context,
+      }).from(alertsTable)
+        .where(and(...conditions, alertStatuses ? undefined : inArray(alertsTable.status, ["active", "escalated"]))),
+    };
+  },
+
+  list_controls: async ({ tenantId, status, search, page, limit: lim }) => {
+    const conditions: ReturnType<typeof eq>[] = [eq(controlsTable.tenantId, tenantId)];
+    if (status) conditions.push(eq(controlsTable.status, status as any));
+    if (search) conditions.push(ilike(controlsTable.title, `%${search}%`));
+
+    if (page && lim) {
+      const offset = (page - 1) * lim;
+      const [data, countResult] = await Promise.all([
+        db.select().from(controlsTable).where(and(...conditions)).limit(lim).offset(offset).orderBy(controlsTable.createdAt),
+        db.select({ count: sql<number>`count(*)::int` }).from(controlsTable).where(and(...conditions)),
+      ]);
+      return { data, total: countResult[0].count };
+    }
+
+    return {
+      data: await db.select({
+        id: controlsTable.id, title: controlsTable.title, status: controlsTable.status,
+      }).from(controlsTable).where(and(...conditions)),
+    };
+  },
 
   list_kris: async ({ tenantId }) => ({
     data: await db.select({
@@ -89,22 +179,46 @@ const toolHandlers: Record<ToolName, (params: ToolCallParams) => Promise<ToolRes
     }).from(frameworksTable).where(eq(frameworksTable.tenantId, tenantId)),
   }),
 
-  run_gap_analysis: async ({ tenantId }) => ({
-    data: await db.select({
-      id: frameworkRequirementsTable.id,
-      frameworkId: frameworkRequirementsTable.frameworkId,
-      code: frameworkRequirementsTable.code,
-      title: frameworkRequirementsTable.title,
-    }).from(frameworkRequirementsTable)
-      .where(and(
-        eq(frameworkRequirementsTable.tenantId, tenantId),
-        sql`${frameworkRequirementsTable.id} NOT IN (
-          SELECT crm.requirement_id FROM control_requirement_maps crm
-          INNER JOIN controls c ON c.id = crm.control_id
-          WHERE c.tenant_id = ${tenantId}
-        )`,
-      )),
-  }),
+  run_gap_analysis: async ({ tenantId, frameworkId }) => {
+    if (frameworkId) {
+      const [framework] = await db.select().from(frameworksTable)
+        .where(and(eq(frameworksTable.id, frameworkId), eq(frameworksTable.tenantId, tenantId))).limit(1);
+      if (!framework) return { data: [] };
+
+      const requirements = await db.select().from(frameworkRequirementsTable)
+        .where(and(eq(frameworkRequirementsTable.frameworkId, frameworkId), eq(frameworkRequirementsTable.tenantId, tenantId)));
+
+      if (requirements.length === 0) return { data: [], total: 0 };
+
+      const reqIds = requirements.map(r => r.id);
+      const mappings = await db.select().from(controlRequirementMapsTable)
+        .where(and(inArray(controlRequirementMapsTable.requirementId, reqIds), eq(controlRequirementMapsTable.tenantId, tenantId)));
+
+      const coveredReqIds = new Set(mappings.map(m => m.requirementId));
+      const gaps = requirements
+        .filter(r => !coveredReqIds.has(r.id))
+        .map(r => ({ id: r.id, code: r.code, title: r.title, description: (r as any).description, frameworkId: r.frameworkId }));
+
+      return { data: gaps, total: requirements.length };
+    }
+
+    return {
+      data: await db.select({
+        id: frameworkRequirementsTable.id,
+        frameworkId: frameworkRequirementsTable.frameworkId,
+        code: frameworkRequirementsTable.code,
+        title: frameworkRequirementsTable.title,
+      }).from(frameworkRequirementsTable)
+        .where(and(
+          eq(frameworkRequirementsTable.tenantId, tenantId),
+          sql`${frameworkRequirementsTable.id} NOT IN (
+            SELECT crm.requirement_id FROM control_requirement_maps crm
+            INNER JOIN controls c ON c.id = crm.control_id
+            WHERE c.tenant_id = ${tenantId}
+          )`,
+        )),
+    };
+  },
 
   list_failed_control_tests: async ({ tenantId, since }) => ({
     data: await db.select({
