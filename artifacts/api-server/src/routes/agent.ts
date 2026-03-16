@@ -158,9 +158,9 @@ router.post("/v1/agent/findings/:id/approve", requireRole("admin", "risk_manager
             tenantId,
             type: alertType,
             title: String(proposedAction.title || finding.title),
-            severity: String(proposedAction.severity || finding.severity || "medium"),
+            severity: (["critical", "high", "medium", "low"].includes(String(proposedAction.severity)) ? String(proposedAction.severity) : "medium") as "critical" | "high" | "medium" | "low",
             status: "active",
-            context: { findingId, agentRunId: finding.agentRunId, ...(proposedAction.context as object || {}) },
+            context: { findingId, agentRunId: finding.runId, ...(proposedAction.context as object || {}) },
           }).returning();
           actionResult = { type: alertType + "_created", id: alert.id };
         } else if (actionType === "create_treatment") {

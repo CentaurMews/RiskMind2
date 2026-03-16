@@ -656,7 +656,40 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
         console.error("[Agent] LLM reasoning failed, continuing with local findings:", err instanceof Error ? err.message : err);
       }
     } else {
-      console.log("[Agent] LLM not available, running with local analysis only");
+      console.log("[Agent] LLM not available for tenant", tenantId);
+
+      if (localFindings.length === 0) {
+        const durationMs = Date.now() - startTime;
+        await db.update(agentRunsTable).set({
+          status: "skipped",
+          durationMs,
+          findingCount: 0,
+          completedAt: new Date(),
+          context: {
+            reason: "LLM unavailable and no local findings detected",
+            llmAvailable: false,
+            observationSummary: {
+              risks: data.risks.length,
+              kris: data.kris.length,
+              vendors: data.vendors.length,
+              signals: data.signals.length,
+              alerts: data.alerts.length,
+              controls: data.controls.length,
+              unmappedRequirements: data.unmappedRequirements.length,
+            },
+          },
+        }).where(eq(agentRunsTable.id, run.id));
+
+        await recordAuditDirect(tenantId, null, "agent_run_skipped", "agent_run", run.id, {
+          policyTier,
+          reason: "LLM unavailable and no local findings detected",
+        });
+
+        console.log(`[Agent] Run ${run.id} skipped for tenant ${tenantId}: LLM unavailable, no local findings`);
+        return run.id;
+      }
+
+      console.log(`[Agent] LLM unavailable but ${localFindings.length} local findings detected, proceeding with local analysis`);
     }
 
     const allFindings = [...localFindings, ...llmFindings];
