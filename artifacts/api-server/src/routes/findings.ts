@@ -79,10 +79,14 @@ router.post("/v1/findings", requireRole("admin", "risk_manager", "auditor"), asy
     }).returning();
 
     if (signalId) {
-      await db.update(signalsTable).set({
-        status: "finding",
-        updatedAt: new Date(),
-      }).where(and(eq(signalsTable.id, signalId), eq(signalsTable.tenantId, tenantId)));
+      const [sig] = await db.select({ status: signalsTable.status }).from(signalsTable)
+        .where(and(eq(signalsTable.id, signalId), eq(signalsTable.tenantId, tenantId))).limit(1);
+      if (sig && sig.status === "triaged") {
+        await db.update(signalsTable).set({
+          status: "finding",
+          updatedAt: new Date(),
+        }).where(and(eq(signalsTable.id, signalId), eq(signalsTable.tenantId, tenantId)));
+      }
     }
 
     await recordAudit(req, "create", "finding", finding.id, { signalId, riskId, vendorId });
