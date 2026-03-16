@@ -1722,6 +1722,58 @@ export const GetSimulationParams = zod.object({
 });
 
 /**
+ * @summary List tenant users
+ */
+export const ListUsersResponseItem = zod.object({
+  id: zod.string().uuid(),
+  email: zod.string(),
+  name: zod.string().nullish(),
+  role: zod.enum([
+    "admin",
+    "risk_manager",
+    "risk_owner",
+    "auditor",
+    "viewer",
+    "vendor",
+  ]),
+  createdAt: zod.date(),
+});
+export const ListUsersResponse = zod.array(ListUsersResponseItem);
+
+/**
+ * @summary Update a user's role
+ */
+export const UpdateUserRoleParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateUserRoleBody = zod.object({
+  role: zod.enum([
+    "admin",
+    "risk_manager",
+    "risk_owner",
+    "auditor",
+    "viewer",
+    "vendor",
+  ]),
+});
+
+export const UpdateUserRoleResponse = zod.object({
+  id: zod.string().uuid(),
+  email: zod.string(),
+  name: zod.string().nullish(),
+  role: zod.enum([
+    "admin",
+    "risk_manager",
+    "risk_owner",
+    "auditor",
+    "viewer",
+    "vendor",
+  ]),
+  createdAt: zod.date(),
+});
+
+/**
  * @summary List LLM provider configurations
  */
 export const ListLlmProvidersResponseItem = zod.object({

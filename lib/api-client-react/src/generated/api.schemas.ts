@@ -10,6 +10,42 @@ export interface HealthStatus {
   database?: string;
 }
 
+export type TenantUserRole =
+  (typeof TenantUserRole)[keyof typeof TenantUserRole];
+
+export const TenantUserRole = {
+  admin: "admin",
+  risk_manager: "risk_manager",
+  risk_owner: "risk_owner",
+  auditor: "auditor",
+  viewer: "viewer",
+  vendor: "vendor",
+} as const;
+
+export interface TenantUser {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: TenantUserRole;
+  createdAt: string;
+}
+
+export type UpdateUserRoleBodyRole =
+  (typeof UpdateUserRoleBodyRole)[keyof typeof UpdateUserRoleBodyRole];
+
+export const UpdateUserRoleBodyRole = {
+  admin: "admin",
+  risk_manager: "risk_manager",
+  risk_owner: "risk_owner",
+  auditor: "auditor",
+  viewer: "viewer",
+  vendor: "vendor",
+} as const;
+
+export interface UpdateUserRoleBody {
+  role: UpdateUserRoleBodyRole;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

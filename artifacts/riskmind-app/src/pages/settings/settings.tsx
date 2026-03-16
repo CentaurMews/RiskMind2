@@ -1,42 +1,38 @@
-import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
-import { useGetMe, useListLlmProviders, useGetAgentConfig } from "@workspace/api-client-react";
+import { useGetMe, useListLlmProviders, useGetAgentConfig, useListUsers, useUpdateUserRole } from "@workspace/api-client-react";
+import type { UpdateUserRoleBodyRole } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShieldAlert, Bot, Server, Loader2, Users, Shield } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/severity-badge";
+import { useQueryClient } from "@tanstack/react-query";
 
-interface TenantUser {
-  id: string;
-  email: string;
-  role: string;
-  createdAt: string;
-}
+const ROLES: { value: UpdateUserRoleBodyRole; label: string }[] = [
+  { value: "admin", label: "Admin" },
+  { value: "risk_manager", label: "Risk Manager" },
+  { value: "risk_owner", label: "Risk Owner" },
+  { value: "auditor", label: "Auditor" },
+  { value: "viewer", label: "Viewer" },
+  { value: "vendor", label: "Vendor" },
+];
 
 export default function Settings() {
   const { data: user } = useGetMe();
   const { data: providers, isLoading: providersLoading } = useListLlmProviders();
   const { data: agentConfig, isLoading: agentLoading } = useGetAgentConfig();
-  const [users, setUsers] = useState<TenantUser[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [usersLoaded, setUsersLoaded] = useState(false);
+  const { data: usersList, isLoading: usersLoading } = useListUsers({ query: { queryKey: ["/api/v1/users"], retry: false } });
+  const queryClient = useQueryClient();
 
-  const loadUsers = async () => {
-    if (usersLoaded) return;
-    setUsersLoading(true);
-    try {
-      const res = await fetch("/api/v1/users").then(r => r.json()) as TenantUser[];
-      setUsers(Array.isArray(res) ? res : []);
-      setUsersLoaded(true);
-    } catch {
-      setUsers([]);
-    } finally {
-      setUsersLoading(false);
-    }
-  };
+  const roleUpdateMutation = useUpdateUserRole({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/users"] });
+      },
+    },
+  });
 
   if (user?.role !== 'admin') {
     return (
@@ -51,6 +47,8 @@ export default function Settings() {
     );
   }
 
+  const users = Array.isArray(usersList) ? usersList : [];
+
   return (
     <AppLayout>
       <div className="p-8 max-w-5xl mx-auto space-y-8">
@@ -59,9 +57,9 @@ export default function Settings() {
           <p className="text-muted-foreground mt-1">Manage configuration for {user.tenantId.split('-')[0]}</p>
         </div>
 
-        <Tabs defaultValue="users" className="w-full" onValueChange={(v) => { if (v === 'users') loadUsers(); }}>
+        <Tabs defaultValue="users" className="w-full">
           <TabsList className="bg-muted/50 p-1 w-full justify-start h-12 rounded-lg">
-            <TabsTrigger value="users" className="data-[state=active]:shadow-sm rounded-md" onClick={loadUsers}>
+            <TabsTrigger value="users" className="data-[state=active]:shadow-sm rounded-md">
               <Users className="h-4 w-4 mr-2" /> Users & Roles
             </TabsTrigger>
             <TabsTrigger value="agent" className="data-[state=active]:shadow-sm rounded-md">
@@ -82,16 +80,16 @@ export default function Settings() {
                 <CardContent>
                   {usersLoading ? (
                     <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground" /></div>
-                  ) : users.length === 0 && usersLoaded ? (
+                  ) : users.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground text-sm">No users found for this tenant.</div>
                   ) : (
                     <Table>
                       <TableHeader className="bg-muted/50">
                         <TableRow>
                           <TableHead>Email</TableHead>
+                          <TableHead>Name</TableHead>
                           <TableHead>Role</TableHead>
                           <TableHead>Joined</TableHead>
-                          <TableHead className="w-[100px]">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -105,17 +103,36 @@ export default function Settings() {
                                 {u.email}
                               </div>
                             </TableCell>
+                            <TableCell className="text-sm">
+                              {u.name || '-'}
+                            </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span className="capitalize text-sm font-mono">{u.role.replace('_', ' ')}</span>
-                              </div>
+                              {u.id === user.id ? (
+                                <div className="flex items-center gap-2">
+                                  <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span className="capitalize text-sm font-mono">{u.role.replace('_', ' ')}</span>
+                                  <span className="text-[10px] text-muted-foreground">(you)</span>
+                                </div>
+                              ) : (
+                                <Select
+                                  value={u.role}
+                                  onValueChange={(newRole) => {
+                                    roleUpdateMutation.mutate({ id: u.id, data: { role: newRole as UpdateUserRoleBodyRole } });
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[160px] h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {ROLES.map(r => (
+                                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}
-                            </TableCell>
-                            <TableCell>
-                              <StatusBadge status="active" />
                             </TableCell>
                           </TableRow>
                         ))}
