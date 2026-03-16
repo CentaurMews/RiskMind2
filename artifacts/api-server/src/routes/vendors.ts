@@ -364,7 +364,9 @@ publicVendorRouter.post("/v1/questionnaires/respond", async (req, res) => {
     if (!secret) { serverError(res, "Server misconfiguration: signing secret not set"); return; }
     const expectedSig = crypto.createHmac("sha256", secret).update(`${qId}:${expiresTs}`).digest("hex");
 
-    if (signature !== expectedSig) { badRequest(res, "Invalid token signature"); return; }
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) { badRequest(res, "Invalid token signature"); return; }
     if (Date.now() > Number(expiresTs)) { badRequest(res, "Token has expired"); return; }
 
     const [q] = await db.select().from(questionnairesTable)
