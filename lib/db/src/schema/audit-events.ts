@@ -11,6 +11,7 @@ export const auditEventsTable = pgTable("audit_events", {
   entityId: uuid("entity_id"),
   payload: jsonb("payload").default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type AuditEvent = typeof auditEventsTable.$inferSelect;

@@ -10,16 +10,10 @@ import {
   frameworkRequirementsTable,
 } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
-import crypto from "crypto";
 
-const ITERATIONS = 100000;
-const KEY_LENGTH = 64;
-const DIGEST = "sha512";
-
-function hashPasswordSync(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const key = crypto.pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, DIGEST);
-  return `${salt}:${key.toString("hex")}`;
+async function hashPassword(password: string): Promise<string> {
+  const bcrypt = await import("bcryptjs");
+  return bcrypt.default.hash(password, 12);
 }
 
 async function seed() {
@@ -40,7 +34,7 @@ async function seed() {
 
   console.log(`Created tenant: ${tenant.name} (${tenant.id})`);
 
-  const password = hashPasswordSync("password123");
+  const password = await hashPassword("password123");
 
   const userDefs = [
     { email: "admin@acme.com", name: "Admin User", role: "admin" as const },
@@ -48,6 +42,7 @@ async function seed() {
     { email: "riskowner@acme.com", name: "Risk Owner", role: "risk_owner" as const },
     { email: "auditor@acme.com", name: "Auditor User", role: "auditor" as const },
     { email: "viewer@acme.com", name: "Viewer User", role: "viewer" as const },
+    { email: "vendor@acme.com", name: "Vendor User", role: "vendor" as const },
   ];
 
   const users = await db.insert(usersTable).values(

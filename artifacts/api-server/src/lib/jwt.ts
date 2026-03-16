@@ -1,6 +1,10 @@
 import crypto from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET || "riskmind-dev-secret-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
+
 const ACCESS_TOKEN_EXPIRY = 60 * 60;
 const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60;
 
@@ -26,7 +30,7 @@ function sign(payload: object): string {
   const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const body = base64UrlEncode(JSON.stringify(payload));
   const signature = crypto
-    .createHmac("sha256", JWT_SECRET)
+    .createHmac("sha256", JWT_SECRET!)
     .update(`${header}.${body}`)
     .digest("base64url");
   return `${header}.${body}.${signature}`;
@@ -39,7 +43,7 @@ function verify(token: string): JwtPayload | null {
 
     const [header, body, signature] = parts;
     const expectedSig = crypto
-      .createHmac("sha256", JWT_SECRET)
+      .createHmac("sha256", JWT_SECRET!)
       .update(`${header}.${body}`)
       .digest("base64url");
 

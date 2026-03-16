@@ -4,12 +4,12 @@ import { db, usersTable } from "@workspace/db";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../lib/jwt";
 import { verifyPassword } from "../lib/password";
 import { badRequest, unauthorized, notFound } from "../lib/errors";
-import { recordAudit } from "../lib/audit";
-import { authMiddleware } from "../middlewares/auth";
+import { recordAuditDirect, recordAudit } from "../lib/audit";
 
-const router: IRouter = Router();
+export const publicAuthRouter: IRouter = Router();
+export const protectedAuthRouter: IRouter = Router();
 
-router.post("/v1/auth/login", async (req, res) => {
+publicAuthRouter.post("/v1/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -38,7 +38,7 @@ router.post("/v1/auth/login", async (req, res) => {
     const accessToken = generateAccessToken(user.id, user.tenantId, user.email, user.role);
     const refreshToken = generateRefreshToken(user.id, user.tenantId, user.email, user.role);
 
-    await recordAudit(user.tenantId, user.id, "login", "user", user.id);
+    await recordAuditDirect(user.tenantId, user.id, "login", "user", user.id);
 
     res.json({
       accessToken,
@@ -57,7 +57,7 @@ router.post("/v1/auth/login", async (req, res) => {
   }
 });
 
-router.post("/v1/auth/refresh", async (req, res) => {
+publicAuthRouter.post("/v1/auth/refresh", async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {
@@ -74,7 +74,7 @@ router.post("/v1/auth/refresh", async (req, res) => {
     const users = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.id, payload.sub))
+      .where(and(eq(usersTable.id, payload.sub), eq(usersTable.tenantId, payload.tenantId)))
       .limit(1);
 
     const user = users[0];
@@ -96,7 +96,7 @@ router.post("/v1/auth/refresh", async (req, res) => {
   }
 });
 
-router.get("/v1/auth/me", authMiddleware, async (req, res) => {
+protectedAuthRouter.get("/v1/auth/me", async (req, res) => {
   try {
     const users = await db
       .select({
@@ -108,7 +108,7 @@ router.get("/v1/auth/me", authMiddleware, async (req, res) => {
         createdAt: usersTable.createdAt,
       })
       .from(usersTable)
-      .where(eq(usersTable.id, req.user!.id))
+      .where(and(eq(usersTable.id, req.user!.id), eq(usersTable.tenantId, req.user!.tenantId)))
       .limit(1);
 
     const user = users[0];
@@ -123,5 +123,3 @@ router.get("/v1/auth/me", authMiddleware, async (req, res) => {
     res.status(500).json({ type: "https://riskmind.app/errors/internal", title: "Internal Server Error", status: 500 });
   }
 });
-
-export default router;
