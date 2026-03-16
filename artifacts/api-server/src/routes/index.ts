@@ -11,6 +11,7 @@ import aiEnrichmentRouter from "./ai-enrichment";
 import settingsRouter from "./settings";
 import interviewsRouter from "./interviews";
 import foresightRouter from "./foresight";
+import agentRouter from "./agent";
 import { authMiddleware } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -34,5 +35,6 @@ router.use(aiEnrichmentRouter);
 router.use(settingsRouter);
 router.use(interviewsRouter);
 router.use(foresightRouter);
+router.use(agentRouter);
 
 export default router;

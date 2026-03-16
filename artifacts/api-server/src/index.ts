@@ -3,6 +3,7 @@ import { ensureExtensions } from "@workspace/db";
 import { startJobProcessor } from "./lib/job-queue";
 import { registerAIWorkers } from "./lib/ai-workers";
 import { startMonitoringScheduler } from "./lib/monitoring";
+import { startAgentScheduler } from "./lib/agent-scheduler";
 
 const rawPort = process.env["PORT"];
 
@@ -24,6 +25,7 @@ async function start() {
   registerAIWorkers();
   startJobProcessor();
   startMonitoringScheduler();
+  startAgentScheduler();
 
   app.listen(port, () => {
     console.log(`Server listening on port ${port}`);

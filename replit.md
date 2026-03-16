@@ -192,6 +192,23 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - `POST /api/v1/risks/:id/ai/suggest-treatments` — Get AI-generated treatment suggestions
 - `POST /api/v1/compliance/:frameworkId/gap-analysis/ai-remediate` — Get AI-generated gap remediation steps
 
+### Autonomous Risk Intelligence Agent
+- `GET /api/v1/agent/runs` — List agent runs (paginated, admin/risk_manager/auditor)
+- `POST /api/v1/agent/runs` — Manually trigger agent run (admin only)
+- `GET /api/v1/agent/findings` — List findings (paginated, filterable by type/severity/status)
+- `POST /api/v1/agent/findings/:id/approve` — Approve a pending finding (admin/risk_manager)
+- `POST /api/v1/agent/findings/:id/dismiss` — Dismiss a finding with optional reason
+- `GET /api/v1/agent/config` — Get tenant agent configuration (admin only)
+- `PUT /api/v1/agent/config` — Update agent config (enabled, policyTier, schedule)
+- Agent loop: observe (DB queries) → reason (LLM cross-domain synthesis) → act (policy-gated actions)
+- Finding types: cascade_chain, cluster, predictive_signal, anomaly, cross_domain, recommendation
+- Policy tiers: observe (findings only), advisory (draft signals for approval), active (auto-create alerts)
+- Cascade reasoning: identifies multi-hop chains (risk + breached KRI + active alert)
+- Cluster detection: pgvector cosine similarity to find semantically related risks/signals
+- Predictive signals: KRI trend analysis toward threshold breach
+- Graceful degradation: runs local analysis even when LLM unavailable
+- All actions audited with actor=null (agent) and agent_run_id in context
+
 ### Foresight (Stubs — 501 Not Implemented)
 - `GET /api/v1/foresight/simulations` — List simulations
 - `POST /api/v1/foresight/simulations` — Create simulation

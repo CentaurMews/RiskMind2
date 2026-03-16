@@ -1981,6 +1981,201 @@ paths:
                           items:
                             type: string
 
+  /v1/agent/runs:
+    get:
+      operationId: listAgentRuns
+      tags: [agent]
+      summary: List recent agent runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of agent runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentRun"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+    post:
+      operationId: triggerAgentRun
+      tags: [agent]
+      summary: Manually trigger an agent run (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Agent run created and completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentRun"
+
+  /v1/agent/findings:
+    get:
+      operationId: listAgentFindings
+      tags: [agent]
+      summary: Paginated findings feed with filters
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [cascade_chain, cluster, predictive_signal, anomaly, cross_domain, recommendation]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [critical, high, medium, low, info]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending_review, dismissed, actioned]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of agent findings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentFinding"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+  /v1/agent/findings/{id}/approve:
+    post:
+      operationId: approveAgentFinding
+      tags: [agent]
+      summary: Approve a pending agent finding
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Finding approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentFinding"
+
+  /v1/agent/findings/{id}/dismiss:
+    post:
+      operationId: dismissAgentFinding
+      tags: [agent]
+      summary: Dismiss a pending agent finding
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Finding dismissed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentFinding"
+
+  /v1/agent/config:
+    get:
+      operationId: getAgentConfig
+      tags: [agent]
+      summary: Get agent configuration for the tenant
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Agent configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+    put:
+      operationId: updateAgentConfig
+      tags: [agent]
+      summary: Update agent configuration
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                policyTier:
+                  type: string
+                  enum: [observe, advisory, active]
+                schedule:
+                  type: string
+      responses:
+        "200":
+          description: Updated configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+
   /mcp:
     post:
       operationId: mcpStreamableHttp
@@ -3597,3 +3792,117 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    AgentRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [running, completed, failed, skipped]
+        policyTier:
+          type: string
+          enum: [observe, advisory, active]
+        model:
+          type: string
+          nullable: true
+        tokenCount:
+          type: integer
+        durationMs:
+          type: integer
+          nullable: true
+        findingCount:
+          type: integer
+        error:
+          type: string
+          nullable: true
+        context:
+          type: object
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AgentFinding:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        runId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [cascade_chain, cluster, predictive_signal, anomaly, cross_domain, recommendation]
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+        title:
+          type: string
+        narrative:
+          type: string
+        linkedEntities:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              id:
+                type: string
+              label:
+                type: string
+        proposedAction:
+          type: object
+          nullable: true
+        status:
+          type: string
+          enum: [pending_review, dismissed, actioned]
+        dismissedReason:
+          type: string
+          nullable: true
+        actionedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AgentConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        policyTier:
+          type: string
+          enum: [observe, advisory, active]
+        schedule:
+          type: string
+        lastRun:
+          $ref: "#/components/schemas/AgentRun"
+        tokenUsage:
+          type: object
+          properties:
+            totalTokens:
+              type: integer
+            totalRuns:
+              type: integer
