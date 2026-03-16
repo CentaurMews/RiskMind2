@@ -54,6 +54,7 @@ export * from "./kRIWithBreachBreach";
 export * from "./limitParameter";
 export * from "./listControlsParams";
 export * from "./listRisksParams";
+export * from "./listRisksSeverity";
 export * from "./listVendorsParams";
 export * from "./loginRequest";
 export * from "./loginResponse";

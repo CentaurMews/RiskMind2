@@ -156,6 +156,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+          description: "Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25"
         - $ref: "#/components/parameters/page"
         - $ref: "#/components/parameters/limit"
       responses:

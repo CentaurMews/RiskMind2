@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { LimitParameter } from "./limitParameter";
+import type { ListRisksSeverity } from "./listRisksSeverity";
 import type { PageParameter } from "./pageParameter";
 import type { RiskCategory } from "./riskCategory";
 import type { RiskStatus } from "./riskStatus";
@@ -15,6 +16,10 @@ export type ListRisksParams = {
   category?: RiskCategory;
   ownerId?: string;
   search?: string;
+  /**
+   * Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25
+   */
+  severity?: ListRisksSeverity;
   page?: PageParameter;
   limit?: LimitParameter;
 };

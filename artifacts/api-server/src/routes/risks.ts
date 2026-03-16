@@ -27,7 +27,7 @@ const router = Router();
 
 router.get("/v1/risks", async (req, res) => {
   try {
-    const { status, category, ownerId, search, page = "1", limit = "20" } = req.query;
+    const { status, category, ownerId, severity, search, page = "1", limit = "20" } = req.query;
     const tenantId = req.user!.tenantId;
     const offset = (Number(page) - 1) * Number(limit);
 
@@ -36,6 +36,19 @@ router.get("/v1/risks", async (req, res) => {
     if (category) conditions.push(eq(risksTable.category, category as "operational" | "financial" | "compliance" | "strategic" | "technology" | "reputational"));
     if (ownerId) conditions.push(eq(risksTable.ownerId, String(ownerId)));
     if (search) conditions.push(ilike(risksTable.title, `%${search}%`));
+    if (severity) {
+      const severityRanges: Record<string, [number, number]> = {
+        low: [1, 4],
+        medium: [5, 9],
+        high: [10, 16],
+        critical: [17, 25],
+      };
+      const range = severityRanges[String(severity)];
+      if (range) {
+        conditions.push(sql`(${risksTable.likelihood} * ${risksTable.impact}) >= ${range[0]}`);
+        conditions.push(sql`(${risksTable.likelihood} * ${risksTable.impact}) <= ${range[1]}`);
+      }
+    }
 
     const [risks, countResult] = await Promise.all([
       db

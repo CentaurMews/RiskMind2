@@ -101,6 +101,12 @@ export const ListRisksQueryParams = zod.object({
     .optional(),
   ownerId: zod.coerce.string().uuid().optional(),
   search: zod.coerce.string().optional(),
+  severity: zod
+    .enum(["low", "medium", "high", "critical"])
+    .optional()
+    .describe(
+      "Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25",
+    ),
   page: zod.coerce.number().default(listRisksQueryPageDefault),
   limit: zod.coerce.number().default(listRisksQueryLimitDefault),
 });

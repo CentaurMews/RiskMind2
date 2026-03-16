@@ -604,9 +604,23 @@ export type ListRisksParams = {
   category?: RiskCategory;
   ownerId?: string;
   search?: string;
+  /**
+   * Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25
+   */
+  severity?: ListRisksSeverity;
   page?: PageParameter;
   limit?: LimitParameter;
 };
+
+export type ListRisksSeverity =
+  (typeof ListRisksSeverity)[keyof typeof ListRisksSeverity];
+
+export const ListRisksSeverity = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  critical: "critical",
+} as const;
 
 export type CompleteReviewBody = {
   notes?: string;
