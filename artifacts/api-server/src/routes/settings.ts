@@ -9,15 +9,25 @@ import { testConnection } from "../lib/llm-service";
 
 const router = Router();
 
-const BLOCKED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]", "metadata.google.internal", "169.254.169.254"];
+const BLOCKED_HOSTS = ["metadata.google.internal", "169.254.169.254"];
+const LOCAL_ALLOWED_PORTS = [11434, 8080, 1234, 4891, 5001];
 
 function validateBaseUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (!["https:", "http:"].includes(parsed.protocol)) return "baseUrl must use http or https protocol";
     const hostname = parsed.hostname.toLowerCase();
-    if (BLOCKED_HOSTS.includes(hostname)) return "baseUrl cannot target localhost or metadata endpoints";
-    if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname)) return "baseUrl cannot target private network addresses";
+
+    if (BLOCKED_HOSTS.includes(hostname)) return "baseUrl cannot target cloud metadata endpoints";
+
+    const isLocal = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"].includes(hostname);
+    if (isLocal) {
+      const port = parsed.port ? parseInt(parsed.port) : (parsed.protocol === "https:" ? 443 : 80);
+      if (!LOCAL_ALLOWED_PORTS.includes(port)) {
+        return `Local base URLs are only allowed on ports: ${LOCAL_ALLOWED_PORTS.join(", ")} (for Ollama, LM Studio, etc.)`;
+      }
+    }
+
     return null;
   } catch {
     return "baseUrl is not a valid URL";
@@ -130,7 +140,7 @@ router.put("/v1/settings/llm-providers/:id", requireRole("admin"), async (req: R
         ));
     }
 
-    const updates: Record<string, any> = { updatedAt: new Date() };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name;
     if (providerType !== undefined) updates.providerType = providerType;
     if (baseUrl !== undefined) updates.baseUrl = baseUrl || null;

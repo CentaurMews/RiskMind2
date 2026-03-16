@@ -1728,7 +1728,7 @@ paths:
                   latencyMs:
                     type: number
 
-  /v1/interviews:
+  /v1/ai/interview/start:
     post:
       operationId: startInterview
       tags: [interviews]
@@ -1754,7 +1754,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InterviewSession"
 
-  /v1/interviews/{id}:
+  /v1/ai/interview/{sessionId}:
     get:
       operationId: getInterview
       tags: [interviews]
@@ -1762,7 +1762,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: id
+        - name: sessionId
           in: path
           required: true
           schema:
@@ -1776,7 +1776,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InterviewSession"
 
-  /v1/interviews/{id}/message:
+  /v1/ai/interview/{sessionId}/message:
     post:
       operationId: sendInterviewMessage
       tags: [interviews]
@@ -1784,7 +1784,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: id
+        - name: sessionId
           in: path
           required: true
           schema:
@@ -1808,7 +1808,7 @@ paths:
               schema:
                 type: string
 
-  /v1/interviews/{id}/commit:
+  /v1/ai/interview/{sessionId}/commit:
     post:
       operationId: commitInterview
       tags: [interviews]
@@ -1816,7 +1816,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: id
+        - name: sessionId
           in: path
           required: true
           schema:
@@ -1839,7 +1839,7 @@ paths:
                   type:
                     type: string
 
-  /v1/interviews/{id}/abandon:
+  /v1/ai/interview/{sessionId}/abandon:
     post:
       operationId: abandonInterview
       tags: [interviews]
@@ -1847,7 +1847,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: id
+        - name: sessionId
           in: path
           required: true
           schema:
@@ -1864,15 +1864,39 @@ paths:
                   status:
                     type: string
 
-  /v1/risks/{riskId}/treatment-suggestions:
+  /v1/risks/{id}/ai/enrich:
     post:
-      operationId: getTreatmentSuggestions
+      operationId: aiEnrichRisk
+      tags: [interviews]
+      summary: Queue AI enrichment of risk description
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "202":
+          description: Enrichment job queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobAccepted"
+        "422":
+          description: AI unavailable
+
+  /v1/risks/{id}/ai/suggest-treatments:
+    post:
+      operationId: suggestTreatments
       tags: [interviews]
       summary: Get AI-generated treatment suggestions for a risk
       security:
         - bearerAuth: []
       parameters:
-        - name: riskId
+        - name: id
           in: path
           required: true
           schema:
@@ -1903,13 +1927,20 @@ paths:
                         riskReduction:
                           type: number
 
-  /v1/compliance/gap-remediation:
+  /v1/compliance/{frameworkId}/gap-analysis/ai-remediate:
     post:
-      operationId: getGapRemediation
+      operationId: aiGapRemediation
       tags: [interviews]
       summary: Get AI-generated gap remediation steps
       security:
         - bearerAuth: []
+      parameters:
+        - name: frameworkId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -1918,8 +1949,6 @@ paths:
               type: object
               required: [gaps]
               properties:
-                frameworkId:
-                  type: string
                 gaps:
                   type: array
                   items:

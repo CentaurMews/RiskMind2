@@ -181,15 +181,16 @@ All tables use UUID primary keys, `created_at`/`updated_at` timestamps. Tenant-s
 - `POST /api/v1/settings/llm-providers/:id/test` — Test LLM provider connection
 
 ### AI Interview Sessions
-- `POST /api/v1/interviews` — Start AI interview (type: risk_creation | control_assessment)
-- `GET /api/v1/interviews/:id` — Get interview session
-- `POST /api/v1/interviews/:id/message` — Send message (SSE streaming response)
-- `POST /api/v1/interviews/:id/commit` — Commit draft to create risk/control record
-- `POST /api/v1/interviews/:id/abandon` — Abandon interview session
+- `POST /api/v1/ai/interview/start` — Start AI interview (type: risk_creation | control_assessment)
+- `GET /api/v1/ai/interview/:sessionId` — Get interview session
+- `POST /api/v1/ai/interview/:sessionId/message` — Send message (SSE streaming response)
+- `POST /api/v1/ai/interview/:sessionId/commit` — Commit draft to create risk/control record
+- `POST /api/v1/ai/interview/:sessionId/abandon` — Abandon interview session
 
-### AI-Powered Suggestions
-- `POST /api/v1/risks/:riskId/treatment-suggestions` — Get AI-generated treatment suggestions
-- `POST /api/v1/compliance/gap-remediation` — Get AI-generated gap remediation steps
+### AI-Powered Enrichment & Suggestions
+- `POST /api/v1/risks/:id/ai/enrich` — Queue AI enrichment of risk (async job, returns 202)
+- `POST /api/v1/risks/:id/ai/suggest-treatments` — Get AI-generated treatment suggestions
+- `POST /api/v1/compliance/:frameworkId/gap-analysis/ai-remediate` — Get AI-generated gap remediation steps
 
 ### Foresight (Stubs — 501 Not Implemented)
 - `GET /api/v1/foresight/simulations` — List simulations

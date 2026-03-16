@@ -1,10 +1,48 @@
 import { Router, type Request, type Response } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, interviewSessionsTable, risksTable, controlTestsTable } from "@workspace/db";
+import { db, interviewSessionsTable, risksTable, controlTestsTable, controlsTable } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, sendError } from "../lib/errors";
 import { complete, streamComplete, isAvailable, LLMUnavailableError } from "../lib/llm-service";
+import { enqueueJob } from "../lib/job-queue";
+
+interface TranscriptEntry {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
+
+interface RiskDraft {
+  title?: string;
+  description?: string;
+  category?: string;
+  likelihood?: number;
+  impact?: number;
+}
+
+interface ControlAssessmentDraft {
+  result?: string;
+  notes?: string;
+  gaps?: string[];
+}
+
+interface TreatmentSuggestion {
+  type: string;
+  description: string;
+  effort: string;
+  riskReduction: number;
+}
+
+interface RemediationStep {
+  gap: string;
+  priority: string;
+  steps: string;
+  effortDays: number;
+  suggestedControls: string[];
+}
+
+const AI_UNAVAILABLE_MSG = "AI unavailable — manual mode active. Configure an LLM provider in Settings to enable AI features.";
 
 const router = Router();
 
@@ -38,11 +76,11 @@ function getSystemPrompt(type: string): string {
   return type === "risk_creation" ? RISK_SYSTEM_PROMPT : CONTROL_SYSTEM_PROMPT;
 }
 
-router.post("/v1/interviews", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
+router.post("/v1/ai/interview/start", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
     const userId = req.user!.id;
-    const { type } = req.body;
+    const { type } = req.body as { type?: string };
 
     if (!type || !["risk_creation", "control_assessment"].includes(type)) {
       badRequest(res, "type must be 'risk_creation' or 'control_assessment'");
@@ -51,7 +89,7 @@ router.post("/v1/interviews", requireRole("admin", "risk_manager", "auditor"), a
 
     const available = await isAvailable(tenantId);
     if (!available) {
-      badRequest(res, "AI unavailable — no LLM provider configured");
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
       return;
     }
 
@@ -66,10 +104,12 @@ router.post("/v1/interviews", requireRole("admin", "risk_manager", "auditor"), a
       });
     } catch (err) {
       console.error("Interview start LLM error:", err);
-      greeting = '{"type":"question","content":"Let\'s begin. Can you describe the risk you\'d like to document?"}';
+      greeting = type === "risk_creation"
+        ? '{"type":"question","content":"Let\'s begin. Can you describe the risk you\'d like to document?"}'
+        : '{"type":"question","content":"Let\'s begin. Which control would you like to assess?"}';
     }
 
-    const transcript = [
+    const transcript: TranscriptEntry[] = [
       { role: "assistant", content: greeting, timestamp: new Date().toISOString() },
     ];
 
@@ -88,12 +128,12 @@ router.post("/v1/interviews", requireRole("admin", "risk_manager", "auditor"), a
   }
 });
 
-router.get("/v1/interviews/:id", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
+router.get("/v1/ai/interview/:sessionId", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
     const [session] = await db.select().from(interviewSessionsTable)
       .where(and(
-        eq(interviewSessionsTable.id, String(req.params.id)),
+        eq(interviewSessionsTable.id, String(req.params.sessionId)),
         eq(interviewSessionsTable.tenantId, tenantId),
       )).limit(1);
 
@@ -105,11 +145,11 @@ router.get("/v1/interviews/:id", requireRole("admin", "risk_manager", "auditor")
   }
 });
 
-router.post("/v1/interviews/:id/message", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
+router.post("/v1/ai/interview/:sessionId/message", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
-    const sessionId = String(req.params.id);
-    const { content } = req.body;
+    const sessionId = String(req.params.sessionId);
+    const { content } = req.body as { content?: string };
 
     if (!content) { badRequest(res, "content is required"); return; }
 
@@ -122,7 +162,13 @@ router.post("/v1/interviews/:id/message", requireRole("admin", "risk_manager", "
     if (!session) { notFound(res, "Interview session not found"); return; }
     if (session.status !== "active") { badRequest(res, "Interview session is not active"); return; }
 
-    const transcript = (session.transcript as any[]) || [];
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
+      return;
+    }
+
+    const transcript = (session.transcript as TranscriptEntry[]) || [];
     transcript.push({ role: "user", content, timestamp: new Date().toISOString() });
 
     await db.update(interviewSessionsTable).set({
@@ -131,9 +177,9 @@ router.post("/v1/interviews/:id/message", requireRole("admin", "risk_manager", "
     }).where(eq(interviewSessionsTable.id, sessionId));
 
     const systemPrompt = getSystemPrompt(session.type);
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
-      ...transcript.map((t: any) => ({ role: t.role as "user" | "assistant", content: t.content })),
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      { role: "system", content: systemPrompt },
+      ...transcript.map((t) => ({ role: t.role, content: t.content })),
     ];
 
     res.setHeader("Content-Type", "text/event-stream");
@@ -150,7 +196,7 @@ router.post("/v1/interviews/:id/message", requireRole("admin", "risk_manager", "
         } else if (chunk.type === "done") {
           transcript.push({ role: "assistant", content: fullResponse, timestamp: new Date().toISOString() });
 
-          let draftData = session.draftData;
+          let draftData = session.draftData as Record<string, unknown>;
           try {
             const parsed = JSON.parse(fullResponse);
             if (parsed.type === "draft" && parsed.data) {
@@ -184,10 +230,10 @@ router.post("/v1/interviews/:id/message", requireRole("admin", "risk_manager", "
   }
 });
 
-router.post("/v1/interviews/:id/commit", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
+router.post("/v1/ai/interview/:sessionId/commit", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
-    const sessionId = String(req.params.id);
+    const sessionId = String(req.params.sessionId);
 
     const [session] = await db.select().from(interviewSessionsTable)
       .where(and(
@@ -198,23 +244,24 @@ router.post("/v1/interviews/:id/commit", requireRole("admin", "risk_manager"), a
     if (!session) { notFound(res, "Interview session not found"); return; }
     if (session.status !== "active") { badRequest(res, "Interview session is not active"); return; }
 
-    const draftData = session.draftData as Record<string, any>;
+    const draftData = session.draftData as Record<string, unknown>;
     if (!draftData || Object.keys(draftData).length === 0) {
       badRequest(res, "No draft data available. Continue the interview to generate a draft.");
       return;
     }
 
     let resultId: string | null = null;
-    const { controlId } = req.body;
+    const { controlId } = req.body as { controlId?: string };
 
     if (session.type === "risk_creation") {
+      const draft = draftData as unknown as RiskDraft;
       const [risk] = await db.insert(risksTable).values({
         tenantId,
-        title: draftData.title || "Untitled Risk",
-        description: draftData.description || "",
-        category: draftData.category || "operational",
-        likelihood: draftData.likelihood || 1,
-        impact: draftData.impact || 1,
+        title: draft.title || "Untitled Risk",
+        description: draft.description || "",
+        category: (draft.category as "operational" | "financial" | "compliance" | "strategic" | "technology" | "reputational") || "operational",
+        likelihood: draft.likelihood || 1,
+        impact: draft.impact || 1,
         status: "draft",
       }).returning();
       resultId = risk.id;
@@ -223,18 +270,32 @@ router.post("/v1/interviews/:id/commit", requireRole("admin", "risk_manager"), a
         badRequest(res, "controlId is required to commit a control assessment");
         return;
       }
-      const resultMap: Record<string, string> = { effective: "pass", partially_effective: "partial", ineffective: "fail" };
-      const testResult = resultMap[draftData.result] || "not_tested";
+
+      const [control] = await db.select({ id: controlsTable.id }).from(controlsTable)
+        .where(and(eq(controlsTable.id, controlId), eq(controlsTable.tenantId, tenantId)))
+        .limit(1);
+      if (!control) {
+        notFound(res, "Control not found in your organization");
+        return;
+      }
+
+      const draft = draftData as unknown as ControlAssessmentDraft;
+      const resultMap: Record<string, "pass" | "partial" | "fail" | "not_tested"> = {
+        effective: "pass",
+        partially_effective: "partial",
+        ineffective: "fail",
+      };
+      const testResult = resultMap[draft.result || ""] || "not_tested";
       const notes = [
-        draftData.notes || "",
-        draftData.gaps?.length ? `\nGaps identified:\n${draftData.gaps.map((g: string) => `- ${g}`).join("\n")}` : "",
+        draft.notes || "",
+        draft.gaps?.length ? `\nGaps identified:\n${draft.gaps.map((g) => `- ${g}`).join("\n")}` : "",
       ].join("").trim();
 
       const [controlTest] = await db.insert(controlTestsTable).values({
         tenantId,
         controlId,
         testerId: req.user!.id,
-        result: testResult as any,
+        result: testResult,
         notes,
         testedAt: new Date(),
       }).returning();
@@ -263,10 +324,10 @@ router.post("/v1/interviews/:id/commit", requireRole("admin", "risk_manager"), a
   }
 });
 
-router.post("/v1/interviews/:id/abandon", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
+router.post("/v1/ai/interview/:sessionId/abandon", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
-    const sessionId = String(req.params.id);
+    const sessionId = String(req.params.sessionId);
 
     const [session] = await db.select().from(interviewSessionsTable)
       .where(and(
@@ -290,10 +351,43 @@ router.post("/v1/interviews/:id/abandon", requireRole("admin", "risk_manager", "
   }
 });
 
-router.post("/v1/risks/:riskId/treatment-suggestions", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
+router.post("/v1/risks/:id/ai/enrich", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
+  try {
+    const riskId = String(req.params.id);
+    const tenantId = req.user!.tenantId;
+
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
+      return;
+    }
+
+    const [risk] = await db.select().from(risksTable)
+      .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId)))
+      .limit(1);
+
+    if (!risk) { notFound(res, "Risk not found"); return; }
+
+    const job = await enqueueJob("ai-enrich", "enrich_risk", { riskId }, tenantId);
+    await recordAudit(req, "enrich_request", "risk", riskId, { jobId: job.id });
+
+    res.status(202).json({ jobId: job.id, status: "queued", message: "Risk enrichment job queued" });
+  } catch (err) {
+    console.error("Enrich risk error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/risks/:id/ai/suggest-treatments", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
-    const riskId = String(req.params.riskId);
+    const riskId = String(req.params.id);
+
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
+      return;
+    }
 
     const [risk] = await db.select().from(risksTable)
       .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId)))
@@ -314,7 +408,7 @@ router.post("/v1/risks/:riskId/treatment-suggestions", requireRole("admin", "ris
       ],
     });
 
-    let treatments = [];
+    let treatments: TreatmentSuggestion[] = [];
     try {
       const parsed = JSON.parse(response);
       treatments = parsed.treatments || [];
@@ -326,7 +420,7 @@ router.post("/v1/risks/:riskId/treatment-suggestions", requireRole("admin", "ris
     res.json({ riskId, treatments });
   } catch (err) {
     if (err instanceof LLMUnavailableError) {
-      badRequest(res, err.message);
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
       return;
     }
     console.error("Treatment suggestions error:", err);
@@ -335,13 +429,20 @@ router.post("/v1/risks/:riskId/treatment-suggestions", requireRole("admin", "ris
   }
 });
 
-router.post("/v1/compliance/gap-remediation", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
+router.post("/v1/compliance/:frameworkId/gap-analysis/ai-remediate", requireRole("admin", "risk_manager", "auditor"), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
-    const { frameworkId, gaps } = req.body;
+    const frameworkId = String(req.params.frameworkId);
+    const { gaps } = req.body as { gaps?: string[] };
 
     if (!gaps || !Array.isArray(gaps) || gaps.length === 0) {
       badRequest(res, "gaps array is required");
+      return;
+    }
+
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
       return;
     }
 
@@ -353,12 +454,12 @@ router.post("/v1/compliance/gap-remediation", requireRole("admin", "risk_manager
         },
         {
           role: "user",
-          content: `Framework: ${frameworkId || "General"}\nGaps:\n${gaps.map((g: string, i: number) => `${i + 1}. ${g}`).join("\n")}`,
+          content: `Framework: ${frameworkId}\nGaps:\n${gaps.map((g, i) => `${i + 1}. ${g}`).join("\n")}`,
         },
       ],
     });
 
-    let remediations = [];
+    let remediations: RemediationStep[] = [];
     try {
       const parsed = JSON.parse(response);
       remediations = parsed.remediations || [];
@@ -366,11 +467,11 @@ router.post("/v1/compliance/gap-remediation", requireRole("admin", "risk_manager
       remediations = [{ gap: gaps[0], priority: "medium", steps: response, effortDays: 30, suggestedControls: [] }];
     }
 
-    await recordAudit(req, "gap_remediation", "compliance", frameworkId || "general", { gapCount: gaps.length });
+    await recordAudit(req, "gap_remediation", "compliance", frameworkId, { gapCount: gaps.length });
     res.json({ frameworkId, remediations });
   } catch (err) {
     if (err instanceof LLMUnavailableError) {
-      badRequest(res, err.message);
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
       return;
     }
     console.error("Gap remediation error:", err);
