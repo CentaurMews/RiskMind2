@@ -20,6 +20,8 @@ import {
   CreateVendorBody,
   ListControlsQueryParams,
   CreateControlBody,
+  ListSignalsQueryParams,
+  ListAlertsQueryParams,
 } from "@workspace/api-zod";
 import { recordAuditDirect } from "../lib/audit";
 import { getMcpAuthBySessionId, type McpAuthContext } from "./handler";
@@ -198,13 +200,7 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "list_signals",
     "List ingested signals with optional status and source filters",
-    {
-      status: z.enum(["pending", "triaged", "finding", "dismissed"]).optional(),
-      source: z.string().optional(),
-      search: z.string().optional(),
-      page: z.number().int().min(1).default(1),
-      limit: z.number().int().min(1).max(100).default(20),
-    },
+    ListSignalsQueryParams.shape,
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
@@ -253,13 +249,7 @@ export function registerMcpTools(mcp: McpServer) {
   mcp.tool(
     "list_alerts",
     "List monitoring alerts with optional severity and status filters",
-    {
-      severity: z.enum(["critical", "high", "medium", "low"]).optional(),
-      status: z.enum(["active", "acknowledged", "resolved", "escalated"]).optional(),
-      type: z.string().optional(),
-      page: z.number().int().min(1).default(1),
-      limit: z.number().int().min(1).max(100).default(20),
-    },
+    ListAlertsQueryParams.shape,
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
@@ -323,7 +313,7 @@ export function registerMcpTools(mcp: McpServer) {
       if (!framework) return deny(user, "get_compliance_score", 404, "Not Found", "Framework not found");
 
       const requirements = await db.select().from(frameworkRequirementsTable)
-        .where(eq(frameworkRequirementsTable.frameworkId, args.frameworkId));
+        .where(and(eq(frameworkRequirementsTable.frameworkId, args.frameworkId), eq(frameworkRequirementsTable.tenantId, user.tenantId)));
 
       if (requirements.length === 0) {
         await audit(user.tenantId, user.userId, "mcp_compliance_score", "framework", args.frameworkId);
@@ -332,7 +322,7 @@ export function registerMcpTools(mcp: McpServer) {
 
       const reqIds = requirements.map(r => r.id);
       const mappings = await db.select().from(controlRequirementMapsTable)
-        .where(inArray(controlRequirementMapsTable.requirementId, reqIds));
+        .where(and(inArray(controlRequirementMapsTable.requirementId, reqIds), eq(controlRequirementMapsTable.tenantId, user.tenantId)));
 
       const coveredReqIds = new Set(mappings.map(m => m.requirementId));
 
@@ -363,7 +353,7 @@ export function registerMcpTools(mcp: McpServer) {
       if (!framework) return deny(user, "run_gap_analysis", 404, "Not Found", "Framework not found");
 
       const requirements = await db.select().from(frameworkRequirementsTable)
-        .where(eq(frameworkRequirementsTable.frameworkId, args.frameworkId));
+        .where(and(eq(frameworkRequirementsTable.frameworkId, args.frameworkId), eq(frameworkRequirementsTable.tenantId, user.tenantId)));
 
       if (requirements.length === 0) {
         await audit(user.tenantId, user.userId, "mcp_gap_analysis", "framework", args.frameworkId);
@@ -372,7 +362,7 @@ export function registerMcpTools(mcp: McpServer) {
 
       const reqIds = requirements.map(r => r.id);
       const mappings = await db.select().from(controlRequirementMapsTable)
-        .where(inArray(controlRequirementMapsTable.requirementId, reqIds));
+        .where(and(inArray(controlRequirementMapsTable.requirementId, reqIds), eq(controlRequirementMapsTable.tenantId, user.tenantId)));
 
       const coveredReqIds = new Set(mappings.map(m => m.requirementId));
       const gaps = requirements
