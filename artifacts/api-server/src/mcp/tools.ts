@@ -59,6 +59,10 @@ function checkRole(user: { role: string }, ...allowed: string[]): boolean {
   return allowed.includes(user.role);
 }
 
+function deny(user: McpAuthContext, tool: string, status: number, title: string, detail: string) {
+  return rfc7807(status, title, detail, { tenantId: user.tenantId, userId: user.userId, tool });
+}
+
 async function audit(tenantId: string, userId: string, action: string, entityType: string, entityId?: string, payload?: Record<string, unknown>) {
   await recordAuditDirect(tenantId, userId, action, entityType, entityId, payload);
 }
@@ -95,7 +99,7 @@ export function registerMcpTools(mcp: McpServer) {
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
-      if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
+      if (!checkRole(user, "admin", "risk_manager")) return deny(user, "create_risk", 403, "Forbidden", "Insufficient permissions");
 
       const [risk] = await db.insert(risksTable).values({
         tenantId: user.tenantId,
@@ -124,7 +128,7 @@ export function registerMcpTools(mcp: McpServer) {
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
-      if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
+      if (!checkRole(user, "admin", "risk_manager")) return deny(user, "update_risk", 403, "Forbidden", "Insufficient permissions");
 
       const { riskId, ...updates } = args;
       const setFields: Record<string, unknown> = { updatedAt: new Date() };
@@ -138,7 +142,7 @@ export function registerMcpTools(mcp: McpServer) {
       const [updated] = await db.update(risksTable).set(setFields)
         .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, user.tenantId))).returning();
 
-      if (!updated) return rfc7807(404, "Not Found", "Risk not found");
+      if (!updated) return deny(user, "update_risk", 404, "Not Found", "Risk not found");
       await audit(user.tenantId, user.userId, "mcp_update", "risk", updated.id);
       return { content: [{ type: "text" as const, text: JSON.stringify(updated) }] };
     }
@@ -174,7 +178,7 @@ export function registerMcpTools(mcp: McpServer) {
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
-      if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
+      if (!checkRole(user, "admin", "risk_manager")) return deny(user, "create_vendor", 403, "Forbidden", "Insufficient permissions");
 
       const [vendor] = await db.insert(vendorsTable).values({
         tenantId: user.tenantId,
@@ -230,13 +234,13 @@ export function registerMcpTools(mcp: McpServer) {
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
-      if (!checkRole(user, "admin", "risk_manager", "auditor")) return rfc7807(403, "Forbidden", "Insufficient permissions");
+      if (!checkRole(user, "admin", "risk_manager", "auditor")) return deny(user, "triage_signal", 403, "Forbidden", "Insufficient permissions");
 
       const [signal] = await db.select().from(signalsTable)
         .where(and(eq(signalsTable.id, args.signalId), eq(signalsTable.tenantId, user.tenantId))).limit(1);
 
-      if (!signal) return rfc7807(404, "Not Found", "Signal not found");
-      if (signal.status !== "pending") return rfc7807(409, "Conflict", `Signal is '${signal.status}', only 'pending' signals can be triaged`);
+      if (!signal) return deny(user, "triage_signal", 404, "Not Found", "Signal not found");
+      if (signal.status !== "pending") return deny(user, "triage_signal", 409, "Conflict", `Signal is '${signal.status}', only 'pending' signals can be triaged`);
 
       const [updated] = await db.update(signalsTable).set({ status: "triaged", updatedAt: new Date() })
         .where(eq(signalsTable.id, args.signalId)).returning();
@@ -285,14 +289,14 @@ export function registerMcpTools(mcp: McpServer) {
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
-      if (!checkRole(user, "admin", "risk_manager", "auditor")) return rfc7807(403, "Forbidden", "Insufficient permissions");
+      if (!checkRole(user, "admin", "risk_manager", "auditor")) return deny(user, "acknowledge_alert", 403, "Forbidden", "Insufficient permissions");
 
       const [alert] = await db.select().from(alertsTable)
         .where(and(eq(alertsTable.id, args.alertId), eq(alertsTable.tenantId, user.tenantId))).limit(1);
 
-      if (!alert) return rfc7807(404, "Not Found", "Alert not found");
+      if (!alert) return deny(user, "acknowledge_alert", 404, "Not Found", "Alert not found");
       if (alert.status !== "active" && alert.status !== "escalated") {
-        return rfc7807(409, "Conflict", `Alert is '${alert.status}', only active or escalated alerts can be acknowledged`);
+        return deny(user, "acknowledge_alert", 409, "Conflict", `Alert is '${alert.status}', only active or escalated alerts can be acknowledged`);
       }
 
       const [updated] = await db.update(alertsTable)
@@ -316,7 +320,7 @@ export function registerMcpTools(mcp: McpServer) {
 
       const [framework] = await db.select().from(frameworksTable)
         .where(and(eq(frameworksTable.id, args.frameworkId), eq(frameworksTable.tenantId, user.tenantId))).limit(1);
-      if (!framework) return rfc7807(404, "Not Found", "Framework not found");
+      if (!framework) return deny(user, "get_compliance_score", 404, "Not Found", "Framework not found");
 
       const requirements = await db.select().from(frameworkRequirementsTable)
         .where(eq(frameworkRequirementsTable.frameworkId, args.frameworkId));
@@ -356,7 +360,7 @@ export function registerMcpTools(mcp: McpServer) {
 
       const [framework] = await db.select().from(frameworksTable)
         .where(and(eq(frameworksTable.id, args.frameworkId), eq(frameworksTable.tenantId, user.tenantId))).limit(1);
-      if (!framework) return rfc7807(404, "Not Found", "Framework not found");
+      if (!framework) return deny(user, "run_gap_analysis", 404, "Not Found", "Framework not found");
 
       const requirements = await db.select().from(frameworkRequirementsTable)
         .where(eq(frameworkRequirementsTable.frameworkId, args.frameworkId));
@@ -410,7 +414,7 @@ export function registerMcpTools(mcp: McpServer) {
     async (args, extra) => {
       const user = getAuth(extra);
       if (!user) return authError(401, "Unauthorized", "Authentication required");
-      if (!checkRole(user, "admin", "risk_manager")) return rfc7807(403, "Forbidden", "Insufficient permissions");
+      if (!checkRole(user, "admin", "risk_manager")) return deny(user, "create_control", 403, "Forbidden", "Insufficient permissions");
 
       const [control] = await db.insert(controlsTable).values({
         tenantId: user.tenantId,
