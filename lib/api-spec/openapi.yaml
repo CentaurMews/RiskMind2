@@ -133,9 +133,12 @@ components:
           format: email
         password:
           type: string
+        tenantSlug:
+          type: string
       required:
         - email
         - password
+        - tenantSlug
 
     LoginResponse:
       type: object

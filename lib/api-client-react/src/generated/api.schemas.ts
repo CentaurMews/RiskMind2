@@ -13,6 +13,7 @@ export interface HealthStatus {
 export interface LoginRequest {
   email: string;
   password: string;
+  tenantSlug: string;
 }
 
 export type UserProfileRole =

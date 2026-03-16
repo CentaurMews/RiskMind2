@@ -69,7 +69,7 @@ publicAuthRouter.post("/v1/auth/login", async (req, res) => {
   }
 });
 
-protectedAuthRouter.post("/v1/auth/refresh", async (req, res) => {
+publicAuthRouter.post("/v1/auth/refresh", async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {
@@ -80,11 +80,6 @@ protectedAuthRouter.post("/v1/auth/refresh", async (req, res) => {
     const payload = verifyRefreshToken(refreshToken);
     if (!payload) {
       unauthorized(res, "Invalid or expired refresh token");
-      return;
-    }
-
-    if (payload.sub !== req.user!.id || payload.tenantId !== req.user!.tenantId) {
-      unauthorized(res, "Token does not match authenticated user");
       return;
     }
 

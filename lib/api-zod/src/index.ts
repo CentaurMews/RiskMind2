@@ -1,2 +1,11 @@
 export * from "./generated/api";
-export * from "./generated/types";
+export type {
+  HealthStatus,
+  LoginRequest,
+  LoginResponse,
+  RefreshRequest,
+  RFC7807Error,
+  TokenPair,
+  UserProfile,
+  UserProfileRole,
+} from "./generated/types";
