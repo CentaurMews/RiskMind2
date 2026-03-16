@@ -3,8 +3,8 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ProtectedRoute } from "@/components/protected-route";
 
-// Pages
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -31,24 +31,32 @@ const queryClient = new QueryClient({
   },
 });
 
-function Router() {
+function ProtectedPage({ Component }: { Component: React.ComponentType }) {
+  return (
+    <ProtectedRoute>
+      <Component />
+    </ProtectedRoute>
+  );
+}
+
+function AppRouter() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/risks" component={RiskList} />
-      <Route path="/risks/heatmap" component={RiskHeatmap} />
-      <Route path="/risks/:id" component={RiskDetail} />
-      <Route path="/signals" component={SignalList} />
-      <Route path="/signals/findings" component={FindingList} />
-      <Route path="/vendors" component={VendorList} />
-      <Route path="/vendors/:id" component={VendorDetail} />
-      <Route path="/compliance" component={FrameworkList} />
-      <Route path="/compliance/:id" component={FrameworkDetail} />
-      <Route path="/controls" component={ControlList} />
-      <Route path="/alerts" component={AlertList} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/foresight" component={Foresight} />
+      <Route path="/dashboard">{() => <ProtectedPage Component={Dashboard} />}</Route>
+      <Route path="/risks/heatmap">{() => <ProtectedPage Component={RiskHeatmap} />}</Route>
+      <Route path="/risks/:id">{() => <ProtectedPage Component={RiskDetail} />}</Route>
+      <Route path="/risks">{() => <ProtectedPage Component={RiskList} />}</Route>
+      <Route path="/signals/findings">{() => <ProtectedPage Component={FindingList} />}</Route>
+      <Route path="/signals">{() => <ProtectedPage Component={SignalList} />}</Route>
+      <Route path="/vendors/:id">{() => <ProtectedPage Component={VendorDetail} />}</Route>
+      <Route path="/vendors">{() => <ProtectedPage Component={VendorList} />}</Route>
+      <Route path="/compliance/:id">{() => <ProtectedPage Component={FrameworkDetail} />}</Route>
+      <Route path="/compliance">{() => <ProtectedPage Component={FrameworkList} />}</Route>
+      <Route path="/controls">{() => <ProtectedPage Component={ControlList} />}</Route>
+      <Route path="/alerts">{() => <ProtectedPage Component={AlertList} />}</Route>
+      <Route path="/settings">{() => <ProtectedPage Component={Settings} />}</Route>
+      <Route path="/foresight">{() => <ProtectedPage Component={Foresight} />}</Route>
       <Route path="/" component={() => {
         const [, setLocation] = useLocation();
         useEffect(() => {
@@ -67,7 +75,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <AppRouter />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
