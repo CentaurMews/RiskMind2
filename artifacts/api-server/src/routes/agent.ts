@@ -51,8 +51,8 @@ router.get("/v1/agent/findings", requireRole("admin", "risk_manager", "auditor")
     }
 
     const statusFilter = req.query.status as string | undefined;
-    if (statusFilter && ["pending_review", "dismissed", "actioned"].includes(statusFilter)) {
-      conditions.push(eq(agentFindingsTable.status, statusFilter as "pending_review" | "dismissed" | "actioned"));
+    if (statusFilter && ["pending_review", "acknowledged", "dismissed", "actioned"].includes(statusFilter)) {
+      conditions.push(eq(agentFindingsTable.status, statusFilter as "pending_review" | "acknowledged" | "dismissed" | "actioned"));
     }
 
     const [findings, countResult] = await Promise.all([

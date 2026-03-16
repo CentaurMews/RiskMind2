@@ -2053,7 +2053,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending_review, dismissed, actioned]
+            enum: [pending_review, acknowledged, dismissed, actioned]
         - name: page
           in: query
           schema:
@@ -3909,7 +3909,7 @@ components:
           nullable: true
         status:
           type: string
-          enum: [pending_review, dismissed, actioned]
+          enum: [pending_review, acknowledged, dismissed, actioned]
         dismissedReason:
           type: string
           nullable: true

@@ -549,7 +549,7 @@ async function act(
   let savedCount = 0;
 
   for (const finding of findings) {
-    let findingStatus: string;
+    let findingStatus: "pending_review" | "acknowledged" | "dismissed" | "actioned";
     let storedAction: Record<string, unknown> | null = null;
 
     if (policyTier === "observe") {
