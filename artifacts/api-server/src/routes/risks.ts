@@ -371,6 +371,24 @@ router.put("/v1/risks/:riskId/kris/:id", requireRole("admin", "risk_manager"), a
     }
 
     await recordAudit(req, "update", "kri", kri.id, { breach });
+
+    if (currentValue !== undefined && kri.currentValue) {
+      await recordAudit(req, "kri_updated", "kri", kri.id, {
+        kriId: kri.id,
+        value: kri.currentValue,
+        breach,
+      });
+
+      if (breach) {
+        await recordAudit(req, "kri_breach", "kri", kri.id, {
+          kriId: kri.id,
+          value: kri.currentValue,
+          level: breach,
+          threshold: breach === "critical" ? kri.criticalThreshold : kri.warningThreshold,
+        });
+      }
+    }
+
     res.json({ ...kri, breach });
   } catch (err) {
     console.error("Update KRI error:", err);

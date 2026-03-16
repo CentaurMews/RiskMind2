@@ -436,12 +436,6 @@ async function detectPredictiveSignals(tenantId: string, data: ObservationData):
             });
           }
         }
-      } else if (warning && val >= warning * 0.8 && val < critical) {
-        const pct = ((val - (warning * 0.8)) / (critical - (warning * 0.8)) * 100).toFixed(0);
-        trendingKris.push({
-          kri,
-          trendInfo: `at ${pct}% of warning-to-critical range`,
-        });
       }
     }
 
