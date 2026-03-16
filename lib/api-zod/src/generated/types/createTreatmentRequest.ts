@@ -15,4 +15,7 @@ export interface CreateTreatmentRequest {
   ownerId?: string;
   dueDate?: Date;
   cost?: string;
+  benefit?: string;
+  effectivenessScore?: number;
+  progressNotes?: string;
 }

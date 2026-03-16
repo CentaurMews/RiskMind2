@@ -226,10 +226,10 @@ export type TreatmentStrategy =
   (typeof TreatmentStrategy)[keyof typeof TreatmentStrategy];
 
 export const TreatmentStrategy = {
-  mitigate: "mitigate",
+  treat: "treat",
   transfer: "transfer",
-  accept: "accept",
-  avoid: "avoid",
+  tolerate: "tolerate",
+  terminate: "terminate",
 } as const;
 
 export type TreatmentStatus =
@@ -251,6 +251,9 @@ export interface Treatment {
   ownerId?: string | null;
   dueDate?: string | null;
   cost?: string | null;
+  benefit?: string | null;
+  effectivenessScore?: number | null;
+  progressNotes?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -262,10 +265,51 @@ export interface CreateTreatmentRequest {
   ownerId?: string;
   dueDate?: string;
   cost?: string;
+  benefit?: string;
+  effectivenessScore?: number;
+  progressNotes?: string;
+}
+
+export interface UpdateTreatmentRequest {
+  strategy?: TreatmentStrategy;
+  description?: string;
+  status?: TreatmentStatus;
+  ownerId?: string;
+  dueDate?: string;
+  cost?: string;
+  benefit?: string;
+  effectivenessScore?: number;
+  progressNotes?: string;
+}
+
+export interface TreatmentStatusEvent {
+  id?: string;
+  treatmentId?: string;
+  fromStatus?: TreatmentStatus | null;
+  toStatus?: TreatmentStatus;
+  changedBy?: string | null;
+  changedByName?: string | null;
+  changedByEmail?: string | null;
+  note?: string | null;
+  createdAt?: string;
 }
 
 export interface TreatmentListResponse {
   data?: Treatment[];
+}
+
+export interface AiTreatmentRecommendation {
+  strategy?: TreatmentStrategy;
+  description?: string;
+  estimatedCost?: number;
+  expectedResidualScoreReduction?: number;
+  roi?: number;
+  rationale?: string;
+}
+
+export interface AiTreatmentRecommendationsResponse {
+  riskId?: string;
+  recommendations?: AiTreatmentRecommendation[];
 }
 
 export interface Kri {
@@ -1084,6 +1128,10 @@ export const ListRisksSeverity = {
   high: "high",
   critical: "critical",
 } as const;
+
+export type ListTreatmentStatusEvents200 = {
+  data?: TreatmentStatusEvent[];
+};
 
 export type CompleteReviewBody = {
   notes?: string;

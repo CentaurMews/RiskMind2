@@ -399,7 +399,7 @@ router.post("/v1/risks/:id/ai/suggest-treatments", requireRole("admin", "risk_ma
       messages: [
         {
           role: "system",
-          content: "You are a risk treatment advisor. Given a risk, suggest 3 treatment options with: type (mitigate/transfer/accept/avoid), description, estimated effort (low/medium/high), and expected residual risk reduction percentage. Respond in JSON: {\"treatments\":[{\"type\":\"...\",\"description\":\"...\",\"effort\":\"...\",\"riskReduction\":N}]}",
+          content: "You are a risk treatment advisor using the 4T framework (Treat, Transfer, Tolerate, Terminate). Given a risk, suggest 3 treatment options with: type (treat/transfer/tolerate/terminate), description, estimated effort (low/medium/high), and expected residual risk reduction percentage. Respond in JSON: {\"treatments\":[{\"type\":\"...\",\"description\":\"...\",\"effort\":\"...\",\"riskReduction\":N}]}",
         },
         {
           role: "user",
@@ -413,7 +413,7 @@ router.post("/v1/risks/:id/ai/suggest-treatments", requireRole("admin", "risk_ma
       const parsed = JSON.parse(response);
       treatments = parsed.treatments || [];
     } catch {
-      treatments = [{ type: "mitigate", description: response, effort: "medium", riskReduction: 50 }];
+      treatments = [{ type: "treat", description: response, effort: "medium", riskReduction: 50 }];
     }
 
     await recordAudit(req, "treatment_suggestions", "risk", riskId, { count: treatments.length });

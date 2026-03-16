@@ -8,18 +8,14 @@
 import type { TreatmentStatus } from "./treatmentStatus";
 import type { TreatmentStrategy } from "./treatmentStrategy";
 
-export interface Treatment {
-  id?: string;
-  riskId?: string;
+export interface UpdateTreatmentRequest {
   strategy?: TreatmentStrategy;
-  description?: string | null;
+  description?: string;
   status?: TreatmentStatus;
-  ownerId?: string | null;
-  dueDate?: Date | null;
-  cost?: string | null;
-  benefit?: string | null;
-  effectivenessScore?: number | null;
-  progressNotes?: string | null;
-  createdAt?: Date;
-  updatedAt?: Date;
+  ownerId?: string;
+  dueDate?: Date;
+  cost?: string;
+  benefit?: string;
+  effectivenessScore?: number;
+  progressNotes?: string;
 }

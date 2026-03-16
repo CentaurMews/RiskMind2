@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { ScoreProgressionBar } from "@/components/score-progression-bar";
+import { TreatmentsTab } from "./treatments-tab";
 
 interface ScorePair { likelihood: number; impact: number }
 
@@ -173,7 +174,6 @@ export default function RiskDetail() {
   const queryClient = useQueryClient();
 
   const { data: risk, isLoading } = useGetRisk(id);
-  const { data: treatments } = useListTreatments(id);
   const { data: kris } = useListKRIs(id);
   const { data: incidents } = useListIncidents(id);
   const { data: reviews } = useListReviews(id);
@@ -396,24 +396,12 @@ export default function RiskDetail() {
           
           <div className="mt-6 bg-card border rounded-xl overflow-hidden shadow-sm min-h-[300px]">
             <TabsContent value="treatments" className="p-0 m-0 border-none outline-none">
-              {treatments?.data?.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground">No treatments defined.</div>
-              ) : (
-                <div className="divide-y">
-                  {treatments?.data?.map(t => (
-                    <div key={t.id} className="p-4 hover:bg-muted/30 transition-colors flex justify-between items-center">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-sm">{t.description}</span>
-                          <StatusBadge status={t.status} />
-                        </div>
-                        <span className="text-xs font-mono text-muted-foreground capitalize">Strategy: {t.strategy}</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">{t.dueDate ? format(new Date(t.dueDate), 'MMM d, yyyy') : 'No date'}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <TreatmentsTab
+                riskId={id}
+                inherentScore={(risk.likelihood || 1) * (risk.impact || 1)}
+                residualLikelihood={risk.residualLikelihood}
+                residualImpact={risk.residualImpact}
+              />
             </TabsContent>
             <TabsContent value="kris" className="p-0 m-0 border-none outline-none">
                {kris?.data?.length === 0 ? (

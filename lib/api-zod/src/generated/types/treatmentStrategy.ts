@@ -10,8 +10,8 @@ export type TreatmentStrategy =
   (typeof TreatmentStrategy)[keyof typeof TreatmentStrategy];
 
 export const TreatmentStrategy = {
-  mitigate: "mitigate",
+  treat: "treat",
   transfer: "transfer",
-  accept: "accept",
-  avoid: "avoid",
+  tolerate: "tolerate",
+  terminate: "terminate",
 } as const;

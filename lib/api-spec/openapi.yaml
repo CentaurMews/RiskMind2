@@ -364,7 +364,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateTreatmentRequest"
+              $ref: "#/components/schemas/UpdateTreatmentRequest"
       responses:
         "200":
           description: Treatment updated
@@ -388,6 +388,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeleteResponse"
+
+  /v1/risks/{riskId}/treatments/{id}/status-events:
+    get:
+      operationId: listTreatmentStatusEvents
+      tags: [treatments]
+      summary: List status change history for a treatment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: List of status change events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TreatmentStatusEvent"
 
   /v1/risks/{riskId}/kris:
     get:
@@ -2069,6 +2092,30 @@ paths:
                         riskReduction:
                           type: number
 
+  /v1/risks/{id}/ai-treatment-recommendations:
+    post:
+      operationId: aiTreatmentRecommendations
+      tags: [treatments]
+      summary: Get AI-ranked treatment recommendations with ROI analysis
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: AI treatment recommendations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiTreatmentRecommendationsResponse"
+        "422":
+          description: AI unavailable
+
   /v1/compliance/{frameworkId}/gap-analysis/ai-remediate:
     post:
       operationId: aiGapRemediation
@@ -2896,7 +2943,7 @@ components:
 
     TreatmentStrategy:
       type: string
-      enum: [mitigate, transfer, accept, avoid]
+      enum: [treat, transfer, tolerate, terminate]
 
     TreatmentStatus:
       type: string
@@ -2929,6 +2976,15 @@ components:
         cost:
           type: string
           nullable: true
+        benefit:
+          type: string
+          nullable: true
+        effectivenessScore:
+          type: integer
+          nullable: true
+        progressNotes:
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -2953,8 +3009,69 @@ components:
           format: date-time
         cost:
           type: string
+        benefit:
+          type: string
+        effectivenessScore:
+          type: integer
+        progressNotes:
+          type: string
       required:
         - strategy
+
+    UpdateTreatmentRequest:
+      type: object
+      properties:
+        strategy:
+          $ref: "#/components/schemas/TreatmentStrategy"
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/TreatmentStatus"
+        ownerId:
+          type: string
+          format: uuid
+        dueDate:
+          type: string
+          format: date-time
+        cost:
+          type: string
+        benefit:
+          type: string
+        effectivenessScore:
+          type: integer
+        progressNotes:
+          type: string
+
+    TreatmentStatusEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        treatmentId:
+          type: string
+          format: uuid
+        fromStatus:
+          $ref: "#/components/schemas/TreatmentStatus"
+          nullable: true
+        toStatus:
+          $ref: "#/components/schemas/TreatmentStatus"
+        changedBy:
+          type: string
+          format: uuid
+          nullable: true
+        changedByName:
+          type: string
+          nullable: true
+        changedByEmail:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
 
     TreatmentListResponse:
       type: object
@@ -2963,6 +3080,33 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Treatment"
+
+    AiTreatmentRecommendation:
+      type: object
+      properties:
+        strategy:
+          $ref: "#/components/schemas/TreatmentStrategy"
+        description:
+          type: string
+        estimatedCost:
+          type: number
+        expectedResidualScoreReduction:
+          type: number
+        roi:
+          type: number
+        rationale:
+          type: string
+
+    AiTreatmentRecommendationsResponse:
+      type: object
+      properties:
+        riskId:
+          type: string
+          format: uuid
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiTreatmentRecommendation"
 
     KRI:
       type: object
