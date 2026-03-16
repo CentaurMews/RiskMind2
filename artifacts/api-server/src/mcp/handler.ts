@@ -57,17 +57,24 @@ export async function handleMcpRequest(req: Request, res: Response) {
       return;
     }
 
+    const auth = extractAuth(req);
+    if (!auth) {
+      res.status(401).json({
+        type: "https://riskmind.app/errors/unauthorized",
+        title: "Unauthorized",
+        status: 401,
+        detail: "Missing or invalid Authorization header. JWT Bearer token required for all MCP requests.",
+      });
+      return;
+    }
+
     if (sessionId && sessions.has(sessionId)) {
       const session = sessions.get(sessionId)!;
-      const auth = extractAuth(req);
-      if (auth) {
-        session.auth = auth;
-      }
+      session.auth = auth;
       await session.transport.handleRequest(req, res, req.body);
       return;
     }
 
-    const auth = extractAuth(req);
     const server = createMcpServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
 
