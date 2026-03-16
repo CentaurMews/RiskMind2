@@ -1514,6 +1514,91 @@ export const useUpdateKRI = <
 };
 
 /**
+ * @summary Delete KRI
+ */
+export const getDeleteKRIUrl = (riskId: string, id: string) => {
+  return `/api/v1/risks/${riskId}/kris/${id}`;
+};
+
+export const deleteKRI = async (
+  riskId: string,
+  id: string,
+  options?: RequestInit,
+): Promise<DeleteResponse> => {
+  return customFetch<DeleteResponse>(getDeleteKRIUrl(riskId, id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteKRIMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteKRI>>,
+    TError,
+    { riskId: string; id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteKRI>>,
+  TError,
+  { riskId: string; id: string },
+  TContext
+> => {
+  const mutationKey = ["deleteKRI"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteKRI>>,
+    { riskId: string; id: string }
+  > = (props) => {
+    const { riskId, id } = props ?? {};
+
+    return deleteKRI(riskId, id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteKRIMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteKRI>>
+>;
+
+export type DeleteKRIMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete KRI
+ */
+export const useDeleteKRI = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteKRI>>,
+    TError,
+    { riskId: string; id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteKRI>>,
+  TError,
+  { riskId: string; id: string },
+  TContext
+> => {
+  return useMutation(getDeleteKRIMutationOptions(options));
+};
+
+/**
  * @summary List incidents for a risk
  */
 export const getListIncidentsUrl = (riskId: string) => {
@@ -1773,6 +1858,91 @@ export const useUpdateIncident = <
   TContext
 > => {
   return useMutation(getUpdateIncidentMutationOptions(options));
+};
+
+/**
+ * @summary Delete incident
+ */
+export const getDeleteIncidentUrl = (riskId: string, id: string) => {
+  return `/api/v1/risks/${riskId}/incidents/${id}`;
+};
+
+export const deleteIncident = async (
+  riskId: string,
+  id: string,
+  options?: RequestInit,
+): Promise<DeleteResponse> => {
+  return customFetch<DeleteResponse>(getDeleteIncidentUrl(riskId, id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteIncidentMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteIncident>>,
+    TError,
+    { riskId: string; id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteIncident>>,
+  TError,
+  { riskId: string; id: string },
+  TContext
+> => {
+  const mutationKey = ["deleteIncident"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteIncident>>,
+    { riskId: string; id: string }
+  > = (props) => {
+    const { riskId, id } = props ?? {};
+
+    return deleteIncident(riskId, id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteIncidentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteIncident>>
+>;
+
+export type DeleteIncidentMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete incident
+ */
+export const useDeleteIncident = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteIncident>>,
+    TError,
+    { riskId: string; id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteIncident>>,
+  TError,
+  { riskId: string; id: string },
+  TContext
+> => {
+  return useMutation(getDeleteIncidentMutationOptions(options));
 };
 
 /**

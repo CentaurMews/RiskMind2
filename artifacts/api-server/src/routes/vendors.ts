@@ -266,9 +266,10 @@ router.post("/v1/vendors/:vendorId/questionnaires/:id/magic-link", requireRole("
 
     if (!q) { notFound(res, "Questionnaire not found"); return; }
 
+    const secret = process.env.JWT_SECRET;
+    if (!secret) { serverError(res, "Server misconfiguration: signing secret not set"); return; }
     const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
     const payload = `${q.id}:${expiresAt.getTime()}`;
-    const secret = process.env.JWT_SECRET || "";
     const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
     const token = Buffer.from(`${payload}:${signature}`).toString("base64url");
 
@@ -359,7 +360,8 @@ publicVendorRouter.post("/v1/questionnaires/respond", async (req, res) => {
     if (parts.length !== 3) { badRequest(res, "Invalid token format"); return; }
 
     const [qId, expiresTs, signature] = parts;
-    const secret = process.env.JWT_SECRET || "";
+    const secret = process.env.JWT_SECRET;
+    if (!secret) { serverError(res, "Server misconfiguration: signing secret not set"); return; }
     const expectedSig = crypto.createHmac("sha256", secret).update(`${qId}:${expiresTs}`).digest("hex");
 
     if (signature !== expectedSig) { badRequest(res, "Invalid token signature"); return; }

@@ -520,6 +520,19 @@ export const UpdateKRIResponse = zod
   );
 
 /**
+ * @summary Delete KRI
+ */
+export const DeleteKRIParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const DeleteKRIResponse = zod.object({
+  deleted: zod.boolean().optional(),
+  id: zod.string().uuid().optional(),
+});
+
+/**
  * @summary List incidents for a risk
  */
 export const ListIncidentsParams = zod.object({
@@ -585,6 +598,19 @@ export const UpdateIncidentResponse = zod.object({
   resolvedAt: zod.date().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Delete incident
+ */
+export const DeleteIncidentParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const DeleteIncidentResponse = zod.object({
+  deleted: zod.boolean().optional(),
+  id: zod.string().uuid().optional(),
 });
 
 /**

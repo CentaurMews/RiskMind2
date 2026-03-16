@@ -365,6 +365,26 @@ router.put("/v1/risks/:riskId/kris/:id", requireRole("admin", "risk_manager"), a
   }
 });
 
+router.delete("/v1/risks/:riskId/kris/:id", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const [kri] = await db
+      .delete(krisTable)
+      .where(and(
+        eq(krisTable.id, p(req, "id")),
+        eq(krisTable.riskId, p(req, "riskId")),
+        eq(krisTable.tenantId, req.user!.tenantId),
+      ))
+      .returning();
+
+    if (!kri) { notFound(res, "KRI not found"); return; }
+    await recordAudit(req, "delete", "kri", kri.id);
+    res.json({ deleted: true, id: kri.id });
+  } catch (err) {
+    console.error("Delete KRI error:", err);
+    serverError(res);
+  }
+});
+
 router.get("/v1/risks/:riskId/incidents", async (req, res) => {
   try {
     const incidents = await db
@@ -428,6 +448,26 @@ router.put("/v1/risks/:riskId/incidents/:id", requireRole("admin", "risk_manager
     res.json(incident);
   } catch (err) {
     console.error("Update incident error:", err);
+    serverError(res);
+  }
+});
+
+router.delete("/v1/risks/:riskId/incidents/:id", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const [incident] = await db
+      .delete(incidentsTable)
+      .where(and(
+        eq(incidentsTable.id, p(req, "id")),
+        eq(incidentsTable.riskId, p(req, "riskId")),
+        eq(incidentsTable.tenantId, req.user!.tenantId),
+      ))
+      .returning();
+
+    if (!incident) { notFound(res, "Incident not found"); return; }
+    await recordAudit(req, "delete", "incident", incident.id);
+    res.json({ deleted: true, id: incident.id });
+  } catch (err) {
+    console.error("Delete incident error:", err);
     serverError(res);
   }
 });

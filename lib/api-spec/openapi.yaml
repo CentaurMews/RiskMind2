@@ -398,6 +398,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/KRIWithBreach"
+    delete:
+      operationId: deleteKRI
+      tags: [kris]
+      summary: Delete KRI
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: KRI deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /v1/risks/{riskId}/incidents:
     get:
@@ -460,6 +478,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Incident"
+    delete:
+      operationId: deleteIncident
+      tags: [incidents]
+      summary: Delete incident
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Incident deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /v1/risks/{riskId}/reviews:
     get:
