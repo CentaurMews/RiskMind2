@@ -217,6 +217,12 @@ function detectCascadeChains(data: ObservationData): Finding[] {
       title: `Cascade: ${risk.title} — KRI breach + active alerts`,
       narrative: `Risk "${risk.title}" has ${breachedKris.length} KRI(s) breaching critical thresholds with ${activeAlerts.length} active alert(s). This indicates an escalating risk pattern requiring immediate attention.`,
       linkedEntities: entities,
+      proposedAction: {
+        type: "create_review_flag",
+        title: `Review cascade: ${risk.title}`,
+        severity: "high",
+        context: { riskId, breachedKriCount: breachedKris.length, activeAlertCount: activeAlerts.length },
+      },
     });
   }
 
@@ -257,6 +263,11 @@ function detectCascadeChains(data: ObservationData): Finding[] {
       title: `Compliance gap cluster: ${framework.name} — ${gaps.length} unmapped requirements`,
       narrative: `Framework "${framework.name}" has ${gaps.length} requirement(s) with no mapped control. ${failedByControl.size > 0 ? `Additionally, ${failedByControl.size} existing control(s) have recent test failures, indicating weakened coverage.` : ""} This creates a systemic compliance gap that increases regulatory risk.`,
       linkedEntities: entities,
+      proposedAction: {
+        type: "create_signal",
+        content: `Compliance gap: ${framework.name} has ${gaps.length} unmapped requirements`,
+        classification: "compliance_gap",
+      },
     });
   }
 
@@ -320,6 +331,12 @@ async function detectClusters(tenantId: string): Promise<Finding[]> {
         title: `Threat cluster: ${row.risk_title} — ${row.signal_count} correlated signals`,
         narrative: `Risk "${row.risk_title}" (${row.category}) has ${row.signal_count} semantically correlated signal(s) detected in the past 30 days. These form a coherent threat cluster that may indicate an emerging risk pattern not yet explicitly linked in the data model.`,
         linkedEntities: entities,
+        proposedAction: {
+          type: "create_alert",
+          title: `Threat cluster detected: ${row.risk_title}`,
+          severity: signals.length >= 5 ? "high" : "medium",
+          context: { riskId: row.risk_id, signalCount: row.signal_count },
+        },
       });
     }
   } catch (err) {
@@ -551,57 +568,51 @@ async function act(
       policyTier,
     });
 
-    if (policyTier === "advisory" && finding.proposedAction) {
-      const action = finding.proposedAction as Record<string, unknown>;
-      if (action.type === "create_signal") {
-        try {
-          const [draftSignal] = await db.insert(signalsTable).values({
-            tenantId,
-            source: "agent",
-            content: String(action.content || finding.title),
-            status: "pending",
-            classification: String(action.classification || "agent_generated"),
-            confidence: "0.7000",
-          }).returning();
-
-          await recordAuditDirect(tenantId, null, "agent_draft_signal_created", "signal", draftSignal.id, {
-            agentRunId: runId,
-            findingId: saved.id,
-            status: "pending",
-          });
-        } catch (err) {
-          console.error("[Agent] Failed to create draft signal:", err instanceof Error ? err.message : err);
-        }
-      }
-    }
-
-    if (policyTier === "active" && finding.severity === "critical") {
+    if (policyTier === "active") {
       try {
-        const [existing] = await db.select({ id: alertsTable.id }).from(alertsTable)
-          .where(and(
-            eq(alertsTable.tenantId, tenantId),
-            eq(alertsTable.type, "agent_finding"),
-            eq(alertsTable.title, finding.title),
-            eq(alertsTable.status, "active"),
-          )).limit(1);
+        if (finding.severity === "critical") {
+          const [existing] = await db.select({ id: alertsTable.id }).from(alertsTable)
+            .where(and(
+              eq(alertsTable.tenantId, tenantId),
+              eq(alertsTable.type, "agent_finding"),
+              eq(alertsTable.title, finding.title),
+              eq(alertsTable.status, "active"),
+            )).limit(1);
 
-        if (!existing) {
+          if (!existing) {
+            await db.insert(alertsTable).values({
+              tenantId,
+              type: "agent_finding",
+              title: finding.title,
+              description: finding.narrative,
+              severity: "critical",
+              context: { agentRunId: runId, findingId: saved.id, linkedEntities: finding.linkedEntities },
+            });
+
+            await recordAuditDirect(tenantId, null, "agent_auto_alert", "alert", saved.id, {
+              agentRunId: runId,
+              severity: finding.severity,
+            });
+          }
+        }
+
+        if (finding.severity === "high" || finding.severity === "critical") {
           await db.insert(alertsTable).values({
             tenantId,
-            type: "agent_finding",
-            title: finding.title,
+            type: "review_flag",
+            title: `[Review] ${finding.title}`,
             description: finding.narrative,
-            severity: finding.severity === "critical" ? "critical" : "high",
-            context: { agentRunId: runId, findingId: saved.id, linkedEntities: finding.linkedEntities },
+            severity: finding.severity,
+            context: { agentRunId: runId, findingId: saved.id, type: finding.type, linkedEntities: finding.linkedEntities },
           });
 
-          await recordAuditDirect(tenantId, null, "agent_auto_alert", "alert", saved.id, {
+          await recordAuditDirect(tenantId, null, "agent_review_flag_created", "alert", saved.id, {
             agentRunId: runId,
             severity: finding.severity,
           });
         }
       } catch (err) {
-        console.error("[Agent] Failed to create auto-alert:", err instanceof Error ? err.message : err);
+        console.error("[Agent] Failed to create auto-alert/review-flag:", err instanceof Error ? err.message : err);
       }
     }
 

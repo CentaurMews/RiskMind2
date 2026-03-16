@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { db, agentRunsTable, agentFindingsTable, tenantsTable } from "@workspace/db";
+import { db, agentRunsTable, agentFindingsTable, tenantsTable, signalsTable, alertsTable } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, sendError } from "../lib/errors";
@@ -136,6 +136,42 @@ router.post("/v1/agent/findings/:id/approve", requireRole("admin", "risk_manager
     if (!finding) { notFound(res, "Finding not found"); return; }
     if (finding.status !== "pending_review") { badRequest(res, "Finding is not pending review"); return; }
 
+    let actionResult: Record<string, unknown> | null = null;
+    const proposedAction = finding.proposedAction as Record<string, unknown> | null;
+
+    if (proposedAction) {
+      const actionType = String(proposedAction.type || "");
+      try {
+        if (actionType === "create_signal") {
+          const [signal] = await db.insert(signalsTable).values({
+            tenantId,
+            source: "agent",
+            content: String(proposedAction.content || finding.title),
+            status: "pending",
+            classification: String(proposedAction.classification || "agent_generated"),
+            confidence: "0.7000",
+          }).returning();
+          actionResult = { type: "signal_created", id: signal.id };
+        } else if (actionType === "create_alert" || actionType === "create_review_flag") {
+          const alertType = actionType === "create_review_flag" ? "review_flag" : "agent_insight";
+          const [alert] = await db.insert(alertsTable).values({
+            tenantId,
+            type: alertType,
+            title: String(proposedAction.title || finding.title),
+            severity: String(proposedAction.severity || finding.severity || "medium"),
+            status: "active",
+            context: { findingId, agentRunId: finding.agentRunId, ...(proposedAction.context as object || {}) },
+          }).returning();
+          actionResult = { type: alertType + "_created", id: alert.id };
+        } else if (actionType === "create_treatment") {
+          actionResult = { type: "treatment_noted", detail: "Treatment proposal noted for manual implementation" };
+        }
+      } catch (err) {
+        console.error("[Agent] Failed to execute proposed action:", err instanceof Error ? err.message : err);
+        actionResult = { type: "action_failed", error: err instanceof Error ? err.message : "Unknown error" };
+      }
+    }
+
     const [updated] = await db.update(agentFindingsTable).set({
       status: "actioned",
       actionedAt: new Date(),
@@ -145,9 +181,10 @@ router.post("/v1/agent/findings/:id/approve", requireRole("admin", "risk_manager
     await recordAudit(req, "agent_finding_approved", "agent_finding", findingId, {
       type: finding.type,
       severity: finding.severity,
+      actionResult,
     });
 
-    res.json(updated);
+    res.json({ ...updated, actionResult });
   } catch (err) {
     console.error("Approve finding error:", err);
     serverError(res);
