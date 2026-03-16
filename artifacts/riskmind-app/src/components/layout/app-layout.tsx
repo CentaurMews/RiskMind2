@@ -91,10 +91,10 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0",
+        "fixed lg:static inset-y-0 left-0 z-50 w-[240px] bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0",
         isMobileOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="flex items-center h-16 px-6 border-b border-sidebar-border shrink-0">
+        <div className="flex items-center h-14 px-6 border-b border-sidebar-border shrink-0">
           <TriangleAlert className="h-6 w-6 mr-2 text-white" />
           <span className="font-bold text-lg tracking-tight">RiskMind</span>
         </div>
@@ -166,7 +166,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
-        <header className="h-16 bg-background border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
+        <header className="h-14 bg-background border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
           <div className="flex items-center">
             <Button variant="ghost" size="icon" className="lg:hidden mr-2" onClick={() => setIsMobileOpen(true)}>
               <Menu className="h-5 w-5" />
