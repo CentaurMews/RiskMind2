@@ -1,0 +1,365 @@
+
+**RISKMIND**
+
+Product Requirements Document
+
+**Version:** 2.0 --- Replit Build Reference
+
+**Classification:** Confidential
+
+**Scope:** Full MVP --- All four domains, Day 1
+
+**Interfaces:** REST API + MCP (Streamable HTTP), Day 1
+
+**AI Layer:** LiteLLM + pgvector embeddings, Day 1
+
+---
+
+## 1. Purpose & Rebuild Scope
+
+This document is the authoritative specification for rebuilding RiskMind on Replit. It defines architecture, design language, epics, per-screen UI specs, and all functional requirements with explicit MVP priority labels.
+
+> **Replit Build Contract:** All requirements marked Must-Have are in scope for the initial Replit deployment. Should-Have items are built if time permits. Deferred items require a separate milestone decision.
+
+### 1.1 What Is RiskMind
+
+RiskMind is an AI-native, multi-organization enterprise risk management platform. It provides a single control plane for operational, compliance, and third-party risk with AI-assisted triage, Monte Carlo simulation, and automated monitoring.
+
+### 1.2 Technology Stack
+
+To be planned
+
+---
+
+## 2. Design Language & UI Specification
+
+RiskMind uses a corporate-enterprise monochrome foundation. Color is a functional signal, not decoration. The single accent — Crimson — is reserved exclusively for critical risk states. All other communication is achieved through weight, scale, and greyscale contrast.
+
+### 2.1 Design Philosophy
+
+- Monochrome base — black, white, and five grey steps handle all structural UI.
+- Crimson accent (#DC2626) is used only for: critical severity, KRI breach, overdue items, destructive actions.
+- No gradients, shadows, or decorative color in any component.
+- Typography hierarchy replaces color hierarchy wherever possible.
+- Data density is preferred over whitespace — this is a professional operations tool.
+- Progressive disclosure not oversaturated dashboards
+- Apple-vibes not MS word 1997!
+
+### 2.2 Color Tokens
+
+| Token | Value | Usage |
+|---|---|---|
+| `--color-ink` | #000000 | Headings, borders, active nav, black badges |
+| `--color-surface` | #FFFFFF | Page background, card background |
+| `--color-gray-90` | #1A1A1A | Primary body text |
+| `--color-gray-70` | #4D4D4D | Secondary body text, labels |
+| `--color-gray-50` | #808080 | Placeholder, muted metadata |
+| `--color-gray-30` | #B3B3B3 | Disabled states, divider lines |
+| `--color-gray-10` | #E6E6E6 | Table borders, input borders |
+| `--color-gray-05` | #F5F5F5 | Alternate table rows, sidebar bg |
+| `--color-critical` | #DC2626 | Critical severity, breach, overdue |
+| `--color-critical-bg` | #FEF2F2 | Critical badge background |
+
+### 2.3 Typography
+
+| Role | Font | Size / Weight | Usage |
+|---|---|---|---|
+| Page Title | Inter | 30px / 700 | Top of each major page |
+| Section Header | Inter | 20px / 600 | Card titles, panel headers |
+| Table Header | Inter | 12px / 600 uppercase | Column labels, tracking-wider |
+| Body | Inter | 14px / 400 | All data, descriptions |
+| Caption / Meta | Inter | 12px / 400 | Timestamps, tenant info, hints |
+| Code / IDs | JetBrains Mono | 12px / 400 | UUIDs, API keys, JSON payloads |
+
+### 2.4 Component Specifications
+
+#### 2.4.1 Layout Shell
+- Collapsable Left sidebar: 240px fixed width, background #F5F5F5, 1px right border #E6E6E6.
+- Top bar: 56px height, white background, 1px bottom border #E6E6E6. Shows tenant name, user role, logout.
+- Main content area: full remaining width, background #FFFFFF, 32px padding.
+- No shadows on sidebar or topbar — borders only.
+
+#### 2.4.2 Navigation
+- Nav items: 40px height, 12px horizontal padding, 14px Inter font.
+- Active state: black left border 3px + black text + #F5F5F5 background.
+- Inactive state: gray-70 text, no background.
+- Nav sections grouped with 11px uppercase gray-50 section labels.
+- Nav order: Dashboard, Risks, Signals, Vendors, Compliance, Controls, Foresight, Alerts, Settings.
+
+#### 2.4.3 Buttons
+
+| Variant | Background | Text | Usage |
+|---|---|---|---|
+| Primary | #000000 | #FFFFFF | Main CTA per page |
+| Secondary | #FFFFFF, border #E6E6E6 | #000000 | Secondary actions |
+| Destructive | #DC2626 | #FFFFFF | Delete, suspend, offboard |
+| Ghost | Transparent | #4D4D4D | Tertiary inline actions |
+
+All buttons: 8px border-radius, 36px height, 14px font, no shadow.
+
+#### 2.4.4 Data Tables
+- Header row: #000000 background, white 12px uppercase text, 600 weight.
+- Data rows: 44px height, alternate rows #FFFFFF / #F5F5F5.
+- Row hover: #E6E6E6 background.
+- All borders: 1px #E6E6E6.
+- Pagination: bottom of table, 12px text, Previous/Next buttons (secondary variant).
+
+#### 2.4.5 Severity & Status Badges
+
+| Label | Background | Text Color | Usage |
+|---|---|---|---|
+| Critical | #FEF2F2 | #DC2626 | Severity, breach, overdue |
+| High | #1A1A1A | #FFFFFF | High severity |
+| Medium | #E6E6E6 | #1A1A1A | Medium severity |
+| Low | #F5F5F5 | #4D4D4D | Low severity |
+| Active / Pass | #F5F5F5 | #000000 | Healthy states |
+
+All badges: 4px border-radius, 6px horizontal padding, 11px font, uppercase, letter-spacing 0.05em.
+
+#### 2.4.6 Forms & Inputs
+- Input height: 40px, border: 1px #E6E6E6, border-radius: 6px, background: #FFFFFF.
+- Focus state: border-color #000000, outline: none.
+- Error state: border-color #DC2626, helper text in #DC2626 12px below input.
+- Labels: 12px, 600 weight, #000000, positioned above input.
+- No floating labels — all labels are static and above.
+
+#### 2.4.7 Cards & Panels
+- Background: #FFFFFF.
+- Border: 1px solid #E6E6E6, border-radius: 8px.
+- No box-shadow on any card.
+- Header section within card: 1px bottom border #E6E6E6, 16px padding, 600 weight 14px title.
+- Content: 16px padding.
+- Do not use any shadcn default blue or violet accent colors.
+
+---
+
+## 4. MVP Scope — Day 1 Domains
+
+| ID | Epic | Scope Summary | Day 1? |
+|---|---|---|---|
+| A | Platform Foundation | Auth, tenancy, RBAC, audit log | **Yes** |
+| B | Risk Register & Lifecycle | Risks, treatments, KRIs, incidents, reviews | **Yes** |
+| C | Signals & AI Triage | Signal ingestion, AI classification, findings pipeline | **Yes** |
+| D | TPRM | Vendor lifecycle, questionnaires, magic links, scoring | **Yes** |
+| E | Compliance & Controls | Frameworks, controls, tests, gap analysis, scoring | **Yes** |
+| F | Foresight Engine | Risk graph, Monte Carlo simulation, trust circles | Phase 2 |
+| G | Monitoring & Alerts | Scheduled checks, alert generation, escalation | **Yes** |
+| H | API Surfaces (REST + MCP) | REST /api/v1 + MCP Streamable HTTP — both Day 1 | **Yes** |
+| I | Frontend Experience | Full app shell, all Day 1 domain UIs | **Yes** |
+
+---
+
+## 5. Functional Requirements by Epic
+
+### Epic A — Platform Foundation
+
+| ID | Requirement | Priority |
+|---|---|---|
+| A1 | Support JWT-based authentication for web and API clients. | Must-Have |
+| A2 | Support development login path for seeded users without SSO. | Must-Have |
+| A3 | Enforce role-based permissions: admin, risk_manager, risk_owner, auditor, viewer, vendor. | Must-Have |
+| A4 | Resolve tenant context from authenticated identity for every request using CLS. | Must-Have |
+| A5 | Apply row-level tenant isolation to all tenant-scoped tables via RLS middleware. | Must-Have |
+| A6 | Record immutable audit events for all state-changing operations. | Must-Have |
+| A7 | Unauthorized requests must fail fast with standard RFC 7807 error payloads. | Must-Have |
+| A8 | Tenant context propagation must be deterministic across all async flows. | Must-Have |
+| A9 | Cross-tenant read/write attempts must be blocked at the data layer, not just the API layer. | Must-Have |
+| A10 | Production SSO integrations (SAML, OIDC) beyond JWT baseline. | Deferred |
+
+### Epic B — Risk Register & Lifecycle
+
+| ID | Requirement | Priority |
+|---|---|---|
+| B1 | CRUD risk records with fields: category, owner, status, inherent score, residual score, description. | Must-Have |
+| B2 | Manage treatment plans under risks: strategy, due date, status, owner, cost. | Must-Have |
+| B3 | Manage KRIs with threshold definitions (warning, critical) and value recording over time. | Must-Have |
+| B4 | Record incidents and link to related risks. | Must-Have |
+| B5 | Create and complete review cycles; surface overdue reviews via API query. | Must-Have |
+| B6 | Risk list endpoint supports filtering by status, category, owner, and severity. | Must-Have |
+| B7 | KRI breach checks must produce warning/critical outcomes surfaced in alerts. | Must-Have |
+| B8 | Risk heatmap data endpoint returns likelihood × impact matrix data. | Must-Have |
+| B9 | AI-assisted risk description enrichment and scoring suggestions via LiteLLM. | Must-Have |
+
+### Epic C — Signals & AI Triage
+
+| ID | Requirement | Priority |
+|---|---|---|
+| C1 | Ingest manual signals and bulk-imported signal sets. | Must-Have |
+| C2 | Run AI-assisted classification and enrichment for signals in pending state via BullMQ job. | Must-Have |
+| C3 | Promote triaged signals into findings with defined pipeline states. | Must-Have |
+| C4 | Correlate findings to risks and vendors where AI confidence meets threshold. | Must-Have |
+| C5 | AI-disabled mode must allow full manual triage and pipeline movement. | Must-Have |
+| C6 | Findings retain full provenance back to source signal. | Must-Have |
+| C7 | Signal status transitions must enforce valid pipeline state machine. | Must-Have |
+| C8 | pgvector semantic similarity used for signal-to-risk correlation. | Must-Have |
+
+### Epic D — TPRM (Third-Party Risk)
+
+| ID | Requirement | Priority |
+|---|---|---|
+| D1 | CRUD vendor profiles with criticality tier, category, contact, and status fields. | Must-Have |
+| D2 | Vendor lifecycle state machine: onboard → approve → active → suspend → offboard. | Must-Have |
+| D3 | Generate questionnaires from templates; capture vendor responses. | Must-Have |
+| D4 | Issue signed magic links for external vendor access to questionnaires. | Must-Have |
+| D5 | Upload vendor documents; async extraction of structured insights via BullMQ. | Must-Have |
+| D6 | Calculate vendor risk score from weighted factors (questionnaire, tier, incidents). | Must-Have |
+| D7 | Questionnaire data exportable as structured JSON for analysis. | Must-Have |
+| D8 | Document processing must be retryable and have a dead-letter queue strategy. | Must-Have |
+| D9 | AI-assisted vendor document summarisation and risk extraction. | Must-Have |
+
+### Epic E — Compliance & Controls
+
+| ID | Requirement | Priority |
+|---|---|---|
+| E1 | Seed and import compliance frameworks with nested requirements (ISO 27001, SOC 2, NIST CSF at minimum). | Must-Have |
+| E2 | CRUD controls and map controls to framework requirements (many-to-many). | Must-Have |
+| E3 | Execute control tests with evidence capture (text + file attachment). | Must-Have |
+| E4 | Compute per-framework compliance score and dashboard rollup. | Must-Have |
+| E5 | Gap analysis: identify unmapped requirements, failed tests, and generate remediation guidance. | Must-Have |
+| E6 | Coverage query: show mapped vs unmapped requirements per framework. | Must-Have |
+| E7 | AI-assisted remediation suggestions for gap analysis findings. | Must-Have |
+| E8 | Dashboard: requirement status breakdown (met, partial, not met, not assessed). | Must-Have |
+
+### Epic F — Foresight Engine (Phase 2)
+
+Deferred from Day 1 MVP. Stubs required so frontend navigation renders without errors.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| F1 | Risk graph with typed nodes (risks, vendors, controls) and weighted edges. | Deferred |
+| F2 | Natural-language scenario parsing into simulation parameters via LiteLLM. | Deferred |
+| F3 | Monte Carlo cascade simulation as async BullMQ job. | Deferred |
+| F4 | Simulation history with P50/P90 percentile outputs. | Deferred |
+| F5 | Cascade visualisation payload for UI graph rendering. | Deferred |
+| F6 | Trust-circle sharing between trusted organisations. | Deferred |
+| F-STUB | Return 501 Not Implemented stubs for all Foresight endpoints on Day 1. | Must-Have |
+
+### Epic G — Monitoring & Alerts
+
+| ID | Requirement | Priority |
+|---|---|---|
+| G1 | Run scheduled daily checks: KRI breaches, overdue reviews, expired docs, failed tests, compliance drift, vendor status. | Must-Have |
+| G2 | Generate alerts with severity (critical, high, medium, low) and structured context payload. | Must-Have |
+| G3 | Acknowledge alerts via API and UI; record acknowledging user and timestamp. | Must-Have |
+| G4 | Escalate unacknowledged critical alerts after configurable policy window. | Must-Have |
+| G5 | Alert summary endpoint: active count, acknowledged count, by severity breakdown. | Must-Have |
+| G6 | Scheduled jobs log outcomes and are observable via /api/v1/health/jobs. | Should-Have |
+
+### Epic H — API Surfaces (REST + MCP)
+
+| ID | Requirement | Priority |
+|---|---|---|
+| H1 | REST endpoints under /api/v1 for all Day 1 domain operations. | Must-Have |
+| H2 | MCP Streamable HTTP endpoint with tool definitions for all major service use-cases. | Must-Have |
+| H3 | Shared validation contracts and RFC 7807 error payloads across REST and MCP. | Must-Have |
+| H4 | GET /api/v1/health — returns 200 with DB, Redis, and queue connectivity status. | Must-Have |
+| H5 | All MCP tools and REST endpoints document auth requirements. | Must-Have |
+| H6 | Thin controllers — no business logic in controllers; services only. | Must-Have |
+| H7 | Rate limiting on public-facing endpoints. | Should-Have |
+| H8 | OpenAPI spec auto-generated from NestJS decorators. | Should-Have |
+
+---
+
+## 6. Frontend Screen Specifications
+
+| Screen | Route | Key Components & Data | Roles |
+|---|---|---|---|
+| Login | /login | Email + password form, JWT response, redirect to /dashboard | All |
+| Dashboard | /dashboard | KPI cards (active risks, open alerts, vendor count, compliance score), recent alerts table, risk heatmap preview | All |
+| Risk Register | /risks | Filterable data table (status, category, owner, severity), Create Risk drawer, inline severity badge | admin, rm, ro |
+| Risk Detail | /risks/[id] | Risk metadata card, Treatment list, KRI list, Incident list, Review history, AI enrichment panel | admin, rm, ro |
+| Risk Heatmap | /risks/heatmap | 5x5 likelihood/impact grid, clickable cells, risk count bubbles in cells | All |
+| Signals | /signals | Table of signals by status, triage action (promote/dismiss), AI classification badge, link to finding | admin, rm |
+| Findings | /signals/findings | Findings pipeline board or table, correlation to risk/vendor, provenance link | admin, rm |
+| Vendors | /vendors | Vendor table (tier, status, score, last assessed), Create Vendor drawer, lifecycle action buttons | admin, rm |
+| Vendor Detail | /vendors/[id] | Vendor profile card, Questionnaire list, Document list, Score breakdown, lifecycle actions | admin, rm |
+| Compliance | /compliance | Framework cards with score rings (% coverage), drill into framework | admin, rm, auditor |
+| Framework Detail | /compliance/[id] | Requirements tree, control mapping status, test results, gap analysis output | admin, rm, auditor |
+| Controls | /controls | Controls table, Create Control drawer, map to requirements action | admin, rm |
+| Foresight | /foresight | Phase 2 stub — show 'Coming Soon' placeholder with stub message | All |
+| Alerts | /alerts | Alerts table (severity, type, status), acknowledge button, filter by severity | admin, rm, ro |
+| Settings | /settings | Tenant settings, user management table, role assignment, notification config | admin |
+
+### 6.1 Dashboard KPI Card Spec
+- 4 cards in a horizontal row, equal width.
+- Each card: white background, 1px #E6E6E6 border, 8px radius, 20px padding.
+- Large number in 36px/700 black. Label in 12px/400 gray-50 below.
+- Critical-state card: number text changes to #DC2626, left border 3px #DC2626.
+- No icons — numbers speak for themselves.
+
+### 6.2 Risk Heatmap Spec
+- 5 columns (Likelihood 1–5) × 5 rows (Impact 1–5) = 25 cells.
+- Cell coloring: monochrome only. Score 1–4: #F5F5F5. Score 5–9: #E6E6E6. Score 10–14: #B3B3B3. Score 15–19: #4D4D4D. Score 20–25: #DC2626 (crimson).
+- Each cell shows the risk count as a number. Clicking a cell opens a side drawer with the list of risks in that cell.
+- Axes labeled: X = Likelihood, Y = Impact, both with numeric and text labels.
+
+### 6.3 Navigation Route Protection
+- /login: public, redirect to /dashboard if already authenticated.
+- All other routes: redirect to /login if JWT absent or expired.
+- Role-restricted screens (e.g. Settings): show 403 Forbidden component if role insufficient.
+
+---
+
+## 7. Data Model Requirements
+
+### 7.1 Core Rules
+- Every tenant-scoped table must include a `tenant_id` UUID column with NOT NULL constraint.
+- Every table must include `created_at` and `updated_at` TIMESTAMPTZ columns with defaults.
+- All primary keys are UUID (`gen_random_uuid()`).
+- pgvector columns (`embedding vector(1536)`) on: risks, vendors, framework_requirements, signals.
+- Drizzle ORM — all schema changes via migration files, never direct DDL.
+
+### 7.2 Primary Tables
+
+| Table | Key Columns | Notes |
+|---|---|---|
+| tenants | id, name, slug, settings | Root isolation entity |
+| users | id, tenant_id, email, role, hashed_password | RBAC role stored here |
+| audit_events | id, tenant_id, user_id, action, entity_type, entity_id, payload, created_at | Immutable; no updates or deletes |
+| risks | id, tenant_id, title, category, owner_id, status, likelihood, impact, embedding | pgvector embedding column |
+| treatments | id, tenant_id, risk_id, strategy, status, owner_id, due_date | Child of risks |
+| kris | id, tenant_id, risk_id, name, warning_threshold, critical_threshold, current_value | Breach triggers alert |
+| signals | id, tenant_id, source, content, status, classification, confidence, embedding | Pipeline state machine |
+| vendors | id, tenant_id, name, tier, status, risk_score, contact_email | Lifecycle state machine |
+| frameworks | id, tenant_id, name, version, type | Seeded: ISO 27001, SOC 2, NIST CSF |
+| controls | id, tenant_id, title, description, status, owner_id | Many-to-many with requirements |
+| alerts | id, tenant_id, type, severity, status, acknowledged_by, acknowledged_at, context | severity: critical\|high\|medium\|low |
+
+---
+
+## 8. Non-Functional Requirements
+
+| Category | Requirement |
+|---|---|
+| Performance | p95 REST latency under 500ms for non-analytical reads. Analytical queries (simulation, gap analysis) are async. |
+| Scalability | AI, simulation, and document processing tasks use BullMQ queues. Core CRUD remains synchronous. |
+| Reliability | BullMQ jobs: exponential backoff retry (3 attempts), dead-letter queue for failed jobs. |
+| Security | Strict RBAC + tenant RLS + bcrypt password hashing + signed magic link tokens (SHA-256, expiry-enforced). |
+| Auditability | Immutable audit_events records for all state mutations. No audit record may be updated or deleted. |
+| Extensibility | New frameworks seeded from JSON config. New MCP tools registered via NestJS module. New checks added to scheduler without core changes. |
+| Testability | Service-level unit tests and integration tests per domain module. Tenant isolation tested with cross-tenant request scenarios. |
+| Graceful Degr. | SMTP absent: notifications silently skipped. LiteLLM absent: AI features show 'manual mode' UI. Storage absent: file uploads return 503 with message. |
+
+---
+
+## 9. Seed Data Requirements
+
+The seed script must be idempotent. Running it multiple times must produce the same result.
+
+### 9.1 Demo Tenant
+- Tenant: name='Acme Corp', slug='acme'
+- Users (one per role): admin@acme.com, riskmanager@acme.com, riskowner@acme.com, auditor@acme.com, viewer@acme.com
+- All seeded user passwords: dev-only plaintext in `.env.example`, bcrypt-hashed in DB.
+
+### 9.2 Compliance Frameworks
+- ISO 27001:2022 — full Annex A control list as requirements.
+- SOC 2 Type II — Trust Services Criteria (Security, Availability, Confidentiality).
+- NIST CSF 2.0 — all six functions and subcategories.
+
+### 9.3 Sample Operational Data
+- 10 seeded risks across 3 categories with varied likelihood/impact scores.
+- 5 seeded vendors across 3 criticality tiers.
+- 3 seeded signals in different pipeline states (pending, triaged, finding).
+- 2 seeded alerts (one critical, one medium) in active state.
+
+---
