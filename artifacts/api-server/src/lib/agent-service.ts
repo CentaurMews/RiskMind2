@@ -549,6 +549,20 @@ async function act(
   let savedCount = 0;
 
   for (const finding of findings) {
+    let findingStatus: string;
+    let storedAction: Record<string, unknown> | null = null;
+
+    if (policyTier === "observe") {
+      findingStatus = "acknowledged";
+      storedAction = null;
+    } else if (policyTier === "advisory") {
+      findingStatus = "pending_review";
+      storedAction = finding.proposedAction || null;
+    } else {
+      findingStatus = "actioned";
+      storedAction = finding.proposedAction || null;
+    }
+
     const [saved] = await db.insert(agentFindingsTable).values({
       tenantId,
       runId,
@@ -557,8 +571,9 @@ async function act(
       title: finding.title,
       narrative: finding.narrative,
       linkedEntities: finding.linkedEntities,
-      proposedAction: finding.proposedAction || null,
-      status: "pending_review",
+      proposedAction: storedAction,
+      status: findingStatus,
+      actionedAt: policyTier === "active" ? new Date() : null,
     }).returning();
 
     await recordAuditDirect(tenantId, null, "agent_finding_created", "agent_finding", saved.id, {
@@ -566,31 +581,50 @@ async function act(
       type: finding.type,
       severity: finding.severity,
       policyTier,
+      findingStatus,
     });
 
-    if (policyTier === "active") {
+    if (policyTier === "active" && storedAction) {
       try {
-        if (finding.severity === "critical") {
+        const actionType = String(storedAction.type || "");
+
+        if (actionType === "create_signal") {
+          const [signal] = await db.insert(signalsTable).values({
+            tenantId,
+            source: "agent",
+            content: String(storedAction.content || finding.title),
+            status: "pending",
+            classification: String(storedAction.classification || "agent_generated"),
+            confidence: "0.7000",
+          }).returning();
+
+          await recordAuditDirect(tenantId, null, "agent_auto_signal", "signal", signal.id, {
+            agentRunId: runId,
+            findingId: saved.id,
+          });
+        } else if (actionType === "create_alert" || actionType === "create_review_flag") {
+          const alertType = actionType === "create_review_flag" ? "review_flag" : "agent_insight";
           const [existing] = await db.select({ id: alertsTable.id }).from(alertsTable)
             .where(and(
               eq(alertsTable.tenantId, tenantId),
-              eq(alertsTable.type, "agent_finding"),
-              eq(alertsTable.title, finding.title),
+              eq(alertsTable.type, alertType),
+              eq(alertsTable.title, String(storedAction.title || finding.title)),
               eq(alertsTable.status, "active"),
             )).limit(1);
 
           if (!existing) {
-            await db.insert(alertsTable).values({
+            const [alert] = await db.insert(alertsTable).values({
               tenantId,
-              type: "agent_finding",
-              title: finding.title,
+              type: alertType,
+              title: String(storedAction.title || finding.title),
               description: finding.narrative,
-              severity: "critical",
+              severity: (["critical", "high", "medium", "low"].includes(String(storedAction.severity)) ? String(storedAction.severity) : "medium") as "critical" | "high" | "medium" | "low",
               context: { agentRunId: runId, findingId: saved.id, linkedEntities: finding.linkedEntities },
-            });
+            }).returning();
 
-            await recordAuditDirect(tenantId, null, "agent_auto_alert", "alert", saved.id, {
+            await recordAuditDirect(tenantId, null, "agent_auto_" + alertType, "alert", alert.id, {
               agentRunId: runId,
+              findingId: saved.id,
               severity: finding.severity,
             });
           }
@@ -603,7 +637,7 @@ async function act(
             title: `[Review] ${finding.title}`,
             description: finding.narrative,
             severity: finding.severity,
-            context: { agentRunId: runId, findingId: saved.id, type: finding.type, linkedEntities: finding.linkedEntities },
+            context: { agentRunId: runId, findingId: saved.id, type: finding.type },
           });
 
           await recordAuditDirect(tenantId, null, "agent_review_flag_created", "alert", saved.id, {
@@ -612,7 +646,7 @@ async function act(
           });
         }
       } catch (err) {
-        console.error("[Agent] Failed to create auto-alert/review-flag:", err instanceof Error ? err.message : err);
+        console.error("[Agent] Failed to execute active-mode action:", err instanceof Error ? err.message : err);
       }
     }
 
@@ -656,40 +690,39 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
         console.error("[Agent] LLM reasoning failed, continuing with local findings:", err instanceof Error ? err.message : err);
       }
     } else {
-      console.log("[Agent] LLM not available for tenant", tenantId);
+      const durationMs = Date.now() - startTime;
+      const skipReason = "LLM provider unavailable or not configured";
+      console.log(`[Agent] LLM not available for tenant ${tenantId}, skipping run`);
 
-      if (localFindings.length === 0) {
-        const durationMs = Date.now() - startTime;
-        await db.update(agentRunsTable).set({
-          status: "skipped",
-          durationMs,
-          findingCount: 0,
-          completedAt: new Date(),
-          context: {
-            reason: "LLM unavailable and no local findings detected",
-            llmAvailable: false,
-            observationSummary: {
-              risks: data.risks.length,
-              kris: data.kris.length,
-              vendors: data.vendors.length,
-              signals: data.signals.length,
-              alerts: data.alerts.length,
-              controls: data.controls.length,
-              unmappedRequirements: data.unmappedRequirements.length,
-            },
+      await db.update(agentRunsTable).set({
+        status: "skipped",
+        durationMs,
+        findingCount: 0,
+        completedAt: new Date(),
+        context: {
+          reason: skipReason,
+          llmAvailable: false,
+          localFindingsDetected: localFindings.length,
+          observationSummary: {
+            risks: data.risks.length,
+            kris: data.kris.length,
+            vendors: data.vendors.length,
+            signals: data.signals.length,
+            alerts: data.alerts.length,
+            controls: data.controls.length,
+            unmappedRequirements: data.unmappedRequirements.length,
           },
-        }).where(eq(agentRunsTable.id, run.id));
+        },
+      }).where(eq(agentRunsTable.id, run.id));
 
-        await recordAuditDirect(tenantId, null, "agent_run_skipped", "agent_run", run.id, {
-          policyTier,
-          reason: "LLM unavailable and no local findings detected",
-        });
+      await recordAuditDirect(tenantId, null, "agent_run_skipped", "agent_run", run.id, {
+        policyTier,
+        reason: skipReason,
+        localFindingsDetected: localFindings.length,
+      });
 
-        console.log(`[Agent] Run ${run.id} skipped for tenant ${tenantId}: LLM unavailable, no local findings`);
-        return run.id;
-      }
-
-      console.log(`[Agent] LLM unavailable but ${localFindings.length} local findings detected, proceeding with local analysis`);
+      console.log(`[Agent] Run ${run.id} skipped for tenant ${tenantId}: ${skipReason}`);
+      return run.id;
     }
 
     const allFindings = [...localFindings, ...llmFindings];
@@ -697,10 +730,19 @@ export async function runAgentCycle(tenantId: string, policyTier: "observe" | "a
     const savedCount = await act(tenantId, run.id, allFindings, policyTier);
 
     const durationMs = Date.now() - startTime;
+    const promptTokens = Math.floor(tokenEstimate * 0.8);
+    const completionTokens = Math.floor(tokenEstimate * 0.2);
+    const costPerInputToken = 0.000003;
+    const costPerOutputToken = 0.000015;
+    const estimatedCost = (promptTokens * costPerInputToken + completionTokens * costPerOutputToken).toFixed(6);
+
     await db.update(agentRunsTable).set({
       status: "completed",
       model,
       tokenCount: tokenEstimate,
+      promptTokens,
+      completionTokens,
+      estimatedCost,
       durationMs,
       findingCount: savedCount,
       completedAt: new Date(),

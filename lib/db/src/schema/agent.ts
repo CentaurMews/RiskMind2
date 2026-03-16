@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, jsonb, pgEnum, integer, real, boolean } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, jsonb, pgEnum, integer, real, boolean, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { tenantsTable } from "./tenants";
@@ -29,6 +29,7 @@ export const agentFindingSeverityEnum = pgEnum("agent_finding_severity", [
 
 export const agentFindingStatusEnum = pgEnum("agent_finding_status", [
   "pending_review",
+  "acknowledged",
   "dismissed",
   "actioned",
 ]);
@@ -46,6 +47,9 @@ export const agentRunsTable = pgTable("agent_runs", {
   policyTier: agentPolicyTierEnum("policy_tier").notNull().default("observe"),
   model: text("model"),
   tokenCount: integer("token_count").default(0),
+  promptTokens: integer("prompt_tokens").default(0),
+  completionTokens: integer("completion_tokens").default(0),
+  estimatedCost: numeric("estimated_cost", { precision: 10, scale: 6 }).default("0"),
   durationMs: integer("duration_ms"),
   findingCount: integer("finding_count").default(0),
   error: text("error"),
