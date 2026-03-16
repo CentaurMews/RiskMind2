@@ -407,7 +407,7 @@ export const ListTreatmentsResponse = zod.object({
         id: zod.string().uuid().optional(),
         riskId: zod.string().uuid().optional(),
         strategy: zod
-          .enum(["mitigate", "transfer", "accept", "avoid"])
+          .enum(["treat", "transfer", "tolerate", "terminate"])
           .optional(),
         description: zod.string().nullish(),
         status: zod
@@ -416,6 +416,9 @@ export const ListTreatmentsResponse = zod.object({
         ownerId: zod.string().uuid().nullish(),
         dueDate: zod.date().nullish(),
         cost: zod.string().nullish(),
+        benefit: zod.string().nullish(),
+        effectivenessScore: zod.number().nullish(),
+        progressNotes: zod.string().nullish(),
         createdAt: zod.date().optional(),
         updatedAt: zod.date().optional(),
       }),
@@ -431,7 +434,7 @@ export const CreateTreatmentParams = zod.object({
 });
 
 export const CreateTreatmentBody = zod.object({
-  strategy: zod.enum(["mitigate", "transfer", "accept", "avoid"]),
+  strategy: zod.enum(["treat", "transfer", "tolerate", "terminate"]),
   description: zod.string().optional(),
   status: zod
     .enum(["planned", "in_progress", "completed", "cancelled"])
@@ -439,6 +442,9 @@ export const CreateTreatmentBody = zod.object({
   ownerId: zod.string().uuid().optional(),
   dueDate: zod.date().optional(),
   cost: zod.string().optional(),
+  benefit: zod.string().optional(),
+  effectivenessScore: zod.number().optional(),
+  progressNotes: zod.string().optional(),
 });
 
 /**
@@ -450,7 +456,7 @@ export const UpdateTreatmentParams = zod.object({
 });
 
 export const UpdateTreatmentBody = zod.object({
-  strategy: zod.enum(["mitigate", "transfer", "accept", "avoid"]),
+  strategy: zod.enum(["treat", "transfer", "tolerate", "terminate"]).optional(),
   description: zod.string().optional(),
   status: zod
     .enum(["planned", "in_progress", "completed", "cancelled"])
@@ -458,12 +464,15 @@ export const UpdateTreatmentBody = zod.object({
   ownerId: zod.string().uuid().optional(),
   dueDate: zod.date().optional(),
   cost: zod.string().optional(),
+  benefit: zod.string().optional(),
+  effectivenessScore: zod.number().optional(),
+  progressNotes: zod.string().optional(),
 });
 
 export const UpdateTreatmentResponse = zod.object({
   id: zod.string().uuid().optional(),
   riskId: zod.string().uuid().optional(),
-  strategy: zod.enum(["mitigate", "transfer", "accept", "avoid"]).optional(),
+  strategy: zod.enum(["treat", "transfer", "tolerate", "terminate"]).optional(),
   description: zod.string().nullish(),
   status: zod
     .enum(["planned", "in_progress", "completed", "cancelled"])
@@ -471,6 +480,9 @@ export const UpdateTreatmentResponse = zod.object({
   ownerId: zod.string().uuid().nullish(),
   dueDate: zod.date().nullish(),
   cost: zod.string().nullish(),
+  benefit: zod.string().nullish(),
+  effectivenessScore: zod.number().nullish(),
+  progressNotes: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -486,6 +498,36 @@ export const DeleteTreatmentParams = zod.object({
 export const DeleteTreatmentResponse = zod.object({
   deleted: zod.boolean().optional(),
   id: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary List status change history for a treatment
+ */
+export const ListTreatmentStatusEventsParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  id: zod.coerce.string().uuid(),
+});
+
+export const ListTreatmentStatusEventsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        treatmentId: zod.string().uuid().optional(),
+        fromStatus: zod
+          .enum(["planned", "in_progress", "completed", "cancelled"])
+          .nullish(),
+        toStatus: zod
+          .enum(["planned", "in_progress", "completed", "cancelled"])
+          .optional(),
+        changedBy: zod.string().uuid().nullish(),
+        changedByName: zod.string().nullish(),
+        changedByEmail: zod.string().nullish(),
+        note: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -2088,6 +2130,31 @@ export const SuggestTreatmentsResponse = zod.object({
         description: zod.string().optional(),
         effort: zod.string().optional(),
         riskReduction: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get AI-ranked treatment recommendations with ROI analysis
+ */
+export const AiTreatmentRecommendationsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AiTreatmentRecommendationsResponse = zod.object({
+  riskId: zod.string().uuid().optional(),
+  recommendations: zod
+    .array(
+      zod.object({
+        strategy: zod
+          .enum(["treat", "transfer", "tolerate", "terminate"])
+          .optional(),
+        description: zod.string().optional(),
+        estimatedCost: zod.number().optional(),
+        expectedResidualScoreReduction: zod.number().optional(),
+        roi: zod.number().optional(),
+        rationale: zod.string().optional(),
       }),
     )
     .optional(),

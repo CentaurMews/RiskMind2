@@ -9,6 +9,8 @@ import {
   risksTable,
   riskSourcesTable,
   treatmentsTable,
+  treatmentStatusEventsTable,
+  usersTable,
   krisTable,
   incidentsTable,
   reviewCyclesTable,
@@ -16,6 +18,7 @@ import {
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError } from "../lib/errors";
+import { complete, isAvailable, LLMUnavailableError } from "../lib/llm-service";
 
 async function verifyRiskOwnership(riskId: string, tenantId: string, res: Response): Promise<boolean> {
   const [risk] = await db.select({ id: risksTable.id }).from(risksTable)
@@ -279,7 +282,7 @@ router.post("/v1/risks/:riskId/treatments", requireRole("admin", "risk_manager",
   try {
     const riskId = p(req, "riskId");
     if (!(await verifyRiskOwnership(riskId, req.user!.tenantId, res))) return;
-    const { strategy, description, status, ownerId, dueDate, cost } = req.body;
+    const { strategy, description, status, ownerId, dueDate, cost, benefit, effectivenessScore, progressNotes } = req.body;
     if (!strategy) { badRequest(res, "strategy is required"); return; }
 
     const [treatment] = await db.insert(treatmentsTable).values({
@@ -291,7 +294,18 @@ router.post("/v1/risks/:riskId/treatments", requireRole("admin", "risk_manager",
       ownerId,
       dueDate: dueDate ? new Date(dueDate) : undefined,
       cost,
+      benefit,
+      effectivenessScore,
+      progressNotes,
     }).returning();
+
+    await db.insert(treatmentStatusEventsTable).values({
+      tenantId: req.user!.tenantId,
+      treatmentId: treatment.id,
+      fromStatus: null,
+      toStatus: treatment.status,
+      changedBy: req.user!.id,
+    });
 
     await recordAudit(req, "create", "treatment", treatment.id);
     res.status(201).json(treatment);
@@ -303,7 +317,20 @@ router.post("/v1/risks/:riskId/treatments", requireRole("admin", "risk_manager",
 
 router.put("/v1/risks/:riskId/treatments/:id", requireRole("admin", "risk_manager", "risk_owner"), async (req, res) => {
   try {
-    const { strategy, description, status, ownerId, dueDate, cost } = req.body;
+    const { strategy, description, status, ownerId, dueDate, cost, benefit, effectivenessScore, progressNotes } = req.body;
+
+    let previousStatus: string | undefined;
+    if (status !== undefined) {
+      const [existing] = await db.select({ status: treatmentsTable.status })
+        .from(treatmentsTable)
+        .where(and(
+          eq(treatmentsTable.id, p(req, "id")),
+          eq(treatmentsTable.tenantId, req.user!.tenantId),
+        ))
+        .limit(1);
+      previousStatus = existing?.status;
+    }
+
     const [treatment] = await db
       .update(treatmentsTable)
       .set({
@@ -313,6 +340,9 @@ router.put("/v1/risks/:riskId/treatments/:id", requireRole("admin", "risk_manage
         ...(ownerId !== undefined && { ownerId }),
         ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
         ...(cost !== undefined && { cost }),
+        ...(benefit !== undefined && { benefit }),
+        ...(effectivenessScore !== undefined && { effectivenessScore }),
+        ...(progressNotes !== undefined && { progressNotes }),
         updatedAt: new Date(),
       })
       .where(and(
@@ -323,6 +353,46 @@ router.put("/v1/risks/:riskId/treatments/:id", requireRole("admin", "risk_manage
       .returning();
 
     if (!treatment) { notFound(res, "Treatment not found"); return; }
+
+    if (status !== undefined && previousStatus !== undefined && previousStatus !== status) {
+      await db.insert(treatmentStatusEventsTable).values({
+        tenantId: req.user!.tenantId,
+        treatmentId: treatment.id,
+        fromStatus: previousStatus as "planned" | "in_progress" | "completed" | "cancelled",
+        toStatus: status,
+        changedBy: req.user!.id,
+      });
+
+      if (status === "completed" && treatment.benefit) {
+        const [risk] = await db.select({
+          likelihood: risksTable.likelihood,
+          impact: risksTable.impact,
+          residualLikelihood: risksTable.residualLikelihood,
+          residualImpact: risksTable.residualImpact,
+        }).from(risksTable).where(eq(risksTable.id, p(req, "riskId"))).limit(1);
+
+        if (risk) {
+          const inherentScore = (risk.likelihood || 1) * (risk.impact || 1);
+          const residualScore = (risk.residualLikelihood && risk.residualImpact)
+            ? risk.residualLikelihood * risk.residualImpact
+            : inherentScore;
+          const predictedReduction = parseFloat(treatment.benefit) || 0;
+          const actualReduction = inherentScore - residualScore;
+          const effectiveness = predictedReduction > 0
+            ? Math.min(100, Math.round((actualReduction / predictedReduction) * 100))
+            : 0;
+
+          const [updated] = await db.update(treatmentsTable)
+            .set({ effectivenessScore: effectiveness, updatedAt: new Date() })
+            .where(eq(treatmentsTable.id, treatment.id))
+            .returning();
+          if (updated) {
+            Object.assign(treatment, updated);
+          }
+        }
+      }
+    }
+
     await recordAudit(req, "update", "treatment", treatment.id);
     res.json(treatment);
   } catch (err) {
@@ -347,6 +417,36 @@ router.delete("/v1/risks/:riskId/treatments/:id", requireRole("admin", "risk_man
     res.json({ deleted: true, id: treatment.id });
   } catch (err) {
     console.error("Delete treatment error:", err);
+    serverError(res);
+  }
+});
+
+router.get("/v1/risks/:riskId/treatments/:id/status-events", async (req, res) => {
+  try {
+    const events = await db
+      .select({
+        id: treatmentStatusEventsTable.id,
+        treatmentId: treatmentStatusEventsTable.treatmentId,
+        fromStatus: treatmentStatusEventsTable.fromStatus,
+        toStatus: treatmentStatusEventsTable.toStatus,
+        changedBy: treatmentStatusEventsTable.changedBy,
+        changedByName: usersTable.name,
+        changedByEmail: usersTable.email,
+        note: treatmentStatusEventsTable.note,
+        createdAt: treatmentStatusEventsTable.createdAt,
+      })
+      .from(treatmentStatusEventsTable)
+      .innerJoin(treatmentsTable, eq(treatmentStatusEventsTable.treatmentId, treatmentsTable.id))
+      .leftJoin(usersTable, eq(treatmentStatusEventsTable.changedBy, usersTable.id))
+      .where(and(
+        eq(treatmentStatusEventsTable.treatmentId, p(req, "id")),
+        eq(treatmentsTable.riskId, p(req, "riskId")),
+        eq(treatmentStatusEventsTable.tenantId, req.user!.tenantId),
+      ))
+      .orderBy(treatmentStatusEventsTable.createdAt);
+    res.json({ data: events });
+  } catch (err) {
+    console.error("List treatment status events error:", err);
     serverError(res);
   }
 });
@@ -635,6 +735,137 @@ router.get("/v1/reviews/overdue", async (req, res) => {
     res.json({ data: overdue });
   } catch (err) {
     console.error("Overdue reviews error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/risks/:id/ai-treatment-recommendations", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const riskId = p(req, "id");
+
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      res.status(422).json({ error: "AI unavailable", message: "No LLM provider configured." });
+      return;
+    }
+
+    const [risk] = await db.select().from(risksTable)
+      .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId)))
+      .limit(1);
+
+    if (!risk) { notFound(res, "Risk not found"); return; }
+
+    const existingTreatments = await db.select().from(treatmentsTable)
+      .where(and(eq(treatmentsTable.riskId, riskId), eq(treatmentsTable.tenantId, tenantId)));
+
+    const existingInfo = existingTreatments.length > 0
+      ? `\nExisting treatments:\n${existingTreatments.map(t => `- ${t.strategy}: ${t.description} (status: ${t.status}, cost: ${t.cost || 'N/A'})`).join('\n')}`
+      : "\nNo existing treatments.";
+
+    const inherentScore = (risk.likelihood || 1) * (risk.impact || 1);
+
+    const response = await complete(tenantId, {
+      messages: [
+        {
+          role: "system",
+          content: `You are a risk management expert using the 4T framework (Treat, Transfer, Tolerate, Terminate). Analyze the given risk and recommend 2-4 treatment options ranked by ROI. For each recommendation provide: strategy (treat/transfer/tolerate/terminate), description (actionable treatment plan), estimatedCost (numeric dollar amount), expectedResidualScoreReduction (numeric score points reduced from inherent score of ${inherentScore}), roi (ratio of risk reduction benefit to cost, higher is better), rationale (plain-English explanation of why this treatment is recommended and its expected effectiveness). Respond ONLY in valid JSON: {"recommendations":[{"strategy":"...","description":"...","estimatedCost":N,"expectedResidualScoreReduction":N,"roi":N,"rationale":"..."}]}`,
+        },
+        {
+          role: "user",
+          content: `Risk: ${risk.title}\nDescription: ${risk.description || "N/A"}\nCategory: ${risk.category}\nLikelihood: ${risk.likelihood}/5\nImpact: ${risk.impact}/5\nInherent Score: ${inherentScore}/25\nResidual Likelihood: ${risk.residualLikelihood || 'Not set'}\nResidual Impact: ${risk.residualImpact || 'Not set'}${existingInfo}`,
+        },
+      ],
+    });
+
+    const validStrategies = ["treat", "transfer", "tolerate", "terminate"];
+
+    interface RawRecommendation {
+      strategy?: string;
+      description?: string;
+      estimatedCost?: number;
+      expectedResidualScoreReduction?: number;
+      roi?: number;
+      rationale?: string;
+    }
+
+    let recommendations: Array<{
+      strategy: string;
+      description: string;
+      estimatedCost: number;
+      expectedResidualScoreReduction: number;
+      roi: number;
+      rationale: string;
+    }> = [];
+
+    try {
+      const parsed = JSON.parse(response);
+      const raw: RawRecommendation[] = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
+
+      recommendations = raw
+        .filter((r): r is RawRecommendation & { strategy: string; description: string } =>
+          typeof r.strategy === "string" &&
+          validStrategies.includes(r.strategy) &&
+          typeof r.description === "string" &&
+          r.description.length > 0
+        )
+        .map(r => ({
+          strategy: r.strategy,
+          description: r.description,
+          estimatedCost: typeof r.estimatedCost === "number" && r.estimatedCost >= 0 ? r.estimatedCost : 0,
+          expectedResidualScoreReduction: typeof r.expectedResidualScoreReduction === "number" ? Math.max(0, Math.min(r.expectedResidualScoreReduction, inherentScore)) : 0,
+          roi: typeof r.roi === "number" && r.roi >= 0 ? Math.round(r.roi * 10) / 10 : 0,
+          rationale: typeof r.rationale === "string" ? r.rationale : "",
+        }));
+
+      recommendations.sort((a, b) => b.roi - a.roi);
+
+      if (recommendations.length < 2) {
+        const fallback = {
+          strategy: "tolerate" as const,
+          description: "Accept the current risk level and monitor through existing KRI thresholds.",
+          estimatedCost: 0,
+          expectedResidualScoreReduction: 0,
+          roi: 0,
+          rationale: "Baseline option: no additional investment required; risk is monitored passively.",
+        };
+        while (recommendations.length < 2) {
+          recommendations.push(fallback);
+        }
+      }
+
+      if (recommendations.length > 4) {
+        recommendations = recommendations.slice(0, 4);
+      }
+    } catch {
+      recommendations = [
+        {
+          strategy: "treat",
+          description: "Implement controls to reduce risk likelihood and impact.",
+          estimatedCost: 0,
+          expectedResidualScoreReduction: Math.floor(inherentScore * 0.3),
+          roi: 1,
+          rationale: "AI response could not be parsed; this is a default recommendation.",
+        },
+        {
+          strategy: "tolerate",
+          description: "Accept the current risk level and monitor through existing KRI thresholds.",
+          estimatedCost: 0,
+          expectedResidualScoreReduction: 0,
+          roi: 0,
+          rationale: "Baseline option: no additional investment required.",
+        },
+      ];
+    }
+
+    await recordAudit(req, "ai_treatment_recommendations", "risk", riskId, { count: recommendations.length });
+    res.json({ riskId, recommendations });
+  } catch (err) {
+    if (err instanceof LLMUnavailableError) {
+      res.status(422).json({ error: "AI unavailable", message: "No LLM provider configured." });
+      return;
+    }
+    console.error("AI treatment recommendations error:", err);
     serverError(res);
   }
 });

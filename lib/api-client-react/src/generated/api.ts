@@ -24,6 +24,7 @@ import type {
   AiGapRemediation200,
   AiGapRemediationBody,
   AiScoreSuggestions200,
+  AiTreatmentRecommendationsResponse,
   Alert,
   AlertListResponse,
   AlertSummary,
@@ -84,6 +85,7 @@ import type {
   ListFindingsParams,
   ListRisksParams,
   ListSignalsParams,
+  ListTreatmentStatusEvents200,
   ListVendorsParams,
   LlmProvider,
   LoginRequest,
@@ -122,6 +124,7 @@ import type {
   UpdateLlmProvider,
   UpdateRiskRequest,
   UpdateSignalStatusRequest,
+  UpdateTreatmentRequest,
   UpdateUserRoleBody,
   UserProfile,
   Vendor,
@@ -1225,14 +1228,14 @@ export const getUpdateTreatmentUrl = (riskId: string, id: string) => {
 export const updateTreatment = async (
   riskId: string,
   id: string,
-  createTreatmentRequest: CreateTreatmentRequest,
+  updateTreatmentRequest: UpdateTreatmentRequest,
   options?: RequestInit,
 ): Promise<Treatment> => {
   return customFetch<Treatment>(getUpdateTreatmentUrl(riskId, id), {
     ...options,
     method: "PUT",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createTreatmentRequest),
+    body: JSON.stringify(updateTreatmentRequest),
   });
 };
 
@@ -1243,14 +1246,14 @@ export const getUpdateTreatmentMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateTreatment>>,
     TError,
-    { riskId: string; id: string; data: BodyType<CreateTreatmentRequest> },
+    { riskId: string; id: string; data: BodyType<UpdateTreatmentRequest> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateTreatment>>,
   TError,
-  { riskId: string; id: string; data: BodyType<CreateTreatmentRequest> },
+  { riskId: string; id: string; data: BodyType<UpdateTreatmentRequest> },
   TContext
 > => {
   const mutationKey = ["updateTreatment"];
@@ -1264,7 +1267,7 @@ export const getUpdateTreatmentMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateTreatment>>,
-    { riskId: string; id: string; data: BodyType<CreateTreatmentRequest> }
+    { riskId: string; id: string; data: BodyType<UpdateTreatmentRequest> }
   > = (props) => {
     const { riskId, id, data } = props ?? {};
 
@@ -1277,7 +1280,7 @@ export const getUpdateTreatmentMutationOptions = <
 export type UpdateTreatmentMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateTreatment>>
 >;
-export type UpdateTreatmentMutationBody = BodyType<CreateTreatmentRequest>;
+export type UpdateTreatmentMutationBody = BodyType<UpdateTreatmentRequest>;
 export type UpdateTreatmentMutationError = ErrorType<unknown>;
 
 /**
@@ -1290,14 +1293,14 @@ export const useUpdateTreatment = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateTreatment>>,
     TError,
-    { riskId: string; id: string; data: BodyType<CreateTreatmentRequest> },
+    { riskId: string; id: string; data: BodyType<UpdateTreatmentRequest> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof updateTreatment>>,
   TError,
-  { riskId: string; id: string; data: BodyType<CreateTreatmentRequest> },
+  { riskId: string; id: string; data: BodyType<UpdateTreatmentRequest> },
   TContext
 > => {
   return useMutation(getUpdateTreatmentMutationOptions(options));
@@ -1387,6 +1390,108 @@ export const useDeleteTreatment = <
 > => {
   return useMutation(getDeleteTreatmentMutationOptions(options));
 };
+
+/**
+ * @summary List status change history for a treatment
+ */
+export const getListTreatmentStatusEventsUrl = (riskId: string, id: string) => {
+  return `/api/v1/risks/${riskId}/treatments/${id}/status-events`;
+};
+
+export const listTreatmentStatusEvents = async (
+  riskId: string,
+  id: string,
+  options?: RequestInit,
+): Promise<ListTreatmentStatusEvents200> => {
+  return customFetch<ListTreatmentStatusEvents200>(
+    getListTreatmentStatusEventsUrl(riskId, id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListTreatmentStatusEventsQueryKey = (
+  riskId: string,
+  id: string,
+) => {
+  return [`/api/v1/risks/${riskId}/treatments/${id}/status-events`] as const;
+};
+
+export const getListTreatmentStatusEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTreatmentStatusEvents>>,
+  TError = ErrorType<unknown>,
+>(
+  riskId: string,
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTreatmentStatusEvents>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListTreatmentStatusEventsQueryKey(riskId, id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTreatmentStatusEvents>>
+  > = ({ signal }) =>
+    listTreatmentStatusEvents(riskId, id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(riskId && id),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTreatmentStatusEvents>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTreatmentStatusEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTreatmentStatusEvents>>
+>;
+export type ListTreatmentStatusEventsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List status change history for a treatment
+ */
+
+export function useListTreatmentStatusEvents<
+  TData = Awaited<ReturnType<typeof listTreatmentStatusEvents>>,
+  TError = ErrorType<unknown>,
+>(
+  riskId: string,
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTreatmentStatusEvents>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTreatmentStatusEventsQueryOptions(
+    riskId,
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List KRIs for a risk
@@ -7904,6 +8009,93 @@ export const useSuggestTreatments = <
   TContext
 > => {
   return useMutation(getSuggestTreatmentsMutationOptions(options));
+};
+
+/**
+ * @summary Get AI-ranked treatment recommendations with ROI analysis
+ */
+export const getAiTreatmentRecommendationsUrl = (id: string) => {
+  return `/api/v1/risks/${id}/ai-treatment-recommendations`;
+};
+
+export const aiTreatmentRecommendations = async (
+  id: string,
+  options?: RequestInit,
+): Promise<AiTreatmentRecommendationsResponse> => {
+  return customFetch<AiTreatmentRecommendationsResponse>(
+    getAiTreatmentRecommendationsUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getAiTreatmentRecommendationsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiTreatmentRecommendations>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiTreatmentRecommendations>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["aiTreatmentRecommendations"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiTreatmentRecommendations>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return aiTreatmentRecommendations(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiTreatmentRecommendationsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiTreatmentRecommendations>>
+>;
+
+export type AiTreatmentRecommendationsMutationError = ErrorType<void>;
+
+/**
+ * @summary Get AI-ranked treatment recommendations with ROI analysis
+ */
+export const useAiTreatmentRecommendations = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiTreatmentRecommendations>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof aiTreatmentRecommendations>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getAiTreatmentRecommendationsMutationOptions(options));
 };
 
 /**
