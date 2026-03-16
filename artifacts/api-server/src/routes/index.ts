@@ -6,6 +6,7 @@ import { authMiddleware } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+
 router.use(publicAuthRouter);
 
 router.use(authMiddleware);

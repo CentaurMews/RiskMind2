@@ -1,4 +1,5 @@
 import app from "./app";
+import { ensureExtensions } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -14,6 +15,14 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+async function start() {
+  await ensureExtensions();
+  app.listen(port, () => {
+    console.log(`Server listening on port ${port}`);
+  });
+}
+
+start().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
 });

@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, tenantsTable } from "@workspace/db";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../lib/jwt";
 import { verifyPassword } from "../lib/password";
-import { badRequest, unauthorized, notFound } from "../lib/errors";
+import { badRequest, unauthorized, notFound, serverError } from "../lib/errors";
 import { recordAuditDirect, recordAudit } from "../lib/audit";
 
 export const publicAuthRouter: IRouter = Router();
@@ -11,27 +11,39 @@ export const protectedAuthRouter: IRouter = Router();
 
 publicAuthRouter.post("/v1/auth/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      badRequest(res, "Email and password are required");
+    const { email, password, tenantSlug } = req.body;
+    if (!email || !password || !tenantSlug) {
+      badRequest(res, "Email, password, and tenantSlug are required");
+      return;
+    }
+
+    const tenants = await db
+      .select()
+      .from(tenantsTable)
+      .where(eq(tenantsTable.slug, tenantSlug))
+      .limit(1);
+
+    const tenant = tenants[0];
+    if (!tenant) {
+      unauthorized(res, "Invalid credentials");
       return;
     }
 
     const users = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.email, email))
+      .where(and(eq(usersTable.email, email), eq(usersTable.tenantId, tenant.id)))
       .limit(1);
 
     const user = users[0];
     if (!user) {
-      unauthorized(res, "Invalid email or password");
+      unauthorized(res, "Invalid credentials");
       return;
     }
 
     const valid = await verifyPassword(password, user.hashedPassword);
     if (!valid) {
-      unauthorized(res, "Invalid email or password");
+      unauthorized(res, "Invalid credentials");
       return;
     }
 
@@ -53,11 +65,11 @@ publicAuthRouter.post("/v1/auth/login", async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
-    res.status(500).json({ type: "https://riskmind.app/errors/internal", title: "Internal Server Error", status: 500 });
+    serverError(res, "An unexpected error occurred");
   }
 });
 
-publicAuthRouter.post("/v1/auth/refresh", async (req, res) => {
+protectedAuthRouter.post("/v1/auth/refresh", async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {
@@ -68,6 +80,11 @@ publicAuthRouter.post("/v1/auth/refresh", async (req, res) => {
     const payload = verifyRefreshToken(refreshToken);
     if (!payload) {
       unauthorized(res, "Invalid or expired refresh token");
+      return;
+    }
+
+    if (payload.sub !== req.user!.id || payload.tenantId !== req.user!.tenantId) {
+      unauthorized(res, "Token does not match authenticated user");
       return;
     }
 
@@ -92,7 +109,7 @@ publicAuthRouter.post("/v1/auth/refresh", async (req, res) => {
     });
   } catch (err) {
     console.error("Refresh error:", err);
-    res.status(500).json({ type: "https://riskmind.app/errors/internal", title: "Internal Server Error", status: 500 });
+    serverError(res, "An unexpected error occurred");
   }
 });
 
@@ -120,6 +137,6 @@ protectedAuthRouter.get("/v1/auth/me", async (req, res) => {
     res.json(user);
   } catch (err) {
     console.error("Me error:", err);
-    res.status(500).json({ type: "https://riskmind.app/errors/internal", title: "Internal Server Error", status: 500 });
+    serverError(res, "An unexpected error occurred");
   }
 });
