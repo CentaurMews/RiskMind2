@@ -9,4 +9,5 @@ import type { VendorStatus } from "./vendorStatus";
 
 export type TransitionVendorBody = {
   targetStatus: VendorStatus;
+  notes?: string;
 };

@@ -524,7 +524,7 @@ async function reason(tenantId: string, data: ObservationData, localFindings: Fi
   const summary = {
     risks: { total: data.risks.length, open: data.risks.filter(r => r.status === "open").length, critical: data.risks.filter(r => (Number(r.likelihood) * Number(r.impact)) >= 20).length },
     kris: { total: data.kris.length, breaching: data.kris.filter(k => Number(k.currentValue) >= Number(k.criticalThreshold)).length },
-    vendors: { total: data.vendors.length, critical: data.vendors.filter(v => v.tier === "critical").length, suspended: data.vendors.filter(v => v.status === "suspended").length },
+    vendors: { total: data.vendors.length, critical: data.vendors.filter(v => v.tier === "critical").length, offboarding: data.vendors.filter(v => v.status === "offboarding").length },
     signals: { total: data.signals.length, pending: data.signals.filter(s => s.status === "pending").length },
     alerts: { total: data.alerts.length, critical: data.alerts.filter(a => a.severity === "critical").length, escalated: data.alerts.filter(a => a.status === "escalated").length },
     controls: { total: data.controls.length, inactive: data.controls.filter(c => c.status === "inactive").length },

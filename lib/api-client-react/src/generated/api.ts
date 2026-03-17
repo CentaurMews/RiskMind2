@@ -129,9 +129,11 @@ import type {
   UpdateSignalStatusRequest,
   UpdateTreatmentRequest,
   UpdateUserRoleBody,
+  UpdateVendorRequest,
   UserProfile,
   Vendor,
   VendorListResponse,
+  VendorStatusEventListResponse,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -2799,14 +2801,14 @@ export const getUpdateVendorUrl = (id: string) => {
 
 export const updateVendor = async (
   id: string,
-  createVendorRequest: CreateVendorRequest,
+  updateVendorRequest: UpdateVendorRequest,
   options?: RequestInit,
 ): Promise<Vendor> => {
   return customFetch<Vendor>(getUpdateVendorUrl(id), {
     ...options,
     method: "PUT",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createVendorRequest),
+    body: JSON.stringify(updateVendorRequest),
   });
 };
 
@@ -2817,14 +2819,14 @@ export const getUpdateVendorMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateVendor>>,
     TError,
-    { id: string; data: BodyType<CreateVendorRequest> },
+    { id: string; data: BodyType<UpdateVendorRequest> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateVendor>>,
   TError,
-  { id: string; data: BodyType<CreateVendorRequest> },
+  { id: string; data: BodyType<UpdateVendorRequest> },
   TContext
 > => {
   const mutationKey = ["updateVendor"];
@@ -2838,7 +2840,7 @@ export const getUpdateVendorMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateVendor>>,
-    { id: string; data: BodyType<CreateVendorRequest> }
+    { id: string; data: BodyType<UpdateVendorRequest> }
   > = (props) => {
     const { id, data } = props ?? {};
 
@@ -2851,7 +2853,7 @@ export const getUpdateVendorMutationOptions = <
 export type UpdateVendorMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateVendor>>
 >;
-export type UpdateVendorMutationBody = BodyType<CreateVendorRequest>;
+export type UpdateVendorMutationBody = BodyType<UpdateVendorRequest>;
 export type UpdateVendorMutationError = ErrorType<unknown>;
 
 /**
@@ -2864,14 +2866,14 @@ export const useUpdateVendor = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateVendor>>,
     TError,
-    { id: string; data: BodyType<CreateVendorRequest> },
+    { id: string; data: BodyType<UpdateVendorRequest> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof updateVendor>>,
   TError,
-  { id: string; data: BodyType<CreateVendorRequest> },
+  { id: string; data: BodyType<UpdateVendorRequest> },
   TContext
 > => {
   return useMutation(getUpdateVendorMutationOptions(options));
@@ -3047,6 +3049,97 @@ export const useTransitionVendor = <
 > => {
   return useMutation(getTransitionVendorMutationOptions(options));
 };
+
+/**
+ * @summary List vendor lifecycle status events
+ */
+export const getListVendorStatusEventsUrl = (id: string) => {
+  return `/api/v1/vendors/${id}/status-events`;
+};
+
+export const listVendorStatusEvents = async (
+  id: string,
+  options?: RequestInit,
+): Promise<VendorStatusEventListResponse> => {
+  return customFetch<VendorStatusEventListResponse>(
+    getListVendorStatusEventsUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListVendorStatusEventsQueryKey = (id: string) => {
+  return [`/api/v1/vendors/${id}/status-events`] as const;
+};
+
+export const getListVendorStatusEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listVendorStatusEvents>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVendorStatusEvents>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListVendorStatusEventsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listVendorStatusEvents>>
+  > = ({ signal }) => listVendorStatusEvents(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listVendorStatusEvents>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListVendorStatusEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listVendorStatusEvents>>
+>;
+export type ListVendorStatusEventsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List vendor lifecycle status events
+ */
+
+export function useListVendorStatusEvents<
+  TData = Awaited<ReturnType<typeof listVendorStatusEvents>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVendorStatusEvents>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListVendorStatusEventsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Calculate vendor risk score

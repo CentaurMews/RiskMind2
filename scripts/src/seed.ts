@@ -93,11 +93,11 @@ async function seed() {
   console.log(`Created ${risks.length} risks`);
 
   const vendorDefs = [
-    { name: "CloudScale Inc", tier: "critical" as const, status: "active" as const, category: "Infrastructure", contactEmail: "security@cloudscale.io" },
-    { name: "DataGuard Pro", tier: "high" as const, status: "active" as const, category: "Security", contactEmail: "vendor@dataguard.com" },
-    { name: "PayFlow Systems", tier: "critical" as const, status: "active" as const, category: "Payments", contactEmail: "compliance@payflow.io" },
-    { name: "OfficeHub SaaS", tier: "medium" as const, status: "approved" as const, category: "Productivity", contactEmail: "admin@officehub.com" },
-    { name: "MarketBridge Analytics", tier: "low" as const, status: "onboarding" as const, category: "Analytics", contactEmail: "info@marketbridge.co" },
+    { name: "CloudScale Inc", tier: "critical" as const, status: "monitoring" as const, category: "Infrastructure", contactEmail: "security@cloudscale.io" },
+    { name: "DataGuard Pro", tier: "high" as const, status: "monitoring" as const, category: "Security", contactEmail: "vendor@dataguard.com" },
+    { name: "PayFlow Systems", tier: "critical" as const, status: "monitoring" as const, category: "Payments", contactEmail: "compliance@payflow.io" },
+    { name: "OfficeHub SaaS", tier: "medium" as const, status: "monitoring" as const, category: "Productivity", contactEmail: "admin@officehub.com" },
+    { name: "MarketBridge Analytics", tier: "low" as const, status: "identification" as const, category: "Analytics", contactEmail: "info@marketbridge.co" },
   ];
 
   const vendors = await db.insert(vendorsTable).values(

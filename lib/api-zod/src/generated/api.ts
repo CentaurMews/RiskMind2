@@ -799,7 +799,15 @@ export const listVendorsQueryLimitDefault = 20;
 
 export const ListVendorsQueryParams = zod.object({
   status: zod
-    .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+    .enum([
+      "identification",
+      "due_diligence",
+      "risk_assessment",
+      "contracting",
+      "onboarding",
+      "monitoring",
+      "offboarding",
+    ])
     .optional(),
   tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
   search: zod.coerce.string().optional(),
@@ -816,12 +824,22 @@ export const ListVendorsResponse = zod.object({
         description: zod.string().nullish(),
         tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
         status: zod
-          .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+          .enum([
+            "identification",
+            "due_diligence",
+            "risk_assessment",
+            "contracting",
+            "onboarding",
+            "monitoring",
+            "offboarding",
+          ])
           .optional(),
         category: zod.string().nullish(),
         contactEmail: zod.string().nullish(),
         contactName: zod.string().nullish(),
         riskScore: zod.string().nullish(),
+        overrideTier: zod.enum(["critical", "high", "medium", "low"]).nullish(),
+        overrideReason: zod.string().nullish(),
         createdAt: zod.date().optional(),
         updatedAt: zod.date().optional(),
       }),
@@ -838,10 +856,10 @@ export const ListVendorsResponse = zod.object({
 export const CreateVendorBody = zod.object({
   name: zod.string(),
   description: zod.string().optional(),
-  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
   category: zod.string().optional(),
   contactEmail: zod.string().optional(),
   contactName: zod.string().optional(),
+  riskScore: zod.number().nullish(),
 });
 
 /**
@@ -857,12 +875,22 @@ export const GetVendorResponse = zod.object({
   description: zod.string().nullish(),
   tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
   status: zod
-    .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+    .enum([
+      "identification",
+      "due_diligence",
+      "risk_assessment",
+      "contracting",
+      "onboarding",
+      "monitoring",
+      "offboarding",
+    ])
     .optional(),
   category: zod.string().nullish(),
   contactEmail: zod.string().nullish(),
   contactName: zod.string().nullish(),
   riskScore: zod.string().nullish(),
+  overrideTier: zod.enum(["critical", "high", "medium", "low"]).nullish(),
+  overrideReason: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -875,12 +903,14 @@ export const UpdateVendorParams = zod.object({
 });
 
 export const UpdateVendorBody = zod.object({
-  name: zod.string(),
+  name: zod.string().optional(),
   description: zod.string().optional(),
-  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
   category: zod.string().optional(),
   contactEmail: zod.string().optional(),
   contactName: zod.string().optional(),
+  riskScore: zod.number().nullish(),
+  overrideTier: zod.enum(["critical", "high", "medium", "low"]).nullish(),
+  overrideReason: zod.string().optional(),
 });
 
 export const UpdateVendorResponse = zod.object({
@@ -889,12 +919,22 @@ export const UpdateVendorResponse = zod.object({
   description: zod.string().nullish(),
   tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
   status: zod
-    .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+    .enum([
+      "identification",
+      "due_diligence",
+      "risk_assessment",
+      "contracting",
+      "onboarding",
+      "monitoring",
+      "offboarding",
+    ])
     .optional(),
   category: zod.string().nullish(),
   contactEmail: zod.string().nullish(),
   contactName: zod.string().nullish(),
   riskScore: zod.string().nullish(),
+  overrideTier: zod.enum(["critical", "high", "medium", "low"]).nullish(),
+  overrideReason: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -920,12 +960,15 @@ export const TransitionVendorParams = zod.object({
 
 export const TransitionVendorBody = zod.object({
   targetStatus: zod.enum([
+    "identification",
+    "due_diligence",
+    "risk_assessment",
+    "contracting",
     "onboarding",
-    "approved",
-    "active",
-    "suspended",
-    "offboarded",
+    "monitoring",
+    "offboarding",
   ]),
+  notes: zod.string().optional(),
 });
 
 export const TransitionVendorResponse = zod.object({
@@ -934,14 +977,67 @@ export const TransitionVendorResponse = zod.object({
   description: zod.string().nullish(),
   tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
   status: zod
-    .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+    .enum([
+      "identification",
+      "due_diligence",
+      "risk_assessment",
+      "contracting",
+      "onboarding",
+      "monitoring",
+      "offboarding",
+    ])
     .optional(),
   category: zod.string().nullish(),
   contactEmail: zod.string().nullish(),
   contactName: zod.string().nullish(),
   riskScore: zod.string().nullish(),
+  overrideTier: zod.enum(["critical", "high", "medium", "low"]).nullish(),
+  overrideReason: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary List vendor lifecycle status events
+ */
+export const ListVendorStatusEventsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const ListVendorStatusEventsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        vendorId: zod.string().uuid().optional(),
+        actorId: zod.string().uuid().nullish(),
+        fromStatus: zod
+          .enum([
+            "identification",
+            "due_diligence",
+            "risk_assessment",
+            "contracting",
+            "onboarding",
+            "monitoring",
+            "offboarding",
+          ])
+          .optional(),
+        toStatus: zod
+          .enum([
+            "identification",
+            "due_diligence",
+            "risk_assessment",
+            "contracting",
+            "onboarding",
+            "monitoring",
+            "offboarding",
+          ])
+          .optional(),
+        notes: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -960,12 +1056,22 @@ export const CalculateVendorRiskScoreResponse = zod.object({
       description: zod.string().nullish(),
       tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
       status: zod
-        .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+        .enum([
+          "identification",
+          "due_diligence",
+          "risk_assessment",
+          "contracting",
+          "onboarding",
+          "monitoring",
+          "offboarding",
+        ])
         .optional(),
       category: zod.string().nullish(),
       contactEmail: zod.string().nullish(),
       contactName: zod.string().nullish(),
       riskScore: zod.string().nullish(),
+      overrideTier: zod.enum(["critical", "high", "medium", "low"]).nullish(),
+      overrideReason: zod.string().nullish(),
       createdAt: zod.date().optional(),
       updatedAt: zod.date().optional(),
     })

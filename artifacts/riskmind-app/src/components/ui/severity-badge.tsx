@@ -34,8 +34,10 @@ export function StatusBadge({ status, className }: { status?: string, className?
       variant="secondary" 
       className={cn(
         "font-mono font-medium capitalize tracking-wider text-[10px] px-2 py-0.5 bg-muted text-muted-foreground",
-        (s === 'open' || s === 'active' || s === 'pending' || s === 'in_progress') && "bg-primary/10 text-primary",
+        (s === 'open' || s === 'active' || s === 'pending' || s === 'in_progress' || s === 'monitoring' || s === 'onboarding') && "bg-primary/10 text-primary",
         (s === 'resolved' || s === 'closed' || s === 'mitigated' || s === 'completed' || s === 'approved') && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+        (s === 'identification' || s === 'due diligence' || s === 'due_diligence' || s === 'risk assessment' || s === 'risk_assessment' || s === 'contracting') && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+        (s === 'offboarding') && "bg-red-500/10 text-red-600 dark:text-red-400",
         s === 'draft' && "bg-secondary text-secondary-foreground",
         className
       )}
