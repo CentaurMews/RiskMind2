@@ -1,7 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import path from "path";
-import { fileURLToPath } from "url";
 import router from "./routes";
 import { sendError } from "./lib/errors";
 import { handleMcpRequest } from "./mcp/handler";
@@ -20,8 +19,6 @@ app.use("/api", router);
 
 // Serve built React SPA from the artifacts/riskmind-app/dist/public/ directory
 // Path resolves correctly from compiled dist/index.cjs location: artifacts/api-server/dist/
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const spaDistPath = path.resolve(__dirname, "../../riskmind-app/dist/public");
 
 app.use(express.static(spaDistPath));
