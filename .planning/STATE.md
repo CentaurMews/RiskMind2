@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-server-foundation/01-01-PLAN.md
-last_updated: "2026-03-17T16:35:50.045Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-03-17T16:38:17.895Z"
 last_activity: 2026-03-17 — Roadmap created, all 35 v1 requirements mapped to 4 phases
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-server-foundation P01 | 2 | 3 tasks | 6 files |
+| Phase 01 P02 | 4 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - [Init]: PM2 for process management with ecosystem.config.cjs
 - [Phase 01-server-foundation]: Remove @replit/* packages entirely from all manifests and lockfile — clean install path on Linux server
 - [Phase 01-server-foundation]: vite.config.ts uses react() + tailwindcss() only — no environment-specific conditional plugins
+- [Phase 01]: Inline framework data in seed.ts to avoid cross-package dependency in api-server artifact
+- [Phase 01]: Check tenantsTable slug 'acme' for idempotent seed detection rather than usersTable
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T16:35:50.036Z
-Stopped at: Completed 01-server-foundation/01-01-PLAN.md
+Last session: 2026-03-17T16:38:17.890Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
