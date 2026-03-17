@@ -866,6 +866,127 @@ paths:
               schema:
                 $ref: "#/components/schemas/Questionnaire"
 
+  /v1/vendors/{vendorId}/questionnaires/{qId}/ai-questions:
+    post:
+      operationId: generateAiQuestions
+      tags: [questionnaires]
+      summary: Generate AI follow-up questions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+        - name: qId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Questionnaire with AI-generated questions appended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Questionnaire"
+        "503":
+          description: LLM unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /v1/vendors/{vendorId}/questionnaires/{qId}/validate-answers:
+    post:
+      operationId: validateQuestionnaireAnswers
+      tags: [questionnaires]
+      summary: Validate questionnaire answers against public knowledge
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+        - name: qId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Validation flags
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationFlagsResponse"
+        "503":
+          description: LLM unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /v1/vendors/{vendorId}/questionnaires/{qId}/score:
+    post:
+      operationId: scoreQuestionnaire
+      tags: [questionnaires]
+      summary: Score questionnaire and update vendor risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+        - name: qId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Scoring result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionnaireScoreResponse"
+
+  /v1/vendors/{vendorId}/questionnaires/{qId}/responses:
+    put:
+      operationId: updateQuestionnaireResponses
+      tags: [questionnaires]
+      summary: Update questionnaire responses
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/vendorId"
+        - name: qId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                responses:
+                  type: object
+              required:
+                - responses
+      responses:
+        "200":
+          description: Updated questionnaire
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Questionnaire"
+
   /v1/vendors/{vendorId}/questionnaires/{id}/magic-link:
     post:
       operationId: generateMagicLink
@@ -3638,6 +3759,65 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Questionnaire"
+
+    ValidationFlag:
+      type: object
+      properties:
+        questionId:
+          type: string
+        flagReason:
+          type: string
+        confidence:
+          type: number
+
+    ValidationFlagsResponse:
+      type: object
+      properties:
+        flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationFlag"
+
+    ScoreBreakdownItem:
+      type: object
+      properties:
+        questionId:
+          type: string
+        text:
+          type: string
+        rawScore:
+          type: number
+        weight:
+          type: number
+        weightedScore:
+          type: number
+
+    QuestionnaireScoreResponse:
+      type: object
+      properties:
+        riskScore:
+          type: number
+        tier:
+          type: string
+          enum: [critical, high, medium, low]
+        breakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreBreakdownItem"
+        totalQuestions:
+          type: integer
+        answeredQuestions:
+          type: integer
+        vendor:
+          $ref: "#/components/schemas/Vendor"
+
+    UpdateQuestionnaireResponsesRequest:
+      type: object
+      properties:
+        responses:
+          type: object
+      required:
+        - responses
 
     DocumentStatus:
       type: string

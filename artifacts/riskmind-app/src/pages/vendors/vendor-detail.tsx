@@ -1,13 +1,46 @@
 import { useState } from "react";
 import { useRoute } from "wouter";
-import { useGetVendor, useListQuestionnaires, useListDocuments, useCalculateVendorRiskScore, useTransitionVendor, useCreateDocument, useSummarizeVendorDocument } from "@workspace/api-client-react";
-import type { VendorStatus, VendorTier } from "@workspace/api-client-react";
+import {
+  useGetVendor,
+  useListQuestionnaires,
+  useListDocuments,
+  useCalculateVendorRiskScore,
+  useTransitionVendor,
+  useCreateDocument,
+  useSummarizeVendorDocument,
+  useCreateQuestionnaire,
+  useGenerateAiQuestions,
+  useValidateQuestionnaireAnswers,
+  useScoreQuestionnaire,
+  useUpdateQuestionnaireResponses,
+} from "@workspace/api-client-react";
+import type { VendorStatus, VendorTier, Questionnaire, QuestionnaireScoreResponse, ValidationFlagsResponse } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/severity-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Mail, Loader2, FileText, ClipboardList, RefreshCw, Upload, ArrowRight, Sparkles, CheckCircle2, AlertCircle, Check } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  Mail,
+  Loader2,
+  FileText,
+  ClipboardList,
+  RefreshCw,
+  Upload,
+  ArrowRight,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Check,
+  Plus,
+  ShieldAlert,
+  BarChart3,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,6 +49,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 const FULL_FLOW: VendorStatus[] = [
   "identification",
@@ -106,6 +143,271 @@ function LifecycleStepper({ currentStatus, tier }: { currentStatus?: VendorStatu
   );
 }
 
+function getTierColor(tier: string) {
+  switch (tier) {
+    case "critical": return "text-red-600 bg-red-50 border-red-200";
+    case "high": return "text-orange-600 bg-orange-50 border-orange-200";
+    case "medium": return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    case "low": return "text-green-600 bg-green-50 border-green-200";
+    default: return "text-muted-foreground bg-muted border-border";
+  }
+}
+
+function QuestionnaireDetail({
+  questionnaire,
+  vendorId,
+}: {
+  questionnaire: Questionnaire;
+  vendorId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [localResponses, setLocalResponses] = useState<Record<string, any>>(() => {
+    const resp = questionnaire.responses as Record<string, any> | null;
+    return resp || {};
+  });
+  const [scoreResult, setScoreResult] = useState<QuestionnaireScoreResponse | null>(null);
+  const [validationResult, setValidationResult] = useState<ValidationFlagsResponse | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/v1/vendors/${vendorId}/questionnaires`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/v1/vendors/${vendorId}`] });
+  };
+
+  const aiQuestionsMutation = useGenerateAiQuestions({
+    mutation: { onSuccess: () => invalidateAll() },
+  });
+
+  const validateMutation = useValidateQuestionnaireAnswers({
+    mutation: {
+      onSuccess: (data) => {
+        setValidationResult(data as ValidationFlagsResponse);
+      },
+    },
+  });
+
+  const scoreMutation = useScoreQuestionnaire({
+    mutation: {
+      onSuccess: (data) => {
+        setScoreResult(data as QuestionnaireScoreResponse);
+        invalidateAll();
+      },
+    },
+  });
+
+  const updateResponsesMutation = useUpdateQuestionnaireResponses({
+    mutation: {
+      onSuccess: () => {
+        invalidateAll();
+        setSaving(false);
+      },
+    },
+  });
+
+  const template = (questionnaire.template as unknown as any[]) || [];
+  const qId = questionnaire.id || "";
+
+  const handleSaveResponses = () => {
+    setSaving(true);
+    updateResponsesMutation.mutate({ vendorId, qId, data: { responses: localResponses } });
+  };
+
+  const handleResponseChange = (questionId: string, value: any) => {
+    setLocalResponses((prev) => ({ ...prev, [questionId]: value }));
+  };
+
+  const answeredCount = Object.keys(localResponses).filter((k) => {
+    const v = localResponses[k];
+    return v !== undefined && v !== null && v !== "";
+  }).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">{questionnaire.title}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <StatusBadge status={questionnaire.status} />
+            <span className="text-xs text-muted-foreground">
+              {answeredCount}/{template.length} answered
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSaveResponses}
+            disabled={saving || updateResponsesMutation.isPending}
+          >
+            {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+            Save Responses
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => aiQuestionsMutation.mutate({ vendorId, qId })}
+            disabled={aiQuestionsMutation.isPending}
+          >
+            {aiQuestionsMutation.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+            ) : (
+              <Sparkles className="h-3 w-3 mr-1" />
+            )}
+            AI Questions
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => validateMutation.mutate({ vendorId, qId })}
+            disabled={validateMutation.isPending || answeredCount === 0}
+          >
+            {validateMutation.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+            ) : (
+              <ShieldAlert className="h-3 w-3 mr-1" />
+            )}
+            Validate
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => scoreMutation.mutate({ vendorId, qId })}
+            disabled={scoreMutation.isPending}
+          >
+            {scoreMutation.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+            ) : (
+              <BarChart3 className="h-3 w-3 mr-1" />
+            )}
+            Score
+          </Button>
+        </div>
+      </div>
+
+      {scoreResult && (
+        <Card className="border-2 border-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold text-sm">Scoring Result</h4>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold font-mono">{scoreResult.riskScore}</span>
+                <span className="text-xs text-muted-foreground">/100</span>
+                {scoreResult.tier && (
+                  <Badge className={`${getTierColor(scoreResult.tier)} text-xs capitalize`}>
+                    {scoreResult.tier}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <Progress value={scoreResult.riskScore} className="h-2" />
+            <div className="text-xs text-muted-foreground mt-2">
+              {scoreResult.answeredQuestions}/{scoreResult.totalQuestions} questions answered
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {validationResult && validationResult.flags && validationResult.flags.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardContent className="p-4">
+            <h4 className="font-semibold text-sm mb-3 flex items-center gap-1 text-orange-700">
+              <AlertTriangle className="h-4 w-4" />
+              Validation Flags ({validationResult.flags.length})
+            </h4>
+            <div className="space-y-2">
+              {validationResult.flags.map((flag, idx) => (
+                <div key={idx} className="p-2 bg-white rounded border border-orange-200 text-sm">
+                  <div className="font-medium text-orange-800">{flag.flagReason}</div>
+                  <div className="text-xs text-orange-600 mt-1">
+                    Confidence: {Math.round((flag.confidence || 0) * 100)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {validationResult && validationResult.flags && validationResult.flags.length === 0 && (
+        <Card className="border-green-200 bg-green-50/50">
+          <CardContent className="p-4 flex items-center gap-2 text-green-700">
+            <CheckCircle2 className="h-4 w-4" />
+            <span className="text-sm font-medium">All responses validated - no discrepancies found.</span>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="space-y-3">
+        {template.map((q: any, idx: number) => (
+          <Card key={q.questionId || idx} className={`${q.isAiGenerated ? "border-purple-200 bg-purple-50/20" : ""}`}>
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-xs font-mono text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 shrink-0">
+                  {idx + 1}
+                </span>
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium">{q.text}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {q.isAiGenerated && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 border-purple-300 text-purple-600">
+                          AI
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 capitalize">
+                        {q.category}
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">w:{q.weight}</span>
+                    </div>
+                  </div>
+
+                  {q.answerType === "boolean" && (
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={localResponses[q.questionId] === true || localResponses[q.questionId] === "true"}
+                        onCheckedChange={(checked) => handleResponseChange(q.questionId, checked)}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {localResponses[q.questionId] === true || localResponses[q.questionId] === "true" ? "Yes" : "No"}
+                      </span>
+                    </div>
+                  )}
+
+                  {q.answerType === "scale" && (
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10}
+                        step={1}
+                        className="w-20 h-8 text-sm"
+                        placeholder="0-10"
+                        value={localResponses[q.questionId] ?? ""}
+                        onChange={(e) => handleResponseChange(q.questionId, e.target.value)}
+                      />
+                      <span className="text-xs text-muted-foreground">Scale: 0 (worst) - 10 (best)</span>
+                    </div>
+                  )}
+
+                  {q.answerType === "text" && (
+                    <Textarea
+                      className="text-sm min-h-[60px]"
+                      placeholder="Enter your response..."
+                      value={localResponses[q.questionId] ?? ""}
+                      onChange={(e) => handleResponseChange(q.questionId, e.target.value)}
+                    />
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+    </div>
+  );
+}
+
 export default function VendorDetail() {
   const [, params] = useRoute("/vendors/:id");
   const id = params?.id || "";
@@ -114,6 +416,9 @@ export default function VendorDetail() {
   const [docForm, setDocForm] = useState({ fileName: "", mimeType: "application/pdf" });
   const [summarizingDocs, setSummarizingDocs] = useState<Record<string, "pending" | "done">>({});
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [newQuestionnaireTitle, setNewQuestionnaireTitle] = useState("");
+  const [creatingQ, setCreatingQ] = useState(false);
+  const [expandedQ, setExpandedQ] = useState<string | null>(null);
 
   const { data: vendor, isLoading } = useGetVendor(id);
   const { data: questionnaires } = useListQuestionnaires(id);
@@ -157,11 +462,31 @@ export default function VendorDetail() {
     },
   });
 
+  const createQuestionnaireMutation = useCreateQuestionnaire({
+    mutation: {
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/vendors/${id}/questionnaires`] });
+        setNewQuestionnaireTitle("");
+        setCreatingQ(false);
+        if (data?.id) setExpandedQ(data.id);
+      },
+    },
+  });
+
   if (isLoading) return <AppLayout><div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div></AppLayout>;
   if (!vendor) return <AppLayout><div className="p-8 text-center text-muted-foreground">Vendor not found</div></AppLayout>;
 
   const effectiveTier = (vendor.overrideTier || vendor.tier) as VendorTier | undefined;
   const nextStatus = getNextStatus(effectiveTier, vendor.status as VendorStatus);
+
+  const riskScoreNum = vendor.riskScore ? parseFloat(String(vendor.riskScore)) : null;
+  let riskTier = "";
+  if (riskScoreNum !== null) {
+    if (riskScoreNum >= 75) riskTier = "critical";
+    else if (riskScoreNum >= 50) riskTier = "high";
+    else if (riskScoreNum >= 25) riskTier = "medium";
+    else riskTier = "low";
+  }
 
   return (
     <AppLayout>
@@ -250,10 +575,13 @@ export default function VendorDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center p-8">
-              {vendor.riskScore ? (
+              {riskScoreNum !== null ? (
                 <>
-                  <div className="text-6xl font-bold font-mono tracking-tighter">{vendor.riskScore}</div>
-                  <span className="text-sm text-muted-foreground mt-2">/ 10.0</span>
+                  <div className="text-6xl font-bold font-mono tracking-tighter">{riskScoreNum}</div>
+                  <span className="text-sm text-muted-foreground mt-2">/ 100</span>
+                  {riskTier && (
+                    <Badge className={`${getTierColor(riskTier)} mt-2 capitalize`}>{riskTier} risk</Badge>
+                  )}
                 </>
               ) : (
                 <div className="text-center text-muted-foreground">
@@ -273,21 +601,98 @@ export default function VendorDetail() {
           
           <div className="mt-6 bg-card border rounded-xl overflow-hidden shadow-sm min-h-[300px]">
             <TabsContent value="questionnaires" className="p-0 m-0 border-none outline-none">
+              <div className="p-4 border-b bg-muted/10 flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {questionnaires?.data?.length || 0} questionnaire(s)
+                </span>
+                {!creatingQ ? (
+                  <Button variant="outline" size="sm" onClick={() => setCreatingQ(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> New Questionnaire
+                  </Button>
+                ) : (
+                  <form
+                    className="flex items-center gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newQuestionnaireTitle.trim()) return;
+                      createQuestionnaireMutation.mutate({
+                        vendorId: id,
+                        data: { title: newQuestionnaireTitle.trim() },
+                      });
+                    }}
+                  >
+                    <Input
+                      className="h-8 w-64"
+                      placeholder="Questionnaire title..."
+                      value={newQuestionnaireTitle}
+                      onChange={(e) => setNewQuestionnaireTitle(e.target.value)}
+                      autoFocus
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={createQuestionnaireMutation.isPending || !newQuestionnaireTitle.trim()}
+                    >
+                      {createQuestionnaireMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        "Create"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setCreatingQ(false); setNewQuestionnaireTitle(""); }}
+                    >
+                      Cancel
+                    </Button>
+                  </form>
+                )}
+              </div>
+
               {questionnaires?.data?.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
                   <ClipboardList className="h-12 w-12 text-muted-foreground/30 mb-4" />
                   <p>No assessments sent to this vendor.</p>
-                  <Button variant="outline" className="mt-4">Send Assessment</Button>
+                  <Button variant="outline" className="mt-4" onClick={() => setCreatingQ(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> Send Assessment
+                  </Button>
                 </div>
               ) : (
                 <div className="divide-y">
-                  {questionnaires?.data?.map(q => (
-                    <div key={q.id} className="p-4 hover:bg-muted/30 transition-colors flex justify-between items-center">
-                      <div>
-                        <div className="font-semibold text-sm mb-1">{q.title}</div>
-                        <span className="text-xs text-muted-foreground font-mono">Last updated: {format(new Date(q.updatedAt || ''), 'MMM d, yyyy')}</span>
+                  {questionnaires?.data?.map((q) => (
+                    <div key={q.id}>
+                      <div
+                        className="p-4 hover:bg-muted/30 transition-colors flex justify-between items-center cursor-pointer"
+                        onClick={() => setExpandedQ(expandedQ === q.id ? null : (q.id || null))}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div>
+                            {expandedQ === q.id ? (
+                              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm mb-1">{q.title}</div>
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {(q.template as unknown as any[])?.length || 0} questions
+                              {" · "}
+                              Last updated: {format(new Date(q.updatedAt || ''), 'MMM d, yyyy')}
+                            </span>
+                          </div>
+                        </div>
+                        <StatusBadge status={q.status} />
                       </div>
-                      <StatusBadge status={q.status} />
+                      {expandedQ === q.id && (
+                        <div className="px-4 pb-4 border-t bg-muted/5">
+                          <div className="pt-4">
+                            <QuestionnaireDetail questionnaire={q} vendorId={id} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -537,6 +537,51 @@ export interface QuestionnaireListResponse {
   data?: Questionnaire[];
 }
 
+export interface ValidationFlag {
+  questionId?: string;
+  flagReason?: string;
+  confidence?: number;
+}
+
+export interface ValidationFlagsResponse {
+  flags?: ValidationFlag[];
+}
+
+export interface ScoreBreakdownItem {
+  questionId?: string;
+  text?: string;
+  rawScore?: number;
+  weight?: number;
+  weightedScore?: number;
+}
+
+export type QuestionnaireScoreResponseTier =
+  (typeof QuestionnaireScoreResponseTier)[keyof typeof QuestionnaireScoreResponseTier];
+
+export const QuestionnaireScoreResponseTier = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export interface QuestionnaireScoreResponse {
+  riskScore?: number;
+  tier?: QuestionnaireScoreResponseTier;
+  breakdown?: ScoreBreakdownItem[];
+  totalQuestions?: number;
+  answeredQuestions?: number;
+  vendor?: Vendor;
+}
+
+export type UpdateQuestionnaireResponsesRequestResponses = {
+  [key: string]: unknown;
+};
+
+export interface UpdateQuestionnaireResponsesRequest {
+  responses: UpdateQuestionnaireResponsesRequestResponses;
+}
+
 export type DocumentStatus =
   (typeof DocumentStatus)[keyof typeof DocumentStatus];
 
@@ -1257,6 +1302,22 @@ export type TransitionVendorBody = {
 export type CalculateVendorRiskScore200 = {
   riskScore?: number;
   vendor?: Vendor;
+};
+
+export type GenerateAiQuestions503 = {
+  error?: string;
+};
+
+export type ValidateQuestionnaireAnswers503 = {
+  error?: string;
+};
+
+export type UpdateQuestionnaireResponsesBodyResponses = {
+  [key: string]: unknown;
+};
+
+export type UpdateQuestionnaireResponsesBody = {
+  responses: UpdateQuestionnaireResponsesBodyResponses;
 };
 
 export type GenerateMagicLinkBody = {

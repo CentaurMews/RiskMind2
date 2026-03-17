@@ -12,6 +12,7 @@ export * from "./findings";
 export * from "./vendors";
 export * from "./vendor-status-events";
 export * from "./questionnaires";
+export * from "./questionnaire-questions";
 export * from "./documents";
 export * from "./frameworks";
 export * from "./framework-requirements";

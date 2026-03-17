@@ -1117,6 +1117,111 @@ export const CreateQuestionnaireBody = zod.object({
 });
 
 /**
+ * @summary Generate AI follow-up questions
+ */
+export const GenerateAiQuestionsParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+  qId: zod.coerce.string().uuid(),
+});
+
+export const GenerateAiQuestionsResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  vendorId: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  status: zod.enum(["draft", "sent", "in_progress", "completed"]).optional(),
+  template: zod.object({}).passthrough().optional(),
+  responses: zod.object({}).passthrough().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Validate questionnaire answers against public knowledge
+ */
+export const ValidateQuestionnaireAnswersParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+  qId: zod.coerce.string().uuid(),
+});
+
+export const ValidateQuestionnaireAnswersResponse = zod.object({
+  flags: zod
+    .array(
+      zod.object({
+        questionId: zod.string().optional(),
+        flagReason: zod.string().optional(),
+        confidence: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Score questionnaire and update vendor risk
+ */
+export const ScoreQuestionnaireParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+  qId: zod.coerce.string().uuid(),
+});
+
+export const ScoreQuestionnaireResponse = zod.object({
+  riskScore: zod.number().optional(),
+  tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+  breakdown: zod
+    .array(
+      zod.object({
+        questionId: zod.string().optional(),
+        text: zod.string().optional(),
+        rawScore: zod.number().optional(),
+        weight: zod.number().optional(),
+        weightedScore: zod.number().optional(),
+      }),
+    )
+    .optional(),
+  totalQuestions: zod.number().optional(),
+  answeredQuestions: zod.number().optional(),
+  vendor: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      name: zod.string().optional(),
+      description: zod.string().nullish(),
+      tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
+      status: zod
+        .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+        .optional(),
+      category: zod.string().nullish(),
+      contactEmail: zod.string().nullish(),
+      contactName: zod.string().nullish(),
+      riskScore: zod.string().nullish(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Update questionnaire responses
+ */
+export const UpdateQuestionnaireResponsesParams = zod.object({
+  vendorId: zod.coerce.string().uuid(),
+  qId: zod.coerce.string().uuid(),
+});
+
+export const UpdateQuestionnaireResponsesBody = zod.object({
+  responses: zod.object({}).passthrough(),
+});
+
+export const UpdateQuestionnaireResponsesResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  vendorId: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  status: zod.enum(["draft", "sent", "in_progress", "completed"]).optional(),
+  template: zod.object({}).passthrough().optional(),
+  responses: zod.object({}).passthrough().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
  * @summary Generate magic link for questionnaire
  */
 export const GenerateMagicLinkParams = zod.object({

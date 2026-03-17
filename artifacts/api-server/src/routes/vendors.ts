@@ -11,6 +11,7 @@ import {
   vendorStatusEventsTable,
   questionnairesTable,
   documentsTable,
+  questionnaireQuestionsTable,
 } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit, recordAuditDirect } from "../lib/audit";
@@ -22,6 +23,7 @@ import {
   getLifecycleFlow,
 } from "../lib/allowed-transitions";
 import type { VendorStatus, VendorTier } from "../lib/allowed-transitions";
+import { complete, LLMUnavailableError } from "../lib/llm-service";
 
 const VALID_STATUSES: VendorStatus[] = ["identification", "due_diligence", "risk_assessment", "contracting", "onboarding", "monitoring", "offboarding"];
 const VALID_TIERS: VendorTier[] = ["critical", "high", "medium", "low"];
@@ -379,21 +381,371 @@ router.get("/v1/vendors/:vendorId/questionnaires", async (req, res) => {
 router.post("/v1/vendors/:vendorId/questionnaires", requireRole("admin", "risk_manager"), async (req, res) => {
   try {
     const vendorId = p(req, "vendorId");
-    if (!(await verifyVendorOwnership(vendorId, req.user!.tenantId, res))) return;
-    const { title, template } = req.body;
+    const tenantId = req.user!.tenantId;
+    if (!(await verifyVendorOwnership(vendorId, tenantId, res))) return;
+    const { title } = req.body;
     if (!title) { badRequest(res, "title is required"); return; }
 
+    const [vendor] = await db.select({ category: vendorsTable.category }).from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId))).limit(1);
+
+    const tenantOrGlobal = sql`(${questionnaireQuestionsTable.tenantId} = ${tenantId} OR ${questionnaireQuestionsTable.tenantId} IS NULL)`;
+
+    const coreQuestions = await db.select().from(questionnaireQuestionsTable)
+      .where(and(eq(questionnaireQuestionsTable.isCore, true), tenantOrGlobal));
+
+    let categoryQuestions: typeof coreQuestions = [];
+    if (vendor?.category) {
+      categoryQuestions = await db.select().from(questionnaireQuestionsTable)
+        .where(and(
+          eq(questionnaireQuestionsTable.isCore, false),
+          eq(questionnaireQuestionsTable.vendorCategory, vendor.category),
+          tenantOrGlobal,
+        ));
+    }
+
+    const NEGATIVE_INDICATOR_PATTERNS = [
+      /breach/i, /incident/i, /violation/i, /compromise/i, /failure/i, /lawsuit/i,
+    ];
+
+    const templateQuestions = [...coreQuestions, ...categoryQuestions].map(q => {
+      const isNegativeIndicator = NEGATIVE_INDICATOR_PATTERNS.some(p => p.test(q.text));
+      return {
+        questionId: q.id,
+        text: q.text,
+        category: q.category,
+        answerType: q.answerType,
+        weight: parseFloat(q.weight),
+        isCore: q.isCore,
+        isAiGenerated: false,
+        isNegativeIndicator,
+      };
+    });
+
     const [q] = await db.insert(questionnairesTable).values({
-      tenantId: req.user!.tenantId,
+      tenantId,
       vendorId,
       title,
-      template: template || [],
+      template: templateQuestions,
     }).returning();
 
     await recordAudit(req, "create", "questionnaire", q.id);
     res.status(201).json(q);
   } catch (err) {
     console.error("Create questionnaire error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/vendors/:vendorId/questionnaires/:qId/ai-questions", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "vendorId");
+    const qId = p(req, "qId");
+    const tenantId = req.user!.tenantId;
+
+    const [vendor] = await db.select().from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId))).limit(1);
+    if (!vendor) { notFound(res, "Vendor not found"); return; }
+
+    const [questionnaire] = await db.select().from(questionnairesTable)
+      .where(and(eq(questionnairesTable.id, qId), eq(questionnairesTable.vendorId, vendorId), eq(questionnairesTable.tenantId, tenantId))).limit(1);
+    if (!questionnaire) { notFound(res, "Questionnaire not found"); return; }
+
+    const template = (questionnaire.template as any[]) || [];
+    const responses = (questionnaire.responses as Record<string, any>) || {};
+
+    const existingQuestions = template.map((q: any) => q.text).join("\n- ");
+    const answeredSummary = Object.entries(responses).map(([qid, val]) => {
+      const q = template.find((t: any) => t.questionId === qid);
+      return q ? `Q: ${q.text}\nA: ${val}` : "";
+    }).filter(Boolean).join("\n\n");
+
+    const prompt = `You are a vendor risk assessment expert. Given the following vendor profile and existing questionnaire, generate 3-5 contextual follow-up questions that dig deeper into potential risk areas.
+
+Vendor: ${vendor.name}
+Category: ${vendor.category || "General"}
+Description: ${vendor.description || "N/A"}
+
+Existing questions:
+- ${existingQuestions}
+
+${answeredSummary ? `Responses so far:\n${answeredSummary}` : "No responses yet."}
+
+Generate 3-5 follow-up questions. For each question provide:
+- text: the question text
+- category: one of security, privacy, operational
+- answerType: one of text, boolean, scale
+- weight: a number between 0.5 and 2.0
+
+Respond ONLY with a JSON array of objects with keys: text, category, answerType, weight. No other text.`;
+
+    const result = await complete(tenantId, {
+      messages: [
+        { role: "system", content: "You are a vendor risk assessment expert. Respond only with valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      maxTokens: 1024,
+    });
+
+    let aiQuestions: any[];
+    try {
+      const cleaned = result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      aiQuestions = JSON.parse(cleaned);
+      if (!Array.isArray(aiQuestions)) throw new Error("Expected array");
+    } catch {
+      badRequest(res, "AI returned invalid format. Please try again.");
+      return;
+    }
+
+    const newQuestions = aiQuestions
+      .slice(0, 5)
+      .filter((q: any) => q.text && String(q.text).trim().length > 5)
+      .map((q: any) => ({
+        questionId: crypto.randomUUID(),
+        text: String(q.text).trim(),
+        category: ["security", "privacy", "operational"].includes(q.category) ? q.category : "general",
+        answerType: ["text", "boolean", "scale"].includes(q.answerType) ? q.answerType : "text",
+        weight: Math.min(2.0, Math.max(0.5, parseFloat(q.weight) || 1.0)),
+        isCore: false,
+        isAiGenerated: true,
+        isNegativeIndicator: false,
+      }));
+
+    const updatedTemplate = [...template, ...newQuestions];
+
+    const [updated] = await db.update(questionnairesTable).set({
+      template: updatedTemplate,
+      updatedAt: new Date(),
+    }).where(eq(questionnairesTable.id, qId)).returning();
+
+    await recordAudit(req, "ai_generate_questions", "questionnaire", qId, { count: newQuestions.length });
+    res.json(updated);
+  } catch (err) {
+    if (err instanceof LLMUnavailableError) {
+      res.status(503).json({ error: err.message });
+      return;
+    }
+    console.error("AI questions error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/vendors/:vendorId/questionnaires/:qId/validate-answers", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "vendorId");
+    const qId = p(req, "qId");
+    const tenantId = req.user!.tenantId;
+
+    const [vendor] = await db.select().from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId))).limit(1);
+    if (!vendor) { notFound(res, "Vendor not found"); return; }
+
+    const [questionnaire] = await db.select().from(questionnairesTable)
+      .where(and(eq(questionnairesTable.id, qId), eq(questionnairesTable.vendorId, vendorId), eq(questionnairesTable.tenantId, tenantId))).limit(1);
+    if (!questionnaire) { notFound(res, "Questionnaire not found"); return; }
+
+    const template = (questionnaire.template as any[]) || [];
+    const responses = (questionnaire.responses as Record<string, any>) || {};
+
+    if (Object.keys(responses).length === 0) {
+      badRequest(res, "No responses to validate");
+      return;
+    }
+
+    const qaPairs = Object.entries(responses).map(([qid, val]) => {
+      const q = template.find((t: any) => t.questionId === qid);
+      return q ? { questionId: qid, question: q.text, answer: val } : null;
+    }).filter(Boolean);
+
+    const prompt = `You are a vendor risk assessment validator. Given the following vendor and their questionnaire responses, identify any answers that seem inconsistent with publicly known information or industry norms.
+
+Vendor: ${vendor.name}
+Category: ${vendor.category || "General"}
+
+Responses:
+${qaPairs.map((qa: any) => `[${qa.questionId}] Q: ${qa.question}\nA: ${qa.answer}`).join("\n\n")}
+
+For each flagged answer, provide:
+- questionId: the question ID in brackets above
+- flagReason: why this answer seems inconsistent
+- confidence: a number 0.0 to 1.0 indicating how confident you are
+
+Respond ONLY with a JSON array of flag objects. If nothing seems inconsistent, return an empty array []. No other text.`;
+
+    const result = await complete(tenantId, {
+      messages: [
+        { role: "system", content: "You are a vendor risk assessment validator. Respond only with valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.3,
+      maxTokens: 1024,
+    });
+
+    let flags: any[];
+    try {
+      const cleaned = result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      flags = JSON.parse(cleaned);
+      if (!Array.isArray(flags)) throw new Error("Expected array");
+    } catch {
+      flags = [];
+    }
+
+    const validatedFlags = flags.map((f: any) => ({
+      questionId: String(f.questionId || ""),
+      flagReason: String(f.flagReason || ""),
+      confidence: Math.min(1.0, Math.max(0.0, parseFloat(f.confidence) || 0.5)),
+    }));
+
+    await recordAudit(req, "validate_answers", "questionnaire", qId, { flagCount: validatedFlags.length });
+    res.json({ flags: validatedFlags });
+  } catch (err) {
+    if (err instanceof LLMUnavailableError) {
+      res.status(503).json({ error: err.message });
+      return;
+    }
+    console.error("Validate answers error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/vendors/:vendorId/questionnaires/:qId/score", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "vendorId");
+    const qId = p(req, "qId");
+    const tenantId = req.user!.tenantId;
+
+    const [vendor] = await db.select().from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId))).limit(1);
+    if (!vendor) { notFound(res, "Vendor not found"); return; }
+
+    const [questionnaire] = await db.select().from(questionnairesTable)
+      .where(and(eq(questionnairesTable.id, qId), eq(questionnairesTable.vendorId, vendorId), eq(questionnairesTable.tenantId, tenantId))).limit(1);
+    if (!questionnaire) { notFound(res, "Questionnaire not found"); return; }
+
+    const template = (questionnaire.template as any[]) || [];
+    const responses = (questionnaire.responses as Record<string, any>) || {};
+
+    if (template.length === 0) {
+      badRequest(res, "Questionnaire has no questions");
+      return;
+    }
+
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+    const breakdown: Array<{ questionId: string; text: string; rawScore: number; weight: number; weightedScore: number }> = [];
+
+    for (const q of template) {
+      const weight = parseFloat(q.weight) || 1.0;
+      const response = responses[q.questionId];
+      let rawScore = 0;
+
+      if (response !== undefined && response !== null && response !== "") {
+        switch (q.answerType) {
+          case "boolean": {
+            const isYes = (response === true || response === "true" || response === "yes");
+            if (q.isNegativeIndicator) {
+              rawScore = isYes ? 0 : 100;
+            } else {
+              rawScore = isYes ? 100 : 0;
+            }
+            break;
+          }
+          case "scale":
+            rawScore = Math.min(100, Math.max(0, parseFloat(response) || 0));
+            if (rawScore <= 10) rawScore = rawScore * 10;
+            break;
+          case "text":
+            rawScore = (typeof response === "string" && response.trim().length > 20) ? 80 : (response ? 50 : 0);
+            break;
+          default:
+            rawScore = response ? 50 : 0;
+        }
+      }
+
+      const weightedScore = rawScore * weight;
+      totalWeightedScore += weightedScore;
+      totalWeight += weight;
+
+      breakdown.push({
+        questionId: q.questionId,
+        text: q.text,
+        rawScore,
+        weight,
+        weightedScore,
+      });
+    }
+
+    const riskScore = totalWeight > 0
+      ? Math.round((100 - (totalWeightedScore / (totalWeight * 100)) * 100) * 100) / 100
+      : 50;
+
+    const normalizedScore = Math.max(0, Math.min(100, riskScore));
+
+    let tier: "critical" | "high" | "medium" | "low";
+    if (normalizedScore >= 75) tier = "critical";
+    else if (normalizedScore >= 50) tier = "high";
+    else if (normalizedScore >= 25) tier = "medium";
+    else tier = "low";
+
+    const [updatedVendor] = await db.update(vendorsTable).set({
+      riskScore: String(normalizedScore),
+      updatedAt: new Date(),
+    }).where(eq(vendorsTable.id, vendorId)).returning();
+
+    await db.update(questionnairesTable).set({
+      status: "completed",
+      updatedAt: new Date(),
+    }).where(eq(questionnairesTable.id, qId));
+
+    await recordAudit(req, "score_questionnaire", "questionnaire", qId, { riskScore: normalizedScore, tier });
+    res.json({
+      riskScore: normalizedScore,
+      tier,
+      breakdown,
+      totalQuestions: template.length,
+      answeredQuestions: Object.keys(responses).length,
+      vendor: updatedVendor,
+    });
+  } catch (err) {
+    console.error("Score questionnaire error:", err);
+    serverError(res);
+  }
+});
+
+router.put("/v1/vendors/:vendorId/questionnaires/:qId/responses", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "vendorId");
+    const qId = p(req, "qId");
+    const tenantId = req.user!.tenantId;
+
+    const [questionnaire] = await db.select().from(questionnairesTable)
+      .where(and(eq(questionnairesTable.id, qId), eq(questionnairesTable.vendorId, vendorId), eq(questionnairesTable.tenantId, tenantId))).limit(1);
+    if (!questionnaire) { notFound(res, "Questionnaire not found"); return; }
+
+    const { responses } = req.body;
+    if (!responses || typeof responses !== "object") { badRequest(res, "responses object is required"); return; }
+
+    const template = (questionnaire.template as any[]) || [];
+    const validQuestionIds = new Set(template.map((q: any) => q.questionId));
+    const filteredResponses: Record<string, any> = {};
+    for (const [key, val] of Object.entries(responses)) {
+      if (validQuestionIds.has(key)) filteredResponses[key] = val;
+    }
+
+    const existingResponses = (questionnaire.responses as Record<string, any>) || {};
+    const mergedResponses = { ...existingResponses, ...filteredResponses };
+
+    const [updated] = await db.update(questionnairesTable).set({
+      responses: mergedResponses,
+      status: "in_progress",
+      updatedAt: new Date(),
+    }).where(eq(questionnairesTable.id, qId)).returning();
+
+    await recordAudit(req, "update_responses", "questionnaire", qId);
+    res.json(updated);
+  } catch (err) {
+    console.error("Update responses error:", err);
     serverError(res);
   }
 });
