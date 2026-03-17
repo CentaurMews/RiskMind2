@@ -1,13 +1,13 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { useListRisks, useCreateRisk, type RiskCategory, type RiskSourceInput } from "@workspace/api-client-react";
+import { useListRisks, useCreateRisk, type RiskCategory } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SeverityBadge, StatusBadge } from "@/components/ui/severity-badge";
-import { Plus, Search, Filter, Loader2, ArrowRight, Sparkles, X, Brain, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Filter, Loader2, ArrowRight, Sparkles, X, Brain, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,7 +15,9 @@ import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { InterviewDialog } from "@/components/ai-interview/interview-dialog";
 import { AiIntelligencePanel } from "@/components/risk-creation/ai-intelligence-panel";
+import { DocumentAnalysisPanel, type PopulateFormPayload } from "@/components/risk-creation/document-analysis-panel";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SourceItem {
   id: string;
@@ -37,6 +39,8 @@ export default function RiskList() {
   const [interviewOpen, setInterviewOpen] = useState(false);
   const [selectedSources, setSelectedSources] = useState<SourceItem[]>([]);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<"intelligence" | "documents">("intelligence");
+  const formRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -107,7 +111,7 @@ export default function RiskList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const sources: RiskSourceInput[] = selectedSources.map(s => ({
+    const sources = selectedSources.map(s => ({
       sourceType: s.sourceType,
       sourceId: s.id,
     }));
@@ -133,6 +137,30 @@ export default function RiskList() {
         ? { category: source.category as RiskCategory }
         : {}),
     }));
+  }, []);
+
+  const handlePopulateFromDocument = useCallback(({ risk, documentSignalId }: PopulateFormPayload) => {
+    const validCategories = ["operational", "financial", "compliance", "strategic", "technology", "reputational"];
+    setFormData({
+      title: risk.title.slice(0, 200),
+      description: risk.description.slice(0, 500),
+      category: (validCategories.includes(risk.category) ? risk.category : "operational") as RiskCategory,
+      likelihood: String(Math.max(1, Math.min(5, risk.likelihood))),
+      impact: String(Math.max(1, Math.min(5, risk.impact))),
+    });
+    if (documentSignalId) {
+      setSelectedSources(prev => {
+        const alreadyAdded = prev.some(s => s.id === documentSignalId);
+        if (alreadyAdded) return prev;
+        return [...prev, {
+          id: documentSignalId,
+          sourceType: "signal" as const,
+          title: risk.title,
+          description: `From document analysis`,
+        }];
+      });
+    }
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   const handleDeselectSource = useCallback((sourceId: string) => {
@@ -170,11 +198,13 @@ export default function RiskList() {
                   <div className="flex-1 min-w-0 flex flex-col">
                     <SheetHeader className="px-6 pt-6 pb-4">
                       <SheetTitle>Create New Risk</SheetTitle>
-                      <SheetDescription>Log a new risk into the enterprise register. Use the AI panel to find related intelligence.</SheetDescription>
+                      <SheetDescription>Log a new risk into the enterprise register. Use the AI panel to find related intelligence or analyse a document.</SheetDescription>
                     </SheetHeader>
 
                     <div className="flex-1 overflow-y-auto px-6 pb-6">
                       <form onSubmit={handleSubmit} className="space-y-6">
+                        <div ref={formRef} />
+
                         {selectedSources.length > 0 && (
                           <div className="space-y-2">
                             <Label className="text-xs text-muted-foreground uppercase tracking-wide">Linked Sources</Label>
@@ -244,13 +274,28 @@ export default function RiskList() {
                             {showMobilePanel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </button>
                           {showMobilePanel && (
-                            <div className="mt-2 border rounded-lg h-[300px] overflow-hidden">
-                              <AiIntelligencePanel
-                                searchText={formData.title + " " + formData.description}
-                                selectedSources={selectedSources}
-                                onSelectSource={handleSelectSource}
-                                onDeselectSource={handleDeselectSource}
-                              />
+                            <div className="mt-2 border rounded-lg p-3 space-y-3">
+                              <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents")}>
+                                <TabsList className="w-full h-8">
+                                  <TabsTrigger value="intelligence" className="flex-1 text-xs">
+                                    <Brain className="h-3 w-3 mr-1" />Intelligence
+                                  </TabsTrigger>
+                                  <TabsTrigger value="documents" className="flex-1 text-xs">
+                                    <FileText className="h-3 w-3 mr-1" />Documents
+                                  </TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="intelligence" className="h-[300px] overflow-hidden mt-2">
+                                  <AiIntelligencePanel
+                                    searchText={formData.title + " " + formData.description}
+                                    selectedSources={selectedSources}
+                                    onSelectSource={handleSelectSource}
+                                    onDeselectSource={handleDeselectSource}
+                                  />
+                                </TabsContent>
+                                <TabsContent value="documents" className="mt-2">
+                                  <DocumentAnalysisPanel onPopulateForm={handlePopulateFromDocument} />
+                                </TabsContent>
+                              </Tabs>
                             </div>
                           )}
                         </div>
@@ -276,13 +321,32 @@ export default function RiskList() {
                     </div>
                   </div>
 
-                  <div className="hidden md:flex w-[300px] border-l bg-muted/20 flex-col min-h-0">
-                    <AiIntelligencePanel
-                      searchText={formData.title + " " + formData.description}
-                      selectedSources={selectedSources}
-                      onSelectSource={handleSelectSource}
-                      onDeselectSource={handleDeselectSource}
-                    />
+                  <div className="hidden md:flex w-[320px] border-l bg-muted/20 flex-col min-h-0">
+                    <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents")} className="flex flex-col h-full">
+                      <div className="px-3 pt-3 pb-0">
+                        <TabsList className="w-full h-8">
+                          <TabsTrigger value="intelligence" className="flex-1 text-xs">
+                            <Brain className="h-3 w-3 mr-1" />Intelligence
+                          </TabsTrigger>
+                          <TabsTrigger value="documents" className="flex-1 text-xs">
+                            <FileText className="h-3 w-3 mr-1" />Documents
+                          </TabsTrigger>
+                        </TabsList>
+                      </div>
+                      <TabsContent value="intelligence" className="flex-1 min-h-0 mt-0 overflow-hidden">
+                        <AiIntelligencePanel
+                          searchText={formData.title + " " + formData.description}
+                          selectedSources={selectedSources}
+                          onSelectSource={handleSelectSource}
+                          onDeselectSource={handleDeselectSource}
+                        />
+                      </TabsContent>
+                      <TabsContent value="documents" className="flex-1 min-h-0 mt-0 overflow-y-auto">
+                        <div className="p-3">
+                          <DocumentAnalysisPanel onPopulateForm={handlePopulateFromDocument} />
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </div>
                 </div>
               </SheetContent>
