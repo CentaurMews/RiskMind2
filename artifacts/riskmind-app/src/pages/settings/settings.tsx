@@ -17,9 +17,13 @@ import {
   useCreateRiskFromFinding,
   useApproveAgentFinding,
   useDismissAgentFinding,
+  useProbeProvider,
+  useProbeProviderById,
+  VENDOR_BASE_URLS,
+  type KnownVendor,
 } from "@workspace/api-client-react";
 import { OsintSourcesTab } from "./osint-sources-tab";
-import type { UpdateUserRoleBodyRole, LlmProvider, CreateLlmProvider, UpdateLlmProvider, AgentFinding } from "@workspace/api-client-react";
+import type { UpdateUserRoleBodyRole, LlmProvider, CreateLlmProvider, UpdateLlmProvider, AgentFinding, LlmUseCase } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,7 +35,8 @@ import {
   ShieldAlert, Bot, Server, Loader2, Users, Shield,
   Plus, Pencil, Trash2, CheckCircle2, XCircle,
   Play, RefreshCw, Clock, AlertTriangle, Eye,
-  Link2, Zap, TrendingUp, Search, Lightbulb, Ban, Globe
+  Link2, Zap, TrendingUp, Search, Lightbulb, Ban, Globe,
+  ChevronRight, ChevronLeft, Gauge
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -89,6 +94,45 @@ const POLICY_TIERS = [
   { value: "advisory", label: "Advisory — suggest but require approval", desc: "Agent raises findings that humans approve before action." },
   { value: "active", label: "Active — autonomous execution", desc: "Agent acts autonomously within defined policy boundaries." },
 ];
+
+const VENDOR_OPTIONS: { key: KnownVendor; label: string }[] = [
+  { key: "openai", label: "OpenAI" },
+  { key: "anthropic", label: "Anthropic (Claude)" },
+  { key: "groq", label: "Groq" },
+  { key: "mistral", label: "Mistral AI" },
+  { key: "together", label: "Together AI" },
+  { key: "cohere", label: "Cohere" },
+  { key: "perplexity", label: "Perplexity" },
+  { key: "ollama", label: "Ollama (local)" },
+  { key: "lmstudio", label: "LM Studio (local)" },
+  { key: "custom", label: "Custom endpoint" },
+];
+
+type WizardState = {
+  step: 1 | 2 | 3 | 4;
+  name: string;
+  apiKey: string;
+  vendor: KnownVendor | "";
+  baseUrl: string;
+  probeResult: { success: boolean; message: string; models: string[]; latencyMs: number; tokensPerSecond?: number } | null;
+  selectedModel: string;
+  modelSearch: string;
+  useCase: string;
+  isDefault: boolean;
+};
+
+const EMPTY_WIZARD: WizardState = {
+  step: 1,
+  name: "",
+  apiKey: "",
+  vendor: "",
+  baseUrl: "",
+  probeResult: null,
+  selectedModel: "",
+  modelSearch: "",
+  useCase: "general",
+  isDefault: false,
+};
 
 type LlmProviderForm = {
   name: string;
@@ -161,7 +205,11 @@ export default function Settings() {
   const [providerSheet, setProviderSheet] = useState<"closed" | "add" | "edit">("closed");
   const [editingProvider, setEditingProvider] = useState<LlmProvider | null>(null);
   const [providerForm, setProviderForm] = useState<LlmProviderForm>(EMPTY_PROVIDER_FORM);
-  const [testResult, setTestResult] = useState<Record<string, "ok" | "fail" | "testing">>({});
+  const [testResult, setTestResult] = useState<Record<string, { status: "ok" | "fail" | "testing"; latencyMs?: number; message?: string }>>({});
+  const [wizard, setWizard] = useState<WizardState>(EMPTY_WIZARD);
+
+  const [editProbeResult, setEditProbeResult] = useState<{ success: boolean; message: string; models: string[]; latencyMs: number } | null>(null);
+  const [editModelSearch, setEditModelSearch] = useState("");
 
   const [agentForm, setAgentForm] = useState<{
     enabled?: boolean;
@@ -182,7 +230,7 @@ export default function Settings() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/v1/settings/llm-providers"] });
         setProviderSheet("closed");
-        setProviderForm(EMPTY_PROVIDER_FORM);
+        setWizard(EMPTY_WIZARD);
       },
     },
   });
@@ -193,6 +241,8 @@ export default function Settings() {
         queryClient.invalidateQueries({ queryKey: ["/api/v1/settings/llm-providers"] });
         setProviderSheet("closed");
         setEditingProvider(null);
+        setEditProbeResult(null);
+        setEditModelSearch("");
       },
     },
   });
@@ -207,13 +257,46 @@ export default function Settings() {
 
   const testProviderMutation = useTestLlmProvider({
     mutation: {
-      onSuccess: (_, vars) => {
-        setTestResult((prev) => ({ ...prev, [vars.id]: "ok" }));
-        setTimeout(() => setTestResult((prev) => { const n = { ...prev }; delete n[vars.id]; return n; }), 4000);
+      onSuccess: (result, vars) => {
+        const r = result as { success?: boolean; message?: string; latencyMs?: number };
+        if (r.success === false) {
+          setTestResult((prev) => ({ ...prev, [vars.id]: { status: "fail", message: r.message, latencyMs: r.latencyMs } }));
+        } else {
+          setTestResult((prev) => ({ ...prev, [vars.id]: { status: "ok", latencyMs: r.latencyMs } }));
+        }
+        setTimeout(() => setTestResult((prev) => { const n = { ...prev }; delete n[vars.id]; return n; }), 6000);
       },
-      onError: (_, vars) => {
-        setTestResult((prev) => ({ ...prev, [vars.id]: "fail" }));
-        setTimeout(() => setTestResult((prev) => { const n = { ...prev }; delete n[vars.id]; return n; }), 4000);
+      onError: (err, vars) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setTestResult((prev) => ({ ...prev, [vars.id]: { status: "fail", message } }));
+        setTimeout(() => setTestResult((prev) => { const n = { ...prev }; delete n[vars.id]; return n; }), 6000);
+      },
+    },
+  });
+
+  const probeMutation = useProbeProvider({
+    mutation: {
+      onSuccess: (result) => {
+        setWizard((prev) => ({
+          ...prev,
+          probeResult: result,
+          selectedModel: result.models[0] || "",
+        }));
+      },
+    },
+  });
+
+  const editProbeMutation = useProbeProviderById({
+    mutation: {
+      onSuccess: (result) => {
+        setEditProbeResult(result);
+        if (result.success && result.models.length > 0) {
+          const currentModel = providerForm.model;
+          const modelInList = result.models.includes(currentModel);
+          if (!modelInList && result.models[0]) {
+            setProviderForm((prev) => ({ ...prev, model: result.models[0] }));
+          }
+        }
       },
     },
   });
@@ -290,8 +373,7 @@ export default function Settings() {
   const findingList: AgentFinding[] = agentFindings?.data || [];
 
   const openAddProvider = () => {
-    setProviderForm(EMPTY_PROVIDER_FORM);
-    setEditingProvider(null);
+    setWizard(EMPTY_WIZARD);
     setProviderSheet("add");
   };
 
@@ -306,11 +388,14 @@ export default function Settings() {
       isDefault: p.isDefault || false,
     });
     setEditingProvider(p);
+    setEditProbeResult(null);
+    setEditModelSearch("");
     setProviderSheet("edit");
   };
 
-  const handleProviderSubmit = (e: React.FormEvent) => {
+  const handleEditProviderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editingProvider?.id) return;
     const payload = {
       name: providerForm.name,
       providerType: providerForm.providerType,
@@ -320,12 +405,7 @@ export default function Settings() {
       useCase: providerForm.useCase,
       isDefault: providerForm.isDefault,
     };
-
-    if (providerSheet === "add") {
-      createProviderMutation.mutate({ data: payload as CreateLlmProvider });
-    } else if (editingProvider?.id) {
-      updateProviderMutation.mutate({ id: editingProvider.id, data: payload as UpdateLlmProvider });
-    }
+    updateProviderMutation.mutate({ id: editingProvider.id, data: payload as UpdateLlmProvider });
   };
 
   const handleAgentSave = () => {
@@ -337,6 +417,35 @@ export default function Settings() {
     enabled: agentForm.enabled ?? agentConfig?.enabled ?? true,
     policyTier: agentForm.policyTier ?? agentConfig?.policyTier ?? "observe",
     schedule: agentForm.schedule ?? agentConfig?.schedule ?? "0 6 * * *",
+  };
+
+  const wizardVendorInfo = wizard.vendor ? VENDOR_BASE_URLS[wizard.vendor] : null;
+  const wizardProviderType = wizardVendorInfo?.providerType ?? "openai_compat";
+  const wizardNeedsUrl = wizard.vendor === "ollama" || wizard.vendor === "lmstudio" || wizard.vendor === "custom";
+  const wizardCanProbe = wizard.vendor !== "" && (wizardNeedsUrl ? wizard.baseUrl.trim() !== "" : true);
+
+  const filteredModels = (wizard.probeResult?.models || []).filter((m) =>
+    m.toLowerCase().includes(wizard.modelSearch.toLowerCase())
+  );
+
+  const editFilteredModels = (editProbeResult?.models || []).filter((m) =>
+    m.toLowerCase().includes(editModelSearch.toLowerCase())
+  );
+
+  const handleWizardSave = () => {
+    const vendor = wizard.vendor ? VENDOR_BASE_URLS[wizard.vendor] : null;
+    const providerType = vendor?.providerType ?? "openai_compat";
+    const baseUrl = wizardNeedsUrl ? wizard.baseUrl : (vendor?.baseUrl || "");
+    const payload: CreateLlmProvider = {
+      name: wizard.name,
+      providerType,
+      model: wizard.selectedModel,
+      baseUrl: baseUrl || undefined,
+      apiKey: wizard.apiKey || undefined,
+      useCase: wizard.useCase as LlmUseCase,
+      isDefault: wizard.isDefault,
+    };
+    createProviderMutation.mutate({ data: payload });
   };
 
   return (
@@ -393,57 +502,73 @@ export default function Settings() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {providerList.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/20 transition-colors">
-                          <div className="space-y-1">
-                            <div className="font-semibold flex items-center gap-2">
-                              {p.name}
-                              {p.isDefault && (
-                                <Badge className="text-[10px] uppercase font-bold tracking-wider h-4 px-1.5">Default</Badge>
+                      {providerList.map((p) => {
+                        const tr = testResult[p.id!];
+                        return (
+                          <div key={p.id} className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/20 transition-colors">
+                            <div className="space-y-1">
+                              <div className="font-semibold flex items-center gap-2">
+                                {p.name}
+                                {p.isDefault && (
+                                  <Badge className="text-[10px] uppercase font-bold tracking-wider h-4 px-1.5">Default</Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground font-mono">
+                                {p.model} &bull; {p.providerType} &bull; {p.useCase || "general"}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {tr?.status === "testing" && (
+                                <Badge variant="outline" className="text-muted-foreground"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Testing</Badge>
                               )}
-                            </div>
-                            <div className="text-xs text-muted-foreground font-mono">
-                              {p.model} &bull; {p.providerType} &bull; {p.useCase || "general"}
+                              {tr?.status === "ok" && (
+                                <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 gap-1.5">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Connected
+                                  {tr.latencyMs != null && (
+                                    <span className="text-emerald-600 font-mono text-[10px]">{tr.latencyMs}ms</span>
+                                  )}
+                                </Badge>
+                              )}
+                              {tr?.status === "fail" && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-red-700 border-red-200 bg-red-50 max-w-[200px]"
+                                  title={tr.message}
+                                >
+                                  <XCircle className="h-3 w-3 mr-1 shrink-0" />
+                                  <span className="truncate">Failed{tr.message ? `: ${tr.message}` : ""}</span>
+                                </Badge>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs"
+                                disabled={tr?.status === "testing"}
+                                onClick={() => {
+                                  if (!p.id) return;
+                                  setTestResult((prev) => ({ ...prev, [p.id!]: { status: "testing" } }));
+                                  testProviderMutation.mutate({ id: p.id });
+                                }}
+                              >
+                                <Play className="h-3 w-3 mr-1" /> Test
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditProvider(p)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => p.id && deleteProviderMutation.mutate({ id: p.id })}
+                                disabled={deleteProviderMutation.isPending}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {testResult[p.id!] === "testing" && (
-                              <Badge variant="outline" className="text-muted-foreground"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Testing</Badge>
-                            )}
-                            {testResult[p.id!] === "ok" && (
-                              <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50"><CheckCircle2 className="h-3 w-3 mr-1" />Connected</Badge>
-                            )}
-                            {testResult[p.id!] === "fail" && (
-                              <Badge variant="outline" className="text-red-700 border-red-200 bg-red-50"><XCircle className="h-3 w-3 mr-1" />Failed</Badge>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 text-xs"
-                              disabled={testResult[p.id!] === "testing"}
-                              onClick={() => {
-                                if (!p.id) return;
-                                setTestResult((prev) => ({ ...prev, [p.id!]: "testing" }));
-                                testProviderMutation.mutate({ id: p.id });
-                              }}
-                            >
-                              <Play className="h-3 w-3 mr-1" /> Test
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditProvider(p)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => p.id && deleteProviderMutation.mutate({ id: p.id })}
-                              disabled={deleteProviderMutation.isPending}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -813,19 +938,305 @@ export default function Settings() {
         </Tabs>
       </div>
 
-      {/* ADD / EDIT PROVIDER SHEET */}
-      <Sheet open={providerSheet !== "closed"} onOpenChange={(o) => { if (!o) { setProviderSheet("closed"); setEditingProvider(null); } }}>
+      {/* ADD PROVIDER WIZARD SHEET */}
+      <Sheet
+        open={providerSheet === "add"}
+        onOpenChange={(o) => {
+          if (!o) { setProviderSheet("closed"); setWizard(EMPTY_WIZARD); }
+        }}
+      >
         <SheetContent className="sm:max-w-md w-full border-l overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{providerSheet === "add" ? "Add LLM Provider" : "Edit LLM Provider"}</SheetTitle>
+            <SheetTitle>Add LLM Provider</SheetTitle>
             <SheetDescription>
-              {providerSheet === "add"
-                ? "Connect a language model provider to enable AI features."
-                : "Update the configuration for this provider."}
+              Follow the steps to connect and verify a language model provider.
             </SheetDescription>
           </SheetHeader>
 
-          <form onSubmit={handleProviderSubmit} className="space-y-5 mt-6">
+          {/* Step indicator */}
+          <div className="flex items-center gap-1.5 mt-5 mb-6">
+            {[1, 2, 3, 4].map((s) => (
+              <div key={s} className="flex items-center gap-1.5">
+                <div
+                  className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                    wizard.step === s
+                      ? "bg-foreground text-background"
+                      : wizard.step > s
+                      ? "bg-emerald-500 text-white"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {wizard.step > s ? <CheckCircle2 className="h-3.5 w-3.5" /> : s}
+                </div>
+                {s < 4 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+              </div>
+            ))}
+            <span className="ml-2 text-xs text-muted-foreground">
+              {wizard.step === 1 && "Display Name"}
+              {wizard.step === 2 && "API Key"}
+              {wizard.step === 3 && "Provider"}
+              {wizard.step === 4 && "Verify & Configure"}
+            </span>
+          </div>
+
+          {/* Step 1: Display Name */}
+          {wizard.step === 1 && (
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <Label>Display Name</Label>
+                <Input
+                  autoFocus
+                  placeholder="e.g. GPT-4o Production"
+                  value={wizard.name}
+                  onChange={(e) => setWizard((prev) => ({ ...prev, name: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">A friendly label to identify this provider in the list.</p>
+              </div>
+              <Button
+                className="w-full"
+                disabled={!wizard.name.trim()}
+                onClick={() => setWizard((prev) => ({ ...prev, step: 2 }))}
+              >
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
+
+          {/* Step 2: API Key */}
+          {wizard.step === 2 && (
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <Label>API Key <span className="text-muted-foreground font-normal">(optional for local providers)</span></Label>
+                <Input
+                  autoFocus
+                  type="password"
+                  placeholder="sk-... or your provider's key"
+                  value={wizard.apiKey}
+                  onChange={(e) => setWizard((prev) => ({ ...prev, apiKey: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Required for cloud providers (OpenAI, Anthropic, Groq, etc.). Leave blank for Ollama or LM Studio running locally.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setWizard((prev) => ({ ...prev, step: 1 }))}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                </Button>
+                <Button className="flex-1" onClick={() => setWizard((prev) => ({ ...prev, step: 3 }))}>
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Provider selection */}
+          {wizard.step === 3 && (
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <Label>Provider / Vendor</Label>
+                <Select
+                  value={wizard.vendor}
+                  onValueChange={(v) => {
+                    const vendor = v as KnownVendor;
+                    const info = VENDOR_BASE_URLS[vendor];
+                    setWizard((prev) => ({
+                      ...prev,
+                      vendor,
+                      baseUrl: info?.baseUrl || "",
+                      probeResult: null,
+                      selectedModel: "",
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a vendor…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VENDOR_OPTIONS.map((v) => (
+                      <SelectItem key={v.key} value={v.key}>{v.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {wizard.vendor && !wizardNeedsUrl && (
+                <div className="p-3 rounded-lg bg-muted/50 border text-xs font-mono text-muted-foreground">
+                  Base URL: {wizardVendorInfo?.baseUrl || "(default)"}
+                </div>
+              )}
+
+              {wizardNeedsUrl && (
+                <div className="space-y-1.5">
+                  <Label>Endpoint URL</Label>
+                  <Input
+                    placeholder={
+                      wizard.vendor === "ollama"
+                        ? "http://localhost:11434/v1"
+                        : wizard.vendor === "lmstudio"
+                        ? "http://localhost:1234/v1"
+                        : "https://your-endpoint/v1"
+                    }
+                    value={wizard.baseUrl}
+                    onChange={(e) => setWizard((prev) => ({ ...prev, baseUrl: e.target.value, probeResult: null, selectedModel: "" }))}
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setWizard((prev) => ({ ...prev, step: 2 }))}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={!wizardCanProbe}
+                  onClick={() => setWizard((prev) => ({ ...prev, step: 4, probeResult: null, selectedModel: "" }))}
+                >
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Discover & Test */}
+          {wizard.step === 4 && (
+            <div className="space-y-5">
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={probeMutation.isPending}
+                onClick={() => {
+                  const info = wizard.vendor ? VENDOR_BASE_URLS[wizard.vendor] : null;
+                  const providerType = info?.providerType ?? "openai_compat";
+                  const baseUrl = wizardNeedsUrl ? wizard.baseUrl : (info?.baseUrl || undefined);
+                  probeMutation.mutate({
+                    data: {
+                      providerType,
+                      vendor: wizard.vendor || undefined,
+                      apiKey: wizard.apiKey || undefined,
+                      baseUrl: baseUrl || undefined,
+                    },
+                  });
+                }}
+              >
+                {probeMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Checking…</>
+                ) : (
+                  <><Zap className="h-4 w-4 mr-2" />Check Available Models & Connection</>
+                )}
+              </Button>
+
+              {wizard.probeResult && (
+                <div className={`p-3 rounded-lg border text-sm space-y-1 ${wizard.probeResult.success ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+                  <div className="flex items-center gap-2 font-medium">
+                    {wizard.probeResult.success ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                    {wizard.probeResult.success ? "Connection verified" : "Connection failed"}
+                    {wizard.probeResult.success && (
+                      <span className="ml-auto flex items-center gap-1 text-xs font-mono text-emerald-700">
+                        <Gauge className="h-3 w-3" />
+                        {wizard.probeResult.latencyMs}ms
+                        {wizard.probeResult.tokensPerSecond != null && ` · ${wizard.probeResult.tokensPerSecond} tok/s`}
+                      </span>
+                    )}
+                  </div>
+                  {!wizard.probeResult.success && (
+                    <p className="text-xs">{wizard.probeResult.message}</p>
+                  )}
+                </div>
+              )}
+
+              {wizard.probeResult?.success && wizard.probeResult.models.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Select Model</Label>
+                  <Input
+                    placeholder="Search models…"
+                    value={wizard.modelSearch}
+                    onChange={(e) => setWizard((prev) => ({ ...prev, modelSearch: e.target.value }))}
+                    className="h-8 text-sm"
+                  />
+                  <div className="max-h-48 overflow-y-auto border rounded-lg divide-y">
+                    {filteredModels.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setWizard((prev) => ({ ...prev, selectedModel: m }))}
+                        className={`w-full text-left px-3 py-2 text-xs font-mono hover:bg-muted/50 transition-colors ${
+                          wizard.selectedModel === m ? "bg-foreground/5 font-semibold" : ""
+                        }`}
+                      >
+                        {wizard.selectedModel === m && <CheckCircle2 className="h-3 w-3 inline mr-1.5 text-emerald-600" />}
+                        {m}
+                      </button>
+                    ))}
+                    {filteredModels.length === 0 && (
+                      <div className="px-3 py-4 text-xs text-muted-foreground text-center">No models match your search.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {wizard.probeResult?.success && (
+                <div className="space-y-4 border-t pt-4">
+                  <div className="space-y-1.5">
+                    <Label>Use Case</Label>
+                    <Select
+                      value={wizard.useCase}
+                      onValueChange={(v) => setWizard((prev) => ({ ...prev, useCase: v }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General — all AI features</SelectItem>
+                        <SelectItem value="enrichment">Enrichment — risk & vendor analysis</SelectItem>
+                        <SelectItem value="triage">Triage — signal classification</SelectItem>
+                        <SelectItem value="interviews">Interviews — guided AI conversations</SelectItem>
+                        <SelectItem value="agent">Agent — autonomous risk agent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 border rounded-lg">
+                    <Switch
+                      checked={wizard.isDefault}
+                      onCheckedChange={(v) => setWizard((prev) => ({ ...prev, isDefault: v }))}
+                    />
+                    <div>
+                      <div className="text-sm font-medium">Set as default provider</div>
+                      <div className="text-xs text-muted-foreground">Used for all AI operations unless a specific use-case provider is configured.</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setWizard((prev) => ({ ...prev, step: 3 }))}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={!wizard.probeResult?.success || !wizard.selectedModel || createProviderMutation.isPending}
+                  onClick={handleWizardSave}
+                >
+                  {createProviderMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save Provider
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* EDIT PROVIDER SHEET */}
+      <Sheet
+        open={providerSheet === "edit"}
+        onOpenChange={(o) => {
+          if (!o) { setProviderSheet("closed"); setEditingProvider(null); setEditProbeResult(null); setEditModelSearch(""); }
+        }}
+      >
+        <SheetContent className="sm:max-w-md w-full border-l overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit LLM Provider</SheetTitle>
+            <SheetDescription>Update the configuration for this provider.</SheetDescription>
+          </SheetHeader>
+
+          <form onSubmit={handleEditProviderSubmit} className="space-y-5 mt-6">
             <div className="space-y-1.5">
               <Label>Display Name</Label>
               <Input
@@ -853,7 +1264,27 @@ export default function Settings() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Model</Label>
+              <div className="flex items-center justify-between">
+                <Label>Model</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  disabled={editProbeMutation.isPending}
+                  onClick={() => {
+                    if (!editingProvider?.id) return;
+                    editProbeMutation.mutate({ id: editingProvider.id });
+                  }}
+                >
+                  {editProbeMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                  )}
+                  Re-test & Refresh Models
+                </Button>
+              </div>
               <Input
                 required
                 placeholder={providerForm.providerType === "anthropic" ? "claude-3-5-sonnet-20241022" : "gpt-4o"}
@@ -866,6 +1297,47 @@ export default function Settings() {
                   : "gpt-4o, gpt-4o-mini, gpt-4-turbo, mistral-7b, llama-3-70b, etc."}
               </p>
             </div>
+
+            {editProbeResult && (
+              <div className={`p-3 rounded-lg border text-sm space-y-2 ${editProbeResult.success ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+                <div className="flex items-center gap-2 font-medium">
+                  {editProbeResult.success ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                  {editProbeResult.success ? "Connection verified" : "Connection failed"}
+                  {editProbeResult.success && (
+                    <span className="ml-auto text-xs font-mono text-emerald-700">{editProbeResult.latencyMs}ms</span>
+                  )}
+                </div>
+                {!editProbeResult.success && (
+                  <p className="text-xs">{editProbeResult.message}</p>
+                )}
+                {editProbeResult.success && editProbeResult.models.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium">Pick a model from available list:</p>
+                    <Input
+                      placeholder="Search models…"
+                      value={editModelSearch}
+                      onChange={(e) => setEditModelSearch(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                    <div className="max-h-36 overflow-y-auto border rounded divide-y bg-white">
+                      {editFilteredModels.map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setProviderForm((prev) => ({ ...prev, model: m }))}
+                          className={`w-full text-left px-2 py-1.5 text-xs font-mono hover:bg-muted/50 transition-colors ${
+                            providerForm.model === m ? "bg-foreground/5 font-semibold" : ""
+                          }`}
+                        >
+                          {providerForm.model === m && <CheckCircle2 className="h-3 w-3 inline mr-1 text-emerald-600" />}
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {providerForm.providerType === "openai_compat" && (
               <div className="space-y-1.5">
@@ -880,10 +1352,10 @@ export default function Settings() {
             )}
 
             <div className="space-y-1.5">
-              <Label>API Key {providerSheet === "edit" && <span className="text-muted-foreground font-normal">(leave blank to keep existing)</span>}</Label>
+              <Label>API Key <span className="text-muted-foreground font-normal">(leave blank to keep existing)</span></Label>
               <Input
                 type="password"
-                placeholder={providerSheet === "edit" ? "••••••••  (unchanged)" : "sk-..."}
+                placeholder="••••••••  (unchanged)"
                 value={providerForm.apiKey}
                 onChange={(e) => setProviderForm((prev) => ({ ...prev, apiKey: e.target.value }))}
               />
@@ -920,10 +1392,10 @@ export default function Settings() {
             <Button
               type="submit"
               className="w-full"
-              disabled={createProviderMutation.isPending || updateProviderMutation.isPending}
+              disabled={updateProviderMutation.isPending}
             >
-              {(createProviderMutation.isPending || updateProviderMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {providerSheet === "add" ? "Add Provider" : "Save Changes"}
+              {updateProviderMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Changes
             </Button>
           </form>
         </SheetContent>

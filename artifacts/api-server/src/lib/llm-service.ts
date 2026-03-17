@@ -239,6 +239,121 @@ export async function testConnection(configId: string, tenantId: string): Promis
   }
 }
 
+const ANTHROPIC_MODELS = [
+  "claude-opus-4-5",
+  "claude-sonnet-4-5",
+  "claude-3-7-sonnet-20250219",
+  "claude-3-5-sonnet-20241022",
+  "claude-3-5-haiku-20241022",
+  "claude-3-opus-20240229",
+  "claude-3-haiku-20240307",
+];
+
+export const KNOWN_VENDOR_BASE_URLS: Record<string, { baseUrl: string; providerType: "openai_compat" | "anthropic" }> = {
+  openai: { baseUrl: "https://api.openai.com/v1", providerType: "openai_compat" },
+  anthropic: { baseUrl: "", providerType: "anthropic" },
+  groq: { baseUrl: "https://api.groq.com/openai/v1", providerType: "openai_compat" },
+  mistral: { baseUrl: "https://api.mistral.ai/v1", providerType: "openai_compat" },
+  together: { baseUrl: "https://api.together.xyz/v1", providerType: "openai_compat" },
+  cohere: { baseUrl: "https://api.cohere.ai/compatibility/v1", providerType: "openai_compat" },
+  perplexity: { baseUrl: "https://api.perplexity.ai", providerType: "openai_compat" },
+};
+
+const LOCAL_VENDOR_KEYS = new Set(["ollama", "lmstudio", "custom"]);
+
+export interface ProbeResult {
+  success: boolean;
+  message: string;
+  models: string[];
+  latencyMs: number;
+  tokensPerSecond?: number;
+}
+
+async function runOpenAIProbe(apiKey: string | undefined, baseUrl: string | undefined): Promise<ProbeResult> {
+  const start = Date.now();
+  const client = new OpenAI({
+    apiKey: apiKey || "ollama",
+    baseURL: baseUrl || undefined,
+  });
+
+  let models: string[] = [];
+  try {
+    const modelsResp = await client.models.list();
+    models = modelsResp.data.map((m) => m.id).sort();
+  } catch {
+    // model list optional; some providers don't implement it
+  }
+
+  if (models.length === 0 && !baseUrl) {
+    return { success: false, message: "Model discovery returned no models — check your API key.", models: [], latencyMs: Date.now() - start };
+  }
+
+  try {
+    const testModel = models[0] || "gpt-4o-mini";
+    const resp = await client.chat.completions.create({
+      model: testModel,
+      messages: [{ role: "user", content: "hi" }],
+      max_tokens: 5,
+    });
+    const latencyMs = Date.now() - start;
+    const totalTokens = (resp.usage?.prompt_tokens ?? 0) + (resp.usage?.completion_tokens ?? 0);
+    const tokensPerSecond = latencyMs > 0 ? Math.round((totalTokens / latencyMs) * 1000) : undefined;
+    return { success: true, message: "Connection successful", models, latencyMs, tokensPerSecond };
+  } catch (err) {
+    return { success: false, message: err instanceof Error ? err.message : String(err), models, latencyMs: Date.now() - start };
+  }
+}
+
+async function runAnthropicProbe(apiKey: string | undefined): Promise<ProbeResult> {
+  const start = Date.now();
+  const client = new Anthropic({ apiKey: apiKey || undefined });
+  try {
+    const resp = await client.messages.create({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 5,
+      messages: [{ role: "user", content: "hi" }],
+    });
+    const latencyMs = Date.now() - start;
+    const inputTokens = resp.usage?.input_tokens ?? 0;
+    const outputTokens = resp.usage?.output_tokens ?? 0;
+    const totalTokens = inputTokens + outputTokens;
+    const tokensPerSecond = latencyMs > 0 ? Math.round((totalTokens / latencyMs) * 1000) : undefined;
+    return { success: true, message: "Connection successful", models: ANTHROPIC_MODELS, latencyMs, tokensPerSecond };
+  } catch (err) {
+    return { success: false, message: err instanceof Error ? err.message : String(err), models: ANTHROPIC_MODELS, latencyMs: Date.now() - start };
+  }
+}
+
+export async function probeProvider(opts: {
+  providerType: "openai_compat" | "anthropic";
+  vendor?: string;
+  apiKey?: string;
+  baseUrl?: string;
+}): Promise<ProbeResult> {
+  const isPublicVendor = opts.vendor && KNOWN_VENDOR_BASE_URLS[opts.vendor] && !LOCAL_VENDOR_KEYS.has(opts.vendor);
+
+  if (opts.providerType === "anthropic") {
+    return runAnthropicProbe(opts.apiKey);
+  }
+
+  let canonicalBaseUrl = opts.baseUrl;
+  if (isPublicVendor && opts.vendor) {
+    canonicalBaseUrl = KNOWN_VENDOR_BASE_URLS[opts.vendor].baseUrl || undefined;
+  }
+
+  return runOpenAIProbe(opts.apiKey, canonicalBaseUrl);
+}
+
+export async function probeProviderById(configId: string, tenantId: string): Promise<ProbeResult> {
+  const config = await resolveConfigById(configId, tenantId);
+  if (!config) return { success: false, message: "Configuration not found", models: [], latencyMs: 0 };
+
+  if (config.providerType === "anthropic") {
+    return runAnthropicProbe(config.apiKey ?? undefined);
+  }
+  return runOpenAIProbe(config.apiKey ?? undefined, config.baseUrl ?? undefined);
+}
+
 export async function isAvailable(tenantId: string): Promise<boolean> {
   const config = await resolveConfig(tenantId);
   return config !== null;

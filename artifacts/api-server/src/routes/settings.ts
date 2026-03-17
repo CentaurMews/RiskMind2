@@ -5,7 +5,7 @@ import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, conflict } from "../lib/errors";
 import { encrypt } from "../lib/encryption";
-import { testConnection } from "../lib/llm-service";
+import { testConnection, probeProvider, probeProviderById } from "../lib/llm-service";
 
 const router = Router();
 
@@ -179,6 +179,41 @@ router.delete("/v1/settings/llm-providers/:id", requireRole("admin"), async (req
     res.status(204).send();
   } catch (err) {
     console.error("Delete LLM provider error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/settings/llm-providers/probe", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const { providerType, vendor, apiKey, baseUrl } = req.body;
+
+    if (!providerType || !["openai_compat", "anthropic"].includes(providerType)) {
+      badRequest(res, "providerType must be 'openai_compat' or 'anthropic'");
+      return;
+    }
+
+    if (baseUrl) {
+      const urlError = validateBaseUrl(baseUrl);
+      if (urlError) { badRequest(res, urlError); return; }
+    }
+
+    const result = await probeProvider({ providerType, vendor, apiKey, baseUrl });
+    res.json(result);
+  } catch (err) {
+    console.error("Probe LLM provider error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/settings/llm-providers/:id/probe", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const configId = String(req.params.id);
+
+    const result = await probeProviderById(configId, tenantId);
+    res.json(result);
+  } catch (err) {
+    console.error("Probe LLM provider by ID error:", err);
     serverError(res);
   }
 });
