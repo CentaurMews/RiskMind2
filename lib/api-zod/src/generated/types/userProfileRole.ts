@@ -13,6 +13,7 @@ export const UserProfileRole = {
   admin: "admin",
   risk_manager: "risk_manager",
   risk_owner: "risk_owner",
+  risk_executive: "risk_executive",
   auditor: "auditor",
   viewer: "viewer",
   vendor: "vendor",

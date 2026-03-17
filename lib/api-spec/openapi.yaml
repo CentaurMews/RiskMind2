@@ -164,7 +164,8 @@ paths:
         - name: status
           in: query
           schema:
-            $ref: "#/components/schemas/RiskStatus"
+            type: string
+          description: "Comma-separated risk statuses to filter by (draft,open,mitigated,accepted,closed)"
         - name: category
           in: query
           schema:
@@ -184,6 +185,11 @@ paths:
             type: string
             enum: [low, medium, high, critical]
           description: "Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25"
+        - name: treatmentStrategy
+          in: query
+          schema:
+            type: string
+          description: "Comma-separated treatment strategies to filter by (treat,transfer,tolerate,terminate)"
         - $ref: "#/components/parameters/page"
         - $ref: "#/components/parameters/limit"
       responses:
@@ -411,6 +417,104 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/TreatmentStatusEvent"
+
+  /v1/risks/{riskId}/acceptance-memoranda:
+    get:
+      operationId: listAcceptanceMemorandum
+      tags: [risks]
+      summary: List acceptance memoranda for a risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      responses:
+        "200":
+          description: List of acceptance memoranda
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptanceMemorandaListResponse"
+
+  /v1/risks/{riskId}/acceptance-memoranda/generate:
+    post:
+      operationId: generateAcceptanceMemorandum
+      tags: [risks]
+      summary: Generate an AI-drafted acceptance memorandum for a risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                treatmentId:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Memorandum generated and saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptanceMemorandum"
+        "422":
+          description: AI unavailable
+
+  /v1/risks/{riskId}/acceptance-memoranda/{memorandumId}/approve:
+    post:
+      operationId: approveAcceptanceMemorandum
+      tags: [risks]
+      summary: Approve an acceptance memorandum (risk_executive or admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - name: memorandumId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Memorandum approved and risk transitioned to accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptanceMemorandum"
+
+  /v1/risks/{riskId}/acceptance-memoranda/{memorandumId}/reject:
+    post:
+      operationId: rejectAcceptanceMemorandum
+      tags: [risks]
+      summary: Reject an acceptance memorandum (risk_executive or admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/riskId"
+        - name: memorandumId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectMemorandumBody"
+      responses:
+        "200":
+          description: Memorandum rejected and risk transitioned back to open
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptanceMemorandum"
 
   /v1/risks/{riskId}/kris:
     get:
@@ -2900,7 +3004,7 @@ components:
           nullable: true
         role:
           type: string
-          enum: [admin, risk_manager, risk_owner, auditor, viewer, vendor]
+          enum: [admin, risk_manager, risk_owner, risk_executive, auditor, viewer, vendor]
         createdAt:
           type: string
           format: date-time
@@ -2915,7 +3019,7 @@ components:
       properties:
         role:
           type: string
-          enum: [admin, risk_manager, risk_owner, auditor, viewer, vendor]
+          enum: [admin, risk_manager, risk_owner, risk_executive, auditor, viewer, vendor]
       required:
         - role
 
@@ -2981,7 +3085,7 @@ components:
           nullable: true
         role:
           type: string
-          enum: [admin, risk_manager, risk_owner, auditor, viewer, vendor]
+          enum: [admin, risk_manager, risk_owner, risk_executive, auditor, viewer, vendor]
         tenantId:
           type: string
           format: uuid
@@ -3348,6 +3452,91 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Treatment"
+
+    MemorandumStatus:
+      type: string
+      enum: [pending_approval, approved, rejected]
+
+    AcceptanceMemorandum:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        riskId:
+          type: string
+          format: uuid
+        treatmentId:
+          type: string
+          format: uuid
+          nullable: true
+        memorandumText:
+          type: string
+        status:
+          $ref: "#/components/schemas/MemorandumStatus"
+        requestedById:
+          type: string
+          format: uuid
+          nullable: true
+        approverId:
+          type: string
+          format: uuid
+          nullable: true
+        approvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rejectedById:
+          type: string
+          format: uuid
+          nullable: true
+        rejectedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rejectionReason:
+          type: string
+          nullable: true
+        requesterName:
+          type: string
+          nullable: true
+        requesterEmail:
+          type: string
+          nullable: true
+        approverName:
+          type: string
+          nullable: true
+        approverEmail:
+          type: string
+          nullable: true
+        rejectorName:
+          type: string
+          nullable: true
+        rejectorEmail:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AcceptanceMemorandaListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AcceptanceMemorandum"
+
+    RejectMemorandumBody:
+      type: object
+      properties:
+        rejectionReason:
+          type: string
+      required:
+        - rejectionReason
 
     AiTreatmentRecommendation:
       type: object

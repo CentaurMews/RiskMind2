@@ -5,6 +5,11 @@ import {
   useUpdateTreatment,
   useAiTreatmentRecommendations,
   useListTreatmentStatusEvents,
+  useListAcceptanceMemorandum,
+  useGenerateAcceptanceMemorandum,
+  useApproveAcceptanceMemorandum,
+  useRejectAcceptanceMemorandum,
+  useGetMe,
 } from "@workspace/api-client-react";
 import type {
   Treatment,
@@ -12,6 +17,7 @@ import type {
   TreatmentStrategy,
   TreatmentStatus,
   TreatmentStatusEvent,
+  AcceptanceMemorandum,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +43,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Sparkles,
@@ -52,6 +59,10 @@ import {
   Clock,
   XCircle,
   BarChart3,
+  FileText,
+  Eye,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -77,6 +88,12 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; colo
   cancelled: { label: "Cancelled", icon: <XCircle className="h-3 w-3" />, color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
 };
 
+const MEMORANDUM_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  pending_approval: { label: "Pending Approval", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
+  approved: { label: "Approved", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
+  rejected: { label: "Rejected", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+};
+
 const STATUS_TRANSITIONS: Record<string, string[]> = {
   planned: ["in_progress", "cancelled"],
   in_progress: ["completed", "cancelled"],
@@ -94,12 +111,27 @@ interface TreatmentsTabProps {
 export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, residualImpact }: TreatmentsTabProps) {
   const queryClient = useQueryClient();
   const { data: treatments } = useListTreatments(riskId);
+  const { data: currentUser } = useGetMe({ query: { queryKey: ["/api/v1/auth/me"] } });
+  const { data: memorandaData } = useListAcceptanceMemorandum(riskId);
   const [aiOpen, setAiOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formStrategy, setFormStrategy] = useState<string>("treat");
   const [formDescription, setFormDescription] = useState("");
   const [formCost, setFormCost] = useState("");
   const [formBenefit, setFormBenefit] = useState("");
+
+  const [memorandumPreviewOpen, setMemorandumPreviewOpen] = useState(false);
+  const [pendingMemorandum, setPendingMemorandum] = useState<AcceptanceMemorandum | null>(null);
+  const [generateTreatmentId, setGenerateTreatmentId] = useState<string | null>(null);
+
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectMemorandumId, setRejectMemorandumId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+
+  const [recordsOpen, setRecordsOpen] = useState(false);
+  const [viewMemorandum, setViewMemorandum] = useState<AcceptanceMemorandum | null>(null);
+
+  const isApprover = currentUser?.role === "admin" || currentUser?.role === "risk_executive";
 
   const aiMutation = useAiTreatmentRecommendations({
     mutation: {
@@ -124,6 +156,43 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${riskId}/treatments`] });
+      },
+    },
+  });
+
+  const generateMemorandumMutation = useGenerateAcceptanceMemorandum({
+    mutation: {
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${riskId}/acceptance-memoranda`] });
+        setPendingMemorandum(data as AcceptanceMemorandum);
+        setMemorandumPreviewOpen(true);
+      },
+    },
+  });
+
+  const approveMemorandumMutation = useApproveAcceptanceMemorandum({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${riskId}/acceptance-memoranda`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${riskId}`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/risks"] });
+        setMemorandumPreviewOpen(false);
+        setViewMemorandum(null);
+      },
+    },
+  });
+
+  const rejectMemorandumMutation = useRejectAcceptanceMemorandum({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${riskId}/acceptance-memoranda`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${riskId}`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/risks"] });
+        setRejectDialogOpen(false);
+        setRejectionReason("");
+        setRejectMemorandumId(null);
+        setMemorandumPreviewOpen(false);
+        setViewMemorandum(null);
       },
     },
   });
@@ -157,10 +226,32 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
     setFormOpen(true);
   };
 
+  const handleGenerateMemorandum = (treatmentId: string) => {
+    setGenerateTreatmentId(treatmentId);
+    generateMemorandumMutation.mutate({
+      riskId,
+      data: { treatmentId },
+    });
+  };
+
+  const handleApprove = (memorandumId: string) => {
+    approveMemorandumMutation.mutate({ riskId, memorandumId });
+  };
+
+  const handleRejectConfirm = () => {
+    if (!rejectMemorandumId || !rejectionReason.trim()) return;
+    rejectMemorandumMutation.mutate({
+      riskId,
+      memorandumId: rejectMemorandumId,
+      data: { rejectionReason: rejectionReason.trim() },
+    });
+  };
+
   const treatmentList = treatments?.data || [];
+  const memoranda = memorandaData?.data || [];
+  const pendingCount = memoranda.filter(m => m.status === "pending_approval").length;
   const totalCost = treatmentList.reduce((sum, t) => sum + (parseFloat(t.cost || "0") || 0), 0);
   const totalExpectedReduction = treatmentList.reduce((sum, t) => sum + (parseFloat(t.benefit || "0") || 0), 0);
-  const completedTreatments = treatmentList.filter(t => t.status === "completed");
   const actualResidualScore = (residualLikelihood && residualImpact)
     ? residualLikelihood * residualImpact
     : null;
@@ -292,6 +383,95 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
         </Collapsible>
       </div>
 
+      {memoranda.length > 0 && (
+        <div className="p-4 border-b">
+          <Collapsible open={recordsOpen} onOpenChange={setRecordsOpen}>
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm font-semibold hover:text-primary transition-colors w-full">
+              {recordsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <FileText className="h-4 w-4 text-primary" />
+              Acceptance Records
+              {pendingCount > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 ml-1">
+                  {pendingCount} pending
+                </Badge>
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <div className="space-y-2">
+                {memoranda.map((m) => {
+                  const statusConfig = MEMORANDUM_STATUS_CONFIG[m.status || "pending_approval"];
+                  return (
+                    <div key={m.id} className="p-3 border rounded-lg bg-background flex items-start justify-between gap-3">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${statusConfig.color}`}>
+                            {statusConfig.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Requested by {m.requesterName || m.requesterEmail || "Unknown"}
+                            {" · "}{m.createdAt ? format(new Date(m.createdAt), "MMM d, yyyy") : ""}
+                          </span>
+                        </div>
+                        {m.status === "approved" && m.approverName && (
+                          <div className="text-xs text-muted-foreground">
+                            Approved by {m.approverName}{m.approvedAt ? ` on ${format(new Date(m.approvedAt), "MMM d, yyyy")}` : ""}
+                          </div>
+                        )}
+                        {m.status === "rejected" && (
+                          <div className="text-xs text-destructive italic space-y-0.5">
+                            {m.rejectorName && (
+                              <div>Rejected by {m.rejectorName}{m.rejectedAt ? ` on ${format(new Date(m.rejectedAt), "MMM d, yyyy")}` : ""}</div>
+                            )}
+                            {m.rejectionReason && <div>Reason: {m.rejectionReason}</div>}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setViewMemorandum(m)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                        {isApprover && m.status === "pending_approval" && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                              onClick={() => handleApprove(m.id!)}
+                              disabled={approveMemorandumMutation.isPending}
+                            >
+                              {approveMemorandumMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ThumbsUp className="h-3 w-3 mr-1" />}
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs text-destructive border-destructive/20 hover:bg-destructive/10"
+                              onClick={() => {
+                                setRejectMemorandumId(m.id!);
+                                setRejectDialogOpen(true);
+                              }}
+                            >
+                              <ThumbsDown className="h-3 w-3 mr-1" />
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
+
       <div className="p-4 border-b flex justify-end">
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
           <DialogTrigger asChild>
@@ -375,10 +555,175 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
               inherentScore={inherentScore}
               actualResidualScore={actualResidualScore}
               onStatusChange={handleStatusChange}
+              onGenerateMemorandum={handleGenerateMemorandum}
+              isGenerating={generateMemorandumMutation.isPending && generateTreatmentId === t.id}
             />
           ))}
         </div>
       )}
+
+      <Dialog open={memorandumPreviewOpen} onOpenChange={setMemorandumPreviewOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Risk Acceptance Memorandum</DialogTitle>
+            <DialogDescription>Review the AI-drafted memorandum before it is submitted for approval.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto mt-2">
+            <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed p-4 bg-muted/30 rounded-lg border">
+              {pendingMemorandum?.memorandumText}
+            </pre>
+          </div>
+          <div className="flex items-center justify-between pt-4 border-t mt-4">
+            <div className="text-xs text-muted-foreground">
+              Status: <span className="font-medium text-amber-700">Pending Approval</span>
+            </div>
+            <div className="flex gap-2">
+              {isApprover && pendingMemorandum && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                    onClick={() => handleApprove(pendingMemorandum.id!)}
+                    disabled={approveMemorandumMutation.isPending}
+                  >
+                    {approveMemorandumMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ThumbsUp className="h-4 w-4 mr-2" />}
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive border-destructive/20 hover:bg-destructive/10"
+                    onClick={() => {
+                      setRejectMemorandumId(pendingMemorandum.id!);
+                      setRejectDialogOpen(true);
+                    }}
+                  >
+                    <ThumbsDown className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                </>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setMemorandumPreviewOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewMemorandum} onOpenChange={(open) => { if (!open) setViewMemorandum(null); }}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Risk Acceptance Memorandum</DialogTitle>
+            <DialogDescription>
+              {viewMemorandum?.status && (
+                <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${MEMORANDUM_STATUS_CONFIG[viewMemorandum.status]?.color}`}>
+                  {MEMORANDUM_STATUS_CONFIG[viewMemorandum.status]?.label}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto mt-2">
+            <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed p-4 bg-muted/30 rounded-lg border">
+              {viewMemorandum?.memorandumText}
+            </pre>
+          </div>
+          {viewMemorandum?.status === "rejected" && (
+            <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg space-y-1">
+              {(viewMemorandum.rejectorName || viewMemorandum.rejectedAt) && (
+                <p className="text-xs text-destructive font-medium">
+                  Rejected by {viewMemorandum.rejectorName || "Unknown"}
+                  {viewMemorandum.rejectedAt
+                    ? ` on ${format(new Date(viewMemorandum.rejectedAt), "MMM d, yyyy")}`
+                    : ""}
+                </p>
+              )}
+              {viewMemorandum.rejectionReason && (
+                <>
+                  <p className="text-xs text-destructive font-medium">Rejection Reason:</p>
+                  <p className="text-xs text-destructive/80">{viewMemorandum.rejectionReason}</p>
+                </>
+              )}
+            </div>
+          )}
+          <div className="flex items-center justify-between pt-4 border-t mt-4">
+            <div className="text-xs text-muted-foreground">
+              {viewMemorandum?.requesterName || viewMemorandum?.requesterEmail
+                ? `Requested by ${viewMemorandum.requesterName || viewMemorandum.requesterEmail}`
+                : ""}
+            </div>
+            <div className="flex gap-2">
+              {isApprover && viewMemorandum?.status === "pending_approval" && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                    onClick={() => handleApprove(viewMemorandum.id!)}
+                    disabled={approveMemorandumMutation.isPending}
+                  >
+                    {approveMemorandumMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ThumbsUp className="h-4 w-4 mr-2" />}
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive border-destructive/20 hover:bg-destructive/10"
+                    onClick={() => {
+                      setRejectMemorandumId(viewMemorandum.id!);
+                      setViewMemorandum(null);
+                      setRejectDialogOpen(true);
+                    }}
+                  >
+                    <ThumbsDown className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                </>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setViewMemorandum(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rejectDialogOpen} onOpenChange={(open) => { if (!open) { setRejectDialogOpen(false); setRejectionReason(""); setRejectMemorandumId(null); } }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Reject Memorandum</DialogTitle>
+            <DialogDescription>Please provide a reason for rejecting this memorandum. The risk will return to open status.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="space-y-2">
+              <Label>Rejection Reason</Label>
+              <Textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Explain why this memorandum is being rejected..."
+                rows={4}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="ghost"
+                onClick={() => { setRejectDialogOpen(false); setRejectionReason(""); setRejectMemorandumId(null); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleRejectConfirm}
+                disabled={!rejectionReason.trim() || rejectMemorandumMutation.isPending}
+              >
+                {rejectMemorandumMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Confirm Reject
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -435,18 +780,23 @@ function TreatmentCard({
   inherentScore,
   actualResidualScore,
   onStatusChange,
+  onGenerateMemorandum,
+  isGenerating,
 }: {
   riskId: string;
   treatment: Treatment;
   inherentScore: number;
   actualResidualScore: number | null;
   onStatusChange: (id: string, status: string) => void;
+  onGenerateMemorandum: (treatmentId: string) => void;
+  isGenerating: boolean;
 }) {
   const [timelineOpen, setTimelineOpen] = useState(false);
   const statusConfig = STATUS_CONFIG[t.status || "planned"];
   const nextStates = STATUS_TRANSITIONS[t.status || "planned"] || [];
   const predictedReduction = parseFloat(t.benefit || "0") || 0;
   const isCompleted = t.status === "completed";
+  const isTolerate = t.strategy === "tolerate";
 
   return (
     <div className="p-4 hover:bg-muted/30 transition-colors">
@@ -524,6 +874,18 @@ function TreatmentCard({
         </div>
 
         <div className="flex flex-col gap-1 shrink-0">
+          {isTolerate && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-7 text-amber-700 border-amber-200 hover:bg-amber-50"
+              onClick={() => onGenerateMemorandum(t.id!)}
+              disabled={isGenerating}
+            >
+              {isGenerating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileText className="h-3 w-3 mr-1" />}
+              Acceptance Memo
+            </Button>
+          )}
           {nextStates.map((ns) => {
             const nsConfig = STATUS_CONFIG[ns];
             return (

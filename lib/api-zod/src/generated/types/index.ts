@@ -7,6 +7,8 @@
  */
 
 export * from "./abandonInterview200";
+export * from "./acceptanceMemorandaListResponse";
+export * from "./acceptanceMemorandum";
 export * from "./agentConfig";
 export * from "./agentConfigPolicyTier";
 export * from "./agentConfigTokenUsage";
@@ -84,6 +86,7 @@ export * from "./gapAnalysisSummary";
 export * from "./gapRequirement";
 export * from "./gapRequirementControlsItem";
 export * from "./gapStatus";
+export * from "./generateAcceptanceMemorandumBody";
 export * from "./generateAiQuestions503";
 export * from "./generateMagicLink200";
 export * from "./generateMagicLinkBody";
@@ -140,6 +143,7 @@ export * from "./mcpStreamableHttpBody";
 export * from "./mcpStreamableHttpBodyJsonrpc";
 export * from "./mcpStreamableHttpBodyMethod";
 export * from "./mcpStreamableHttpBodyParams";
+export * from "./memorandumStatus";
 export * from "./notFoundResponse";
 export * from "./pageParameter";
 export * from "./promoteSignalRequest";
@@ -151,6 +155,7 @@ export * from "./questionnaireScoreResponseTier";
 export * from "./questionnaireStatus";
 export * from "./questionnaireTemplate";
 export * from "./refreshRequest";
+export * from "./rejectMemorandumBody";
 export * from "./requirement";
 export * from "./respondToQuestionnaireBody";
 export * from "./respondToQuestionnaireBodyResponses";

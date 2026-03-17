@@ -4,6 +4,7 @@ export * from "./audit-events";
 export * from "./risks";
 export * from "./treatments";
 export * from "./treatment-events";
+export * from "./acceptance-memoranda";
 export * from "./kris";
 export * from "./incidents";
 export * from "./review-cycles";

@@ -37,6 +37,7 @@ export const LoginResponse = zod.object({
       "admin",
       "risk_manager",
       "risk_owner",
+      "risk_executive",
       "auditor",
       "viewer",
       "vendor",
@@ -71,6 +72,7 @@ export const GetMeResponse = zod.object({
     "admin",
     "risk_manager",
     "risk_owner",
+    "risk_executive",
     "auditor",
     "viewer",
     "vendor",
@@ -86,9 +88,12 @@ export const listRisksQueryPageDefault = 1;
 export const listRisksQueryLimitDefault = 20;
 
 export const ListRisksQueryParams = zod.object({
-  status: zod
-    .enum(["draft", "open", "mitigated", "accepted", "closed"])
-    .optional(),
+  status: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated risk statuses to filter by (draft,open,mitigated,accepted,closed)",
+    ),
   category: zod
     .enum([
       "operational",
@@ -106,6 +111,12 @@ export const ListRisksQueryParams = zod.object({
     .optional()
     .describe(
       "Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25",
+    ),
+  treatmentStrategy: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated treatment strategies to filter by (treat,transfer,tolerate,terminate)",
     ),
   page: zod.coerce.number().default(listRisksQueryPageDefault),
   limit: zod.coerce.number().default(listRisksQueryLimitDefault),
@@ -528,6 +539,118 @@ export const ListTreatmentStatusEventsResponse = zod.object({
       }),
     )
     .optional(),
+});
+
+/**
+ * @summary List acceptance memoranda for a risk
+ */
+export const ListAcceptanceMemorandumParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const ListAcceptanceMemorandumResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        riskId: zod.string().uuid().optional(),
+        treatmentId: zod.string().uuid().nullish(),
+        memorandumText: zod.string().optional(),
+        status: zod
+          .enum(["pending_approval", "approved", "rejected"])
+          .optional(),
+        requestedById: zod.string().uuid().nullish(),
+        approverId: zod.string().uuid().nullish(),
+        approvedAt: zod.date().nullish(),
+        rejectedById: zod.string().uuid().nullish(),
+        rejectedAt: zod.date().nullish(),
+        rejectionReason: zod.string().nullish(),
+        requesterName: zod.string().nullish(),
+        requesterEmail: zod.string().nullish(),
+        approverName: zod.string().nullish(),
+        approverEmail: zod.string().nullish(),
+        rejectorName: zod.string().nullish(),
+        rejectorEmail: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Generate an AI-drafted acceptance memorandum for a risk
+ */
+export const GenerateAcceptanceMemorandumParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+});
+
+export const GenerateAcceptanceMemorandumBody = zod.object({
+  treatmentId: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary Approve an acceptance memorandum (risk_executive or admin only)
+ */
+export const ApproveAcceptanceMemorandumParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  memorandumId: zod.coerce.string().uuid(),
+});
+
+export const ApproveAcceptanceMemorandumResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  riskId: zod.string().uuid().optional(),
+  treatmentId: zod.string().uuid().nullish(),
+  memorandumText: zod.string().optional(),
+  status: zod.enum(["pending_approval", "approved", "rejected"]).optional(),
+  requestedById: zod.string().uuid().nullish(),
+  approverId: zod.string().uuid().nullish(),
+  approvedAt: zod.date().nullish(),
+  rejectedById: zod.string().uuid().nullish(),
+  rejectedAt: zod.date().nullish(),
+  rejectionReason: zod.string().nullish(),
+  requesterName: zod.string().nullish(),
+  requesterEmail: zod.string().nullish(),
+  approverName: zod.string().nullish(),
+  approverEmail: zod.string().nullish(),
+  rejectorName: zod.string().nullish(),
+  rejectorEmail: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * @summary Reject an acceptance memorandum (risk_executive or admin only)
+ */
+export const RejectAcceptanceMemorandumParams = zod.object({
+  riskId: zod.coerce.string().uuid(),
+  memorandumId: zod.coerce.string().uuid(),
+});
+
+export const RejectAcceptanceMemorandumBody = zod.object({
+  rejectionReason: zod.string(),
+});
+
+export const RejectAcceptanceMemorandumResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  riskId: zod.string().uuid().optional(),
+  treatmentId: zod.string().uuid().nullish(),
+  memorandumText: zod.string().optional(),
+  status: zod.enum(["pending_approval", "approved", "rejected"]).optional(),
+  requestedById: zod.string().uuid().nullish(),
+  approverId: zod.string().uuid().nullish(),
+  approvedAt: zod.date().nullish(),
+  rejectedById: zod.string().uuid().nullish(),
+  rejectedAt: zod.date().nullish(),
+  rejectionReason: zod.string().nullish(),
+  requesterName: zod.string().nullish(),
+  requesterEmail: zod.string().nullish(),
+  approverName: zod.string().nullish(),
+  approverEmail: zod.string().nullish(),
+  rejectorName: zod.string().nullish(),
+  rejectorEmail: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
 });
 
 /**
@@ -1186,12 +1309,22 @@ export const ScoreQuestionnaireResponse = zod.object({
       description: zod.string().nullish(),
       tier: zod.enum(["critical", "high", "medium", "low"]).optional(),
       status: zod
-        .enum(["onboarding", "approved", "active", "suspended", "offboarded"])
+        .enum([
+          "identification",
+          "due_diligence",
+          "risk_assessment",
+          "contracting",
+          "onboarding",
+          "monitoring",
+          "offboarding",
+        ])
         .optional(),
       category: zod.string().nullish(),
       contactEmail: zod.string().nullish(),
       contactName: zod.string().nullish(),
       riskScore: zod.string().nullish(),
+      overrideTier: zod.enum(["critical", "high", "medium", "low"]).nullish(),
+      overrideReason: zod.string().nullish(),
       createdAt: zod.date().optional(),
       updatedAt: zod.date().optional(),
     })
@@ -2135,6 +2268,7 @@ export const ListUsersResponseItem = zod.object({
     "admin",
     "risk_manager",
     "risk_owner",
+    "risk_executive",
     "auditor",
     "viewer",
     "vendor",
@@ -2155,6 +2289,7 @@ export const UpdateUserRoleBody = zod.object({
     "admin",
     "risk_manager",
     "risk_owner",
+    "risk_executive",
     "auditor",
     "viewer",
     "vendor",
@@ -2169,6 +2304,7 @@ export const UpdateUserRoleResponse = zod.object({
     "admin",
     "risk_manager",
     "risk_owner",
+    "risk_executive",
     "auditor",
     "viewer",
     "vendor",

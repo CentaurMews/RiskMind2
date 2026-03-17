@@ -9,10 +9,12 @@ import type { LimitParameter } from "./limitParameter";
 import type { ListRisksSeverity } from "./listRisksSeverity";
 import type { PageParameter } from "./pageParameter";
 import type { RiskCategory } from "./riskCategory";
-import type { RiskStatus } from "./riskStatus";
 
 export type ListRisksParams = {
-  status?: RiskStatus;
+  /**
+   * Comma-separated risk statuses to filter by (draft,open,mitigated,accepted,closed)
+   */
+  status?: string;
   category?: RiskCategory;
   ownerId?: string;
   search?: string;
@@ -20,6 +22,10 @@ export type ListRisksParams = {
    * Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25
    */
   severity?: ListRisksSeverity;
+  /**
+   * Comma-separated treatment strategies to filter by (treat,transfer,tolerate,terminate)
+   */
+  treatmentStrategy?: string;
   page?: PageParameter;
   limit?: LimitParameter;
 };
