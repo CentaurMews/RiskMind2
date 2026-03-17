@@ -10,7 +10,7 @@ RiskMind is a functioning ERM platform being migrated from Replit to a dedicated
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Server Foundation** - Strip Replit dependencies, provision database, build and run the app locally on port 4000 with PM2
+- [x] **Phase 1: Server Foundation** - Strip Replit dependencies, provision database, build and run the app locally on port 4000 with PM2 (completed 2026-03-17)
 - [ ] **Phase 2: Public Access and Security** - Configure named Cloudflare tunnel, lock CORS, enable SSE streaming, expose app via public URL
 - [ ] **Phase 3: Dashboard Polish and Demo Readiness** - Visual polish, empty/loading/error states, RBAC UI enforcement, vendor and compliance views
 - [ ] **Phase 4: AI Differentiators Surfaced** - AI enrichment badges, treatment suggestions, Foresight page, signal traceability visible in UI
@@ -78,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Server Foundation | 4/5 | In Progress|  |
+| 1. Server Foundation | 5/5 | Complete   | 2026-03-17 |
 | 2. Public Access and Security | 0/TBD | Not started | - |
 | 3. Dashboard Polish and Demo Readiness | 0/TBD | Not started | - |
 | 4. AI Differentiators Surfaced | 0/TBD | Not started | - |

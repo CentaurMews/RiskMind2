@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-03-17T16:50:36.124Z"
+stopped_at: "Checkpoint: 01-05 Task 2 awaiting human verification"
+last_updated: "2026-03-17T16:56:21.368Z"
 last_activity: 2026-03-17 — Roadmap created, all 35 v1 requirements mapped to 4 phases
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 4 | 3 tasks | 4 files |
 | Phase 01-server-foundation P03 | 3 | 1 tasks | 0 files |
 | Phase 01-server-foundation P04 | 15 | 3 tasks | 1 files |
+| Phase 01-server-foundation P05 | 5 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Recent decisions affecting current work:
 - [Phase 01-server-foundation]: Manual migration for risk_executive enum value is idempotent (DO IF NOT EXISTS blocks) — safe to re-run
 - [Phase 01-server-foundation]: Use native __dirname instead of fileURLToPath(import.meta.url) — esbuild CJS output makes import.meta empty
 - [Phase 01-server-foundation]: SPA fallback regex excludes /api and /mcp prefixes so API 404 handler still fires for unmatched API routes
+- [Phase 01-server-foundation]: PM2 6.x env_file broken — use node_args with Node 20 --env-file absolute path instead
+- [Phase 01-server-foundation]: Boot persistence via systemd pm2-root.service (pm2 startup + pm2 save)
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T16:50:36.115Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-03-17T16:56:21.360Z
+Stopped at: Checkpoint: 01-05 Task 2 awaiting human verification
 Resume file: None

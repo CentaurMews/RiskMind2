@@ -13,7 +13,7 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 - [x] **DEPL-02**: Configure environment variables (JWT_SECRET, ENCRYPTION_KEY, DATABASE_URL, PORT) with startup validation
 - [x] **DEPL-03**: Install pnpm dependencies and build all workspace packages successfully
 - [x] **DEPL-04**: Express serves both REST API and built React SPA from single port (4000)
-- [ ] **DEPL-05**: PM2 process management with ecosystem.config.cjs, auto-restart, boot persistence
+- [x] **DEPL-05**: PM2 process management with ecosystem.config.cjs, auto-restart, boot persistence
 
 ### Database
 
@@ -110,7 +110,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEPL-02 | Phase 1 | Complete |
 | DEPL-03 | Phase 1 | Complete |
 | DEPL-04 | Phase 1 | Complete |
-| DEPL-05 | Phase 1 | Pending |
+| DEPL-05 | Phase 1 | Complete |
 | DB-01 | Phase 1 | Complete |
 | DB-02 | Phase 1 | Complete |
 | DB-03 | Phase 1 | Complete |
