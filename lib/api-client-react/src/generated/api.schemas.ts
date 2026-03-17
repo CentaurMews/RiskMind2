@@ -17,6 +17,7 @@ export const TenantUserRole = {
   admin: "admin",
   risk_manager: "risk_manager",
   risk_owner: "risk_owner",
+  risk_executive: "risk_executive",
   auditor: "auditor",
   viewer: "viewer",
   vendor: "vendor",
@@ -37,6 +38,7 @@ export const UpdateUserRoleBodyRole = {
   admin: "admin",
   risk_manager: "risk_manager",
   risk_owner: "risk_owner",
+  risk_executive: "risk_executive",
   auditor: "auditor",
   viewer: "viewer",
   vendor: "vendor",
@@ -59,6 +61,7 @@ export const UserProfileRole = {
   admin: "admin",
   risk_manager: "risk_manager",
   risk_owner: "risk_owner",
+  risk_executive: "risk_executive",
   auditor: "auditor",
   viewer: "viewer",
   vendor: "vendor",
@@ -296,6 +299,41 @@ export interface TreatmentStatusEvent {
 
 export interface TreatmentListResponse {
   data?: Treatment[];
+}
+
+export type MemorandumStatus =
+  (typeof MemorandumStatus)[keyof typeof MemorandumStatus];
+
+export const MemorandumStatus = {
+  pending_approval: "pending_approval",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export interface AcceptanceMemorandum {
+  id?: string;
+  riskId?: string;
+  treatmentId?: string | null;
+  memorandumText?: string;
+  status?: MemorandumStatus;
+  requestedById?: string | null;
+  approverId?: string | null;
+  approvedAt?: string | null;
+  rejectionReason?: string | null;
+  requesterName?: string | null;
+  requesterEmail?: string | null;
+  approverName?: string | null;
+  approverEmail?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AcceptanceMemorandaListResponse {
+  data?: AcceptanceMemorandum[];
+}
+
+export interface RejectMemorandumBody {
+  rejectionReason: string;
 }
 
 export interface AiTreatmentRecommendation {
@@ -1264,6 +1302,10 @@ export type ListRisksParams = {
    * Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25
    */
   severity?: ListRisksSeverity;
+  /**
+   * Comma-separated treatment strategies to filter by (treat,transfer,tolerate,terminate)
+   */
+  treatmentStrategy?: string;
   page?: PageParameter;
   limit?: LimitParameter;
 };
@@ -1280,6 +1322,10 @@ export const ListRisksSeverity = {
 
 export type ListTreatmentStatusEvents200 = {
   data?: TreatmentStatusEvent[];
+};
+
+export type GenerateAcceptanceMemorandumBody = {
+  treatmentId?: string;
 };
 
 export type CompleteReviewBody = {

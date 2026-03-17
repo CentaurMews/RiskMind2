@@ -14,6 +14,7 @@ import {
   krisTable,
   incidentsTable,
   reviewCyclesTable,
+  acceptanceMemorandaTable,
 } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
@@ -31,12 +32,24 @@ const router = Router();
 
 router.get("/v1/risks", async (req, res) => {
   try {
-    const { status, category, ownerId, severity, search, page = "1", limit = "20" } = req.query;
+    const { status, category, ownerId, severity, search, treatmentStrategy, page = "1", limit = "20" } = req.query;
     const tenantId = req.user!.tenantId;
     const offset = (Number(page) - 1) * Number(limit);
 
+    const validStatuses = ["draft", "open", "mitigated", "accepted", "closed"] as const;
+    type RiskStatusType = typeof validStatuses[number];
+
     const conditions = [eq(risksTable.tenantId, tenantId)];
-    if (status) conditions.push(eq(risksTable.status, status as "draft" | "open" | "mitigated" | "accepted" | "closed"));
+
+    if (status) {
+      const statusList = String(status).split(",").filter(s => validStatuses.includes(s as RiskStatusType)) as RiskStatusType[];
+      if (statusList.length === 1) {
+        conditions.push(eq(risksTable.status, statusList[0]));
+      } else if (statusList.length > 1) {
+        conditions.push(inArray(risksTable.status, statusList));
+      }
+    }
+
     if (category) conditions.push(eq(risksTable.category, category as "operational" | "financial" | "compliance" | "strategic" | "technology" | "reputational"));
     if (ownerId) conditions.push(eq(risksTable.ownerId, String(ownerId)));
     if (search) conditions.push(ilike(risksTable.title, `%${search}%`));
@@ -54,24 +67,48 @@ router.get("/v1/risks", async (req, res) => {
       }
     }
 
-    const [risks, countResult] = await Promise.all([
+    const validStrategies = ["treat", "transfer", "tolerate", "terminate"] as const;
+    type StrategyType = typeof validStrategies[number];
+    const strategyList = treatmentStrategy
+      ? String(treatmentStrategy).split(",").filter(s => validStrategies.includes(s as StrategyType)) as StrategyType[]
+      : [];
+
+    const selectFields = {
+      id: risksTable.id,
+      title: risksTable.title,
+      description: risksTable.description,
+      category: risksTable.category,
+      status: risksTable.status,
+      ownerId: risksTable.ownerId,
+      likelihood: risksTable.likelihood,
+      impact: risksTable.impact,
+      residualLikelihood: risksTable.residualLikelihood,
+      residualImpact: risksTable.residualImpact,
+      targetLikelihood: risksTable.targetLikelihood,
+      targetImpact: risksTable.targetImpact,
+      createdAt: risksTable.createdAt,
+      updatedAt: risksTable.updatedAt,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let risks: any[] = [];
+    let countResult: { count: number }[] = [];
+
+    if (strategyList.length > 0) {
+      const subquery = db
+        .selectDistinct({ riskId: treatmentsTable.riskId })
+        .from(treatmentsTable)
+        .where(and(
+          eq(treatmentsTable.tenantId, tenantId),
+          inArray(treatmentsTable.strategy, strategyList),
+        ));
+
+      conditions.push(sql`${risksTable.id} IN (${subquery})`);
+    }
+
+    [risks, countResult] = await Promise.all([
       db
-        .select({
-          id: risksTable.id,
-          title: risksTable.title,
-          description: risksTable.description,
-          category: risksTable.category,
-          status: risksTable.status,
-          ownerId: risksTable.ownerId,
-          likelihood: risksTable.likelihood,
-          impact: risksTable.impact,
-          residualLikelihood: risksTable.residualLikelihood,
-          residualImpact: risksTable.residualImpact,
-          targetLikelihood: risksTable.targetLikelihood,
-          targetImpact: risksTable.targetImpact,
-          createdAt: risksTable.createdAt,
-          updatedAt: risksTable.updatedAt,
-        })
+        .select(selectFields)
         .from(risksTable)
         .where(and(...conditions))
         .limit(Number(limit))
@@ -866,6 +903,228 @@ router.post("/v1/risks/:id/ai-treatment-recommendations", requireRole("admin", "
       return;
     }
     console.error("AI treatment recommendations error:", err);
+    serverError(res);
+  }
+});
+
+router.get("/v1/risks/:riskId/acceptance-memoranda", async (req, res) => {
+  try {
+    const riskId = p(req, "riskId");
+    if (!(await verifyRiskOwnership(riskId, req.user!.tenantId, res))) return;
+
+    const memoranda = await db
+      .select({
+        id: acceptanceMemorandaTable.id,
+        riskId: acceptanceMemorandaTable.riskId,
+        treatmentId: acceptanceMemorandaTable.treatmentId,
+        memorandumText: acceptanceMemorandaTable.memorandumText,
+        status: acceptanceMemorandaTable.status,
+        requestedById: acceptanceMemorandaTable.requestedById,
+        approverId: acceptanceMemorandaTable.approverId,
+        approvedAt: acceptanceMemorandaTable.approvedAt,
+        rejectionReason: acceptanceMemorandaTable.rejectionReason,
+        createdAt: acceptanceMemorandaTable.createdAt,
+        updatedAt: acceptanceMemorandaTable.updatedAt,
+        requesterName: sql<string | null>`req_user.name`,
+        requesterEmail: sql<string | null>`req_user.email`,
+        approverName: sql<string | null>`appr_user.name`,
+        approverEmail: sql<string | null>`appr_user.email`,
+      })
+      .from(acceptanceMemorandaTable)
+      .leftJoin(sql`users req_user`, sql`req_user.id = ${acceptanceMemorandaTable.requestedById}`)
+      .leftJoin(sql`users appr_user`, sql`appr_user.id = ${acceptanceMemorandaTable.approverId}`)
+      .where(and(
+        eq(acceptanceMemorandaTable.riskId, riskId),
+        eq(acceptanceMemorandaTable.tenantId, req.user!.tenantId),
+      ))
+      .orderBy(acceptanceMemorandaTable.createdAt);
+
+    res.json({ data: memoranda });
+  } catch (err) {
+    console.error("List memoranda error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/risks/:riskId/acceptance-memoranda/generate", requireRole("admin", "risk_manager", "risk_owner"), async (req, res) => {
+  try {
+    const riskId = p(req, "riskId");
+    const tenantId = req.user!.tenantId;
+    if (!(await verifyRiskOwnership(riskId, tenantId, res))) return;
+
+    const { treatmentId } = req.body;
+
+    const [risk] = await db.select().from(risksTable)
+      .where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId)))
+      .limit(1);
+    if (!risk) { notFound(res, "Risk not found"); return; }
+
+    let treatment = null;
+    if (treatmentId) {
+      const [t] = await db.select().from(treatmentsTable)
+        .where(and(eq(treatmentsTable.id, treatmentId), eq(treatmentsTable.riskId, riskId), eq(treatmentsTable.tenantId, tenantId)))
+        .limit(1);
+      treatment = t;
+    }
+
+    const available = await isAvailable(tenantId);
+    let memorandumText: string;
+
+    if (!available) {
+      const inherentScore = (risk.likelihood || 1) * (risk.impact || 1);
+      memorandumText = `RISK ACCEPTANCE MEMORANDUM
+
+Risk: ${risk.title}
+Category: ${risk.category}
+Date: ${new Date().toLocaleDateString()}
+
+EXECUTIVE SUMMARY
+This memorandum documents the formal acceptance of the risk "${risk.title}" by the designated Risk Executive.
+
+RISK DESCRIPTION
+${risk.description || "No description provided."}
+
+RISK SCORES
+- Inherent Risk Score: ${inherentScore}/25 (Likelihood: ${risk.likelihood}/5, Impact: ${risk.impact}/5)
+- Residual Risk Score: ${risk.residualLikelihood && risk.residualImpact ? `${risk.residualLikelihood * risk.residualImpact}/25` : "Not assessed"}
+
+BUSINESS JUSTIFICATION
+${treatment ? `Treatment Strategy: ${treatment.strategy}\n${treatment.description || ""}` : "The organization has evaluated this risk and determined it falls within acceptable risk tolerance thresholds."}
+
+RESIDUAL RISK STATEMENT
+After evaluating available treatment options, the residual risk is deemed acceptable given current business constraints and the organization's risk appetite.
+
+APPROVAL
+By approving this memorandum, the Risk Executive acknowledges awareness of this risk and formally accepts it on behalf of the organization.`;
+    } else {
+      const inherentScore = (risk.likelihood || 1) * (risk.impact || 1);
+      const residualScore = risk.residualLikelihood && risk.residualImpact ? risk.residualLikelihood * risk.residualImpact : null;
+
+      const prompt = `Draft a formal Risk Acceptance Memorandum for the following risk. The document should be professional, concise, and suitable for executive review and sign-off.
+
+Risk: ${risk.title}
+Category: ${risk.category}
+Description: ${risk.description || "N/A"}
+Inherent Risk Score: ${inherentScore}/25 (Likelihood: ${risk.likelihood}/5, Impact: ${risk.impact}/5)
+Residual Risk Score: ${residualScore !== null ? `${residualScore}/25` : "Not assessed"}
+${treatment ? `Treatment Strategy: ${treatment.strategy}\nTreatment Description: ${treatment.description || "N/A"}` : "No specific treatment on record."}
+
+The memorandum must include: Executive Summary, Risk Description, Risk Scores, Business Justification for Acceptance, Residual Risk Statement, and an Approval section.`;
+
+      memorandumText = await complete(tenantId, {
+        messages: [
+          { role: "system", content: "You are a risk management professional drafting formal risk acceptance memoranda for enterprise organizations. Write in clear, authoritative language suitable for C-suite executives." },
+          { role: "user", content: prompt },
+        ],
+        maxTokens: 1500,
+      });
+    }
+
+    const [memorandum] = await db.insert(acceptanceMemorandaTable).values({
+      tenantId,
+      riskId,
+      treatmentId: treatmentId || null,
+      memorandumText,
+      status: "pending_approval",
+      requestedById: req.user!.id,
+    }).returning();
+
+    await recordAudit(req, "generate_acceptance_memorandum", "risk", riskId, { memorandumId: memorandum.id });
+    res.status(201).json(memorandum);
+  } catch (err) {
+    if (err instanceof LLMUnavailableError) {
+      res.status(422).json({ error: "AI unavailable", message: "No LLM provider configured." });
+      return;
+    }
+    console.error("Generate memorandum error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/risks/:riskId/acceptance-memoranda/:memorandumId/approve", requireRole("admin", "risk_executive"), async (req, res) => {
+  try {
+    const riskId = p(req, "riskId");
+    const memorandumId = p(req, "memorandumId");
+    const tenantId = req.user!.tenantId;
+
+    const [memorandum] = await db.select().from(acceptanceMemorandaTable)
+      .where(and(
+        eq(acceptanceMemorandaTable.id, memorandumId),
+        eq(acceptanceMemorandaTable.riskId, riskId),
+        eq(acceptanceMemorandaTable.tenantId, tenantId),
+      )).limit(1);
+
+    if (!memorandum) { notFound(res, "Memorandum not found"); return; }
+    if (memorandum.status !== "pending_approval") {
+      badRequest(res, "Memorandum is not in pending_approval state"); return;
+    }
+
+    const [updated] = await db.transaction(async (tx) => {
+      const [updatedMemo] = await tx.update(acceptanceMemorandaTable).set({
+        status: "approved",
+        approverId: req.user!.id,
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(acceptanceMemorandaTable.id, memorandumId)).returning();
+
+      await tx.update(risksTable).set({
+        status: "accepted",
+        updatedAt: new Date(),
+      }).where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId)));
+
+      return [updatedMemo];
+    });
+
+    await recordAudit(req, "approve_acceptance_memorandum", "risk", riskId, { memorandumId });
+    res.json(updated);
+  } catch (err) {
+    console.error("Approve memorandum error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/risks/:riskId/acceptance-memoranda/:memorandumId/reject", requireRole("admin", "risk_executive"), async (req, res) => {
+  try {
+    const riskId = p(req, "riskId");
+    const memorandumId = p(req, "memorandumId");
+    const tenantId = req.user!.tenantId;
+    const { rejectionReason } = req.body;
+
+    if (!rejectionReason || !String(rejectionReason).trim()) {
+      badRequest(res, "rejectionReason is required"); return;
+    }
+
+    const [memorandum] = await db.select().from(acceptanceMemorandaTable)
+      .where(and(
+        eq(acceptanceMemorandaTable.id, memorandumId),
+        eq(acceptanceMemorandaTable.riskId, riskId),
+        eq(acceptanceMemorandaTable.tenantId, tenantId),
+      )).limit(1);
+
+    if (!memorandum) { notFound(res, "Memorandum not found"); return; }
+    if (memorandum.status !== "pending_approval") {
+      badRequest(res, "Memorandum is not in pending_approval state"); return;
+    }
+
+    const [updated] = await db.transaction(async (tx) => {
+      const [updatedMemo] = await tx.update(acceptanceMemorandaTable).set({
+        status: "rejected",
+        rejectionReason: String(rejectionReason).trim(),
+        updatedAt: new Date(),
+      }).where(eq(acceptanceMemorandaTable.id, memorandumId)).returning();
+
+      await tx.update(risksTable).set({
+        status: "open",
+        updatedAt: new Date(),
+      }).where(and(eq(risksTable.id, riskId), eq(risksTable.tenantId, tenantId)));
+
+      return [updatedMemo];
+    });
+
+    await recordAudit(req, "reject_acceptance_memorandum", "risk", riskId, { memorandumId, rejectionReason });
+    res.json(updated);
+  } catch (err) {
+    console.error("Reject memorandum error:", err);
     serverError(res);
   }
 });

@@ -16,6 +16,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { InterviewDialog } from "@/components/ai-interview/interview-dialog";
 import { AiIntelligencePanel } from "@/components/risk-creation/ai-intelligence-panel";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface SourceItem {
   id: string;
@@ -27,11 +29,44 @@ interface SourceItem {
   severity?: string;
 }
 
+const ALL_STATUSES = [
+  { value: "open", label: "Open" },
+  { value: "draft", label: "Draft" },
+  { value: "mitigated", label: "Mitigated" },
+  { value: "accepted", label: "Accepted" },
+  { value: "closed", label: "Closed" },
+] as const;
+
+const ALL_STRATEGIES = [
+  { value: "treat", label: "Treat" },
+  { value: "transfer", label: "Transfer" },
+  { value: "tolerate", label: "Tolerate" },
+  { value: "terminate", label: "Terminate" },
+] as const;
+
+const HISTORICAL_STATUSES = new Set(["accepted", "closed"]);
+
+const DEFAULT_STATUSES = ["open", "mitigated", "accepted"];
+
 export default function RiskList() {
   const [search, setSearch] = useState("");
-  const { data, isLoading } = useListRisks({ search: search || undefined });
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(DEFAULT_STATUSES);
+  const [selectedStrategies, setSelectedStrategies] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+
+  const statusParam = selectedStatuses.length > 0 && selectedStatuses.length < 5
+    ? selectedStatuses.join(",")
+    : undefined;
+
+  const strategyParam = selectedStrategies.length > 0 ? selectedStrategies.join(",") : undefined;
+
+  const { data, isLoading } = useListRisks({
+    search: search || undefined,
+    status: statusParam as never,
+    treatmentStrategy: strategyParam,
+  });
 
   const [isOpen, setIsOpen] = useState(false);
   const [interviewOpen, setInterviewOpen] = useState(false);
@@ -139,6 +174,18 @@ export default function RiskList() {
     setSelectedSources(prev => prev.filter(s => s.id !== sourceId));
   }, []);
 
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev =>
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    );
+  };
+
+  const toggleStrategy = (strategy: string) => {
+    setSelectedStrategies(prev =>
+      prev.includes(strategy) ? prev.filter(s => s !== strategy) : [...prev, strategy]
+    );
+  };
+
   const computeSeverity = (l?: number, i?: number) => {
     if (!l || !i) return 'unknown';
     const score = l * i;
@@ -147,6 +194,11 @@ export default function RiskList() {
     if (score >= 5) return 'medium';
     return 'low';
   };
+
+  const activeFilterCount = (selectedStatuses.join(",") !== DEFAULT_STATUSES.join(",") ? 1 : 0)
+    + (selectedStrategies.length > 0 ? 1 : 0);
+
+  const risks = data?.data || [];
 
   return (
     <AppLayout>
@@ -311,11 +363,93 @@ export default function RiskList() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" /> Filter
-            </Button>
+            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="relative">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-4 space-y-4" align="end">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Status</div>
+                  <div className="space-y-2">
+                    {ALL_STATUSES.map(({ value, label }) => (
+                      <div key={value} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`status-${value}`}
+                          checked={selectedStatuses.includes(value)}
+                          onCheckedChange={() => toggleStatus(value)}
+                        />
+                        <label htmlFor={`status-${value}`} className="text-sm cursor-pointer flex items-center gap-2">
+                          {label}
+                          {HISTORICAL_STATUSES.has(value) && (
+                            <span className="text-[10px] text-muted-foreground italic">(historical)</span>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-t pt-3">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Treatment Strategy</div>
+                  <div className="space-y-2">
+                    {ALL_STRATEGIES.map(({ value, label }) => (
+                      <div key={value} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`strategy-${value}`}
+                          checked={selectedStrategies.includes(value)}
+                          onCheckedChange={() => toggleStrategy(value)}
+                        />
+                        <label htmlFor={`strategy-${value}`} className="text-sm cursor-pointer">{label}</label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {(selectedStatuses.join(",") !== DEFAULT_STATUSES.join(",") || selectedStrategies.length > 0) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-muted-foreground text-xs"
+                    onClick={() => {
+                      setSelectedStatuses(DEFAULT_STATUSES);
+                      setSelectedStrategies([]);
+                    }}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Reset to defaults
+                  </Button>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
           
+          {(selectedStatuses.length > 0 || selectedStrategies.length > 0) && (
+            <div className="px-4 py-2 border-b bg-muted/20 flex items-center gap-2 flex-wrap">
+              {selectedStatuses.map(s => (
+                <Badge key={s} variant="secondary" className="text-xs capitalize pr-1">
+                  {s}
+                  <button onClick={() => toggleStatus(s)} className="ml-1 hover:text-destructive">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </Badge>
+              ))}
+              {selectedStrategies.map(s => (
+                <Badge key={s} variant="outline" className="text-xs capitalize pr-1">
+                  {s}
+                  <button onClick={() => toggleStrategy(s)} className="ml-1 hover:text-destructive">
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+
           <div className="flex-1 overflow-auto">
             <Table>
               <TableHeader className="bg-muted/50 sticky top-0 z-10">
@@ -336,37 +470,45 @@ export default function RiskList() {
                       <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                     </TableCell>
                   </TableRow>
-                ) : data?.data?.length === 0 ? (
+                ) : risks.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                       No risks found matching criteria.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data?.data?.map((risk) => (
-                    <TableRow key={risk.id} className="group hover:bg-muted/30 transition-colors">
-                      <TableCell className="font-mono text-xs text-muted-foreground">{risk.id?.split('-')[0]}</TableCell>
-                      <TableCell className="font-medium">{risk.title}</TableCell>
-                      <TableCell className="capitalize">{risk.category}</TableCell>
-                      <TableCell>
-                        <SeverityBadge severity={computeSeverity(risk.likelihood, risk.impact)} />
-                        <span className="text-xs text-muted-foreground ml-2 font-mono hidden lg:inline">
-                          ({risk.likelihood}×{risk.impact})
-                        </span>
-                      </TableCell>
-                      <TableCell><StatusBadge status={risk.status} /></TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(risk.createdAt || ''), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Link href={`/risks/${risk.id}`}>
-                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ArrowRight className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  risks.map((risk) => {
+                    const isHistorical = HISTORICAL_STATUSES.has(risk.status || "");
+                    return (
+                      <TableRow key={risk.id} className={`group hover:bg-muted/30 transition-colors${isHistorical ? " opacity-60" : ""}`}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{risk.id?.split('-')[0]}</TableCell>
+                        <TableCell className="font-medium">
+                          {risk.title}
+                          {isHistorical && (
+                            <span className="ml-2 text-[10px] text-muted-foreground italic">historical</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="capitalize">{risk.category}</TableCell>
+                        <TableCell>
+                          <SeverityBadge severity={computeSeverity(risk.likelihood, risk.impact)} />
+                          <span className="text-xs text-muted-foreground ml-2 font-mono hidden lg:inline">
+                            ({risk.likelihood}×{risk.impact})
+                          </span>
+                        </TableCell>
+                        <TableCell><StatusBadge status={risk.status} /></TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {format(new Date(risk.createdAt || ''), 'MMM d, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/risks/${risk.id}`}>
+                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

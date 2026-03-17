@@ -18,6 +18,8 @@ import type {
 
 import type {
   AbandonInterview200,
+  AcceptanceMemorandaListResponse,
+  AcceptanceMemorandum,
   AgentConfig,
   AgentFinding,
   AgentRun,
@@ -64,6 +66,7 @@ import type {
   FrameworkListResponse,
   FrameworkWithRequirements,
   GapAnalysis,
+  GenerateAcceptanceMemorandumBody,
   GenerateAiQuestions503,
   GenerateMagicLink200,
   GenerateMagicLinkBody,
@@ -103,6 +106,7 @@ import type {
   QuestionnaireScoreResponse,
   RFC7807Error,
   RefreshRequest,
+  RejectMemorandumBody,
   RespondToQuestionnaireBody,
   Review,
   ReviewListResponse,
@@ -1503,6 +1507,400 @@ export function useListTreatmentStatusEvents<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List acceptance memoranda for a risk
+ */
+export const getListAcceptanceMemorandumUrl = (riskId: string) => {
+  return `/api/v1/risks/${riskId}/acceptance-memoranda`;
+};
+
+export const listAcceptanceMemorandum = async (
+  riskId: string,
+  options?: RequestInit,
+): Promise<AcceptanceMemorandaListResponse> => {
+  return customFetch<AcceptanceMemorandaListResponse>(
+    getListAcceptanceMemorandumUrl(riskId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListAcceptanceMemorandumQueryKey = (riskId: string) => {
+  return [`/api/v1/risks/${riskId}/acceptance-memoranda`] as const;
+};
+
+export const getListAcceptanceMemorandumQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAcceptanceMemorandum>>,
+  TError = ErrorType<unknown>,
+>(
+  riskId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAcceptanceMemorandum>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAcceptanceMemorandumQueryKey(riskId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAcceptanceMemorandum>>
+  > = ({ signal }) =>
+    listAcceptanceMemorandum(riskId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!riskId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAcceptanceMemorandum>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAcceptanceMemorandumQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAcceptanceMemorandum>>
+>;
+export type ListAcceptanceMemorandumQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List acceptance memoranda for a risk
+ */
+
+export function useListAcceptanceMemorandum<
+  TData = Awaited<ReturnType<typeof listAcceptanceMemorandum>>,
+  TError = ErrorType<unknown>,
+>(
+  riskId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAcceptanceMemorandum>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAcceptanceMemorandumQueryOptions(riskId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Generate an AI-drafted acceptance memorandum for a risk
+ */
+export const getGenerateAcceptanceMemorandumUrl = (riskId: string) => {
+  return `/api/v1/risks/${riskId}/acceptance-memoranda/generate`;
+};
+
+export const generateAcceptanceMemorandum = async (
+  riskId: string,
+  generateAcceptanceMemorandumBody?: GenerateAcceptanceMemorandumBody,
+  options?: RequestInit,
+): Promise<AcceptanceMemorandum> => {
+  return customFetch<AcceptanceMemorandum>(
+    getGenerateAcceptanceMemorandumUrl(riskId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(generateAcceptanceMemorandumBody),
+    },
+  );
+};
+
+export const getGenerateAcceptanceMemorandumMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateAcceptanceMemorandum>>,
+    TError,
+    { riskId: string; data: BodyType<GenerateAcceptanceMemorandumBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateAcceptanceMemorandum>>,
+  TError,
+  { riskId: string; data: BodyType<GenerateAcceptanceMemorandumBody> },
+  TContext
+> => {
+  const mutationKey = ["generateAcceptanceMemorandum"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateAcceptanceMemorandum>>,
+    { riskId: string; data: BodyType<GenerateAcceptanceMemorandumBody> }
+  > = (props) => {
+    const { riskId, data } = props ?? {};
+
+    return generateAcceptanceMemorandum(riskId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateAcceptanceMemorandumMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateAcceptanceMemorandum>>
+>;
+export type GenerateAcceptanceMemorandumMutationBody =
+  BodyType<GenerateAcceptanceMemorandumBody>;
+export type GenerateAcceptanceMemorandumMutationError = ErrorType<void>;
+
+/**
+ * @summary Generate an AI-drafted acceptance memorandum for a risk
+ */
+export const useGenerateAcceptanceMemorandum = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateAcceptanceMemorandum>>,
+    TError,
+    { riskId: string; data: BodyType<GenerateAcceptanceMemorandumBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateAcceptanceMemorandum>>,
+  TError,
+  { riskId: string; data: BodyType<GenerateAcceptanceMemorandumBody> },
+  TContext
+> => {
+  return useMutation(getGenerateAcceptanceMemorandumMutationOptions(options));
+};
+
+/**
+ * @summary Approve an acceptance memorandum (risk_executive or admin only)
+ */
+export const getApproveAcceptanceMemorandumUrl = (
+  riskId: string,
+  memorandumId: string,
+) => {
+  return `/api/v1/risks/${riskId}/acceptance-memoranda/${memorandumId}/approve`;
+};
+
+export const approveAcceptanceMemorandum = async (
+  riskId: string,
+  memorandumId: string,
+  options?: RequestInit,
+): Promise<AcceptanceMemorandum> => {
+  return customFetch<AcceptanceMemorandum>(
+    getApproveAcceptanceMemorandumUrl(riskId, memorandumId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getApproveAcceptanceMemorandumMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveAcceptanceMemorandum>>,
+    TError,
+    { riskId: string; memorandumId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveAcceptanceMemorandum>>,
+  TError,
+  { riskId: string; memorandumId: string },
+  TContext
+> => {
+  const mutationKey = ["approveAcceptanceMemorandum"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveAcceptanceMemorandum>>,
+    { riskId: string; memorandumId: string }
+  > = (props) => {
+    const { riskId, memorandumId } = props ?? {};
+
+    return approveAcceptanceMemorandum(riskId, memorandumId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveAcceptanceMemorandumMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveAcceptanceMemorandum>>
+>;
+
+export type ApproveAcceptanceMemorandumMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Approve an acceptance memorandum (risk_executive or admin only)
+ */
+export const useApproveAcceptanceMemorandum = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveAcceptanceMemorandum>>,
+    TError,
+    { riskId: string; memorandumId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof approveAcceptanceMemorandum>>,
+  TError,
+  { riskId: string; memorandumId: string },
+  TContext
+> => {
+  return useMutation(getApproveAcceptanceMemorandumMutationOptions(options));
+};
+
+/**
+ * @summary Reject an acceptance memorandum (risk_executive or admin only)
+ */
+export const getRejectAcceptanceMemorandumUrl = (
+  riskId: string,
+  memorandumId: string,
+) => {
+  return `/api/v1/risks/${riskId}/acceptance-memoranda/${memorandumId}/reject`;
+};
+
+export const rejectAcceptanceMemorandum = async (
+  riskId: string,
+  memorandumId: string,
+  rejectMemorandumBody: RejectMemorandumBody,
+  options?: RequestInit,
+): Promise<AcceptanceMemorandum> => {
+  return customFetch<AcceptanceMemorandum>(
+    getRejectAcceptanceMemorandumUrl(riskId, memorandumId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(rejectMemorandumBody),
+    },
+  );
+};
+
+export const getRejectAcceptanceMemorandumMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rejectAcceptanceMemorandum>>,
+    TError,
+    {
+      riskId: string;
+      memorandumId: string;
+      data: BodyType<RejectMemorandumBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rejectAcceptanceMemorandum>>,
+  TError,
+  {
+    riskId: string;
+    memorandumId: string;
+    data: BodyType<RejectMemorandumBody>;
+  },
+  TContext
+> => {
+  const mutationKey = ["rejectAcceptanceMemorandum"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rejectAcceptanceMemorandum>>,
+    {
+      riskId: string;
+      memorandumId: string;
+      data: BodyType<RejectMemorandumBody>;
+    }
+  > = (props) => {
+    const { riskId, memorandumId, data } = props ?? {};
+
+    return rejectAcceptanceMemorandum(
+      riskId,
+      memorandumId,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RejectAcceptanceMemorandumMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rejectAcceptanceMemorandum>>
+>;
+export type RejectAcceptanceMemorandumMutationBody =
+  BodyType<RejectMemorandumBody>;
+export type RejectAcceptanceMemorandumMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Reject an acceptance memorandum (risk_executive or admin only)
+ */
+export const useRejectAcceptanceMemorandum = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rejectAcceptanceMemorandum>>,
+    TError,
+    {
+      riskId: string;
+      memorandumId: string;
+      data: BodyType<RejectMemorandumBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rejectAcceptanceMemorandum>>,
+  TError,
+  {
+    riskId: string;
+    memorandumId: string;
+    data: BodyType<RejectMemorandumBody>;
+  },
+  TContext
+> => {
+  return useMutation(getRejectAcceptanceMemorandumMutationOptions(options));
+};
 
 /**
  * @summary List KRIs for a risk

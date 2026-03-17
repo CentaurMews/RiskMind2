@@ -20,6 +20,10 @@ export type ListRisksParams = {
    * Filter by computed severity (likelihood × impact): low 1-4, medium 5-9, high 10-16, critical 17-25
    */
   severity?: ListRisksSeverity;
+  /**
+   * Comma-separated treatment strategies to filter by (treat,transfer,tolerate,terminate)
+   */
+  treatmentStrategy?: string;
   page?: PageParameter;
   limit?: LimitParameter;
 };
