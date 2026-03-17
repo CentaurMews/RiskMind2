@@ -258,12 +258,32 @@ export default function RiskList() {
                   <div className="flex-1 min-w-0 flex flex-col">
                     <SheetHeader className="px-6 pt-6 pb-4">
                       <SheetTitle>Create New Risk</SheetTitle>
-                      <SheetDescription>Log a new risk into the enterprise register. Use the AI panel to find related intelligence or analyse a document.</SheetDescription>
+                      <SheetDescription>Let AI discover risks from your signals and findings, or fill in the form manually.</SheetDescription>
                     </SheetHeader>
 
                     <div className="flex-1 overflow-y-auto px-6 pb-6">
                       <form onSubmit={handleSubmit} className="space-y-6">
                         <div ref={formRef} />
+
+                        <div className="rounded-xl border border-primary/25 bg-primary/[0.03] p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Wand2 className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-semibold text-primary">AI Risk Discovery</span>
+                          </div>
+                          <AiRiskConfigurator
+                            documentText={documentExtractedText}
+                            onPopulateForm={(scenario) => {
+                              setFormData({
+                                title: scenario.title,
+                                description: scenario.description,
+                                category: scenario.category as typeof formData.category,
+                                likelihood: String(scenario.likelihood),
+                                impact: String(scenario.impact),
+                              });
+                              formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }}
+                          />
+                        </div>
 
                         {selectedSources.length > 0 && (
                           <div className="space-y-2">

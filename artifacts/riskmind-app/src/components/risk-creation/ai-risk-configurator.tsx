@@ -10,12 +10,13 @@ import {
   Sparkles,
   AlertTriangle,
   ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 
-interface ConfiguratorScenario {
+export interface ConfiguratorScenario {
   title: string;
   description: string;
   category: string;
@@ -31,8 +32,9 @@ interface ScenarioCardState {
   error?: string;
 }
 
-interface AiRiskConfiguratorProps {
+export interface AiRiskConfiguratorProps {
   documentText?: string;
+  onPopulateForm?: (scenario: ConfiguratorScenario) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -60,11 +62,13 @@ function ScenarioCard({
   onRecord,
   onDraft,
   onDismiss,
+  onPopulateForm,
 }: {
   state: ScenarioCardState;
   onRecord: () => void;
   onDraft: () => void;
   onDismiss: () => void;
+  onPopulateForm?: (scenario: ConfiguratorScenario) => void;
 }) {
   const { scenario, status, savedId, error } = state;
   const catColor = CATEGORY_COLORS[scenario.category] || "bg-muted text-foreground border-border";
@@ -75,13 +79,13 @@ function ScenarioCard({
 
   return (
     <div className={cn(
-      "border rounded-xl p-4 space-y-3 transition-all",
+      "border rounded-xl p-3 space-y-2.5 transition-all",
       isDone ? "bg-muted/30 opacity-80" : "bg-card hover:border-primary/30"
     )}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm leading-snug">{scenario.title}</p>
-          <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
+          <div className="flex items-center flex-wrap gap-1.5 mt-1">
             <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded border capitalize", catColor)}>
               {scenario.category}
             </span>
@@ -97,15 +101,11 @@ function ScenarioCard({
             className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5"
             aria-label="Dismiss"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
-        {status === "recorded" && (
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-        )}
-        {status === "drafted" && (
-          <Badge variant="secondary" className="text-[10px] shrink-0">Draft</Badge>
-        )}
+        {status === "recorded" && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />}
+        {status === "drafted" && <Badge variant="secondary" className="text-[10px] shrink-0">Draft</Badge>}
       </div>
 
       {scenario.description && (
@@ -131,7 +131,7 @@ function ScenarioCard({
       {(status === "recorded" || status === "drafted") && savedId && (
         <div className="flex items-center gap-2">
           <p className="text-xs text-muted-foreground">
-            {status === "recorded" ? "Recorded in register." : "Saved as draft."}
+            {status === "recorded" ? "Recorded." : "Saved as draft."}
           </p>
           <Link href={`/risks/${savedId}`}>
             <button type="button" className="text-[11px] text-primary underline underline-offset-2 flex items-center gap-0.5">
@@ -142,28 +142,36 @@ function ScenarioCard({
       )}
 
       {!isDone && (
-        <div className="flex gap-2 pt-1">
-          <Button size="sm" onClick={onRecord} disabled={isLoading} className="flex-1">
-            {status === "recording" ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-            )}
-            Record
-          </Button>
-          <Button size="sm" variant="outline" onClick={onDraft} disabled={isLoading} className="flex-1">
-            {status === "saving" ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : null}
-            Save as Draft
-          </Button>
+        <div className="space-y-1.5 pt-0.5">
+          {onPopulateForm && (
+            <Button
+              type="button"
+              size="sm"
+              className="w-full"
+              onClick={() => onPopulateForm(scenario)}
+              disabled={isLoading}
+            >
+              <ArrowRight className="h-3.5 w-3.5 mr-1.5" />
+              Use this — fill form
+            </Button>
+          )}
+          <div className="flex gap-1.5">
+            <Button type="button" size="sm" variant={onPopulateForm ? "outline" : "default"} onClick={onRecord} disabled={isLoading} className="flex-1 text-xs">
+              {status === "recording" ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+              Record
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={onDraft} disabled={isLoading} className="flex-1 text-xs">
+              {status === "saving" ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+              Draft
+            </Button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export function AiRiskConfigurator({ documentText }: AiRiskConfiguratorProps) {
+export function AiRiskConfigurator({ documentText, onPopulateForm }: AiRiskConfiguratorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [scenarios, setScenarios] = useState<ScenarioCardState[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -259,12 +267,12 @@ export function AiRiskConfigurator({ documentText }: AiRiskConfiguratorProps) {
         {isLoading ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Analysing signals, findings and documents…
+            Analysing signals &amp; findings…
           </>
         ) : (
           <>
             <Wand2 className="h-4 w-4 mr-2" />
-            AI Risk Configurator
+            {hasRun ? "Re-scan with AI" : "Scan for risks with AI"}
           </>
         )}
       </Button>
@@ -283,14 +291,14 @@ export function AiRiskConfigurator({ documentText }: AiRiskConfiguratorProps) {
       {hasRun && !isLoading && scenarios.length === 0 && !error && (
         <div className="text-center py-4 text-muted-foreground">
           <Sparkles className="h-6 w-6 mx-auto mb-2 opacity-40" />
-          <p className="text-xs">No risk scenarios could be identified from available context.</p>
+          <p className="text-xs">No scenarios identified from available context.</p>
           <p className="text-[10px] mt-1">Add signals, findings, or upload a document to improve results.</p>
         </div>
       )}
 
       {visibleScenarios.length > 0 && (
-        <ScrollArea className="max-h-[400px]">
-          <div className="space-y-3 pr-2">
+        <ScrollArea className="max-h-[420px]">
+          <div className="space-y-2.5 pr-1">
             {scenarios.map((state, i) =>
               state.status !== "dismissed" ? (
                 <ScenarioCard
@@ -299,6 +307,7 @@ export function AiRiskConfigurator({ documentText }: AiRiskConfiguratorProps) {
                   onRecord={() => saveScenario(i, false)}
                   onDraft={() => saveScenario(i, true)}
                   onDismiss={() => dismissScenario(i)}
+                  onPopulateForm={onPopulateForm}
                 />
               ) : null
             )}

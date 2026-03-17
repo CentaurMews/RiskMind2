@@ -102,6 +102,14 @@ function buildOpenAIClient(config: ResolvedConfig): OpenAI {
 }
 
 function buildAnthropicClient(config: ResolvedConfig): Anthropic {
+  const baseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+  const proxyKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+  if (baseUrl && proxyKey) {
+    return new Anthropic({
+      apiKey: proxyKey,
+      baseURL: baseUrl,
+    });
+  }
   return new Anthropic({
     apiKey: config.apiKey || undefined,
   });
