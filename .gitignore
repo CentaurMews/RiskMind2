@@ -50,3 +50,6 @@ Thumbs.db
 
 # Environment secrets — never commit actual .env
 .env
+
+# PM2 log files — keep logs/ dir but not log contents
+logs/*.log
