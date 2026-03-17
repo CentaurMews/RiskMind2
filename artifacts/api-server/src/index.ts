@@ -6,14 +6,15 @@ import { startMonitoringScheduler } from "./lib/monitoring";
 import { startAgentScheduler } from "./lib/agent-scheduler";
 import { seedDemoDataIfEmpty } from "./lib/seed";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+// Fail-fast: validate all required env vars before any other code runs
+const REQUIRED_ENV = ["PORT", "DATABASE_URL", "JWT_SECRET", "ENCRYPTION_KEY"] as const;
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    throw new Error(`Required environment variable ${key} is not set. Check your .env file.`);
+  }
 }
 
+const rawPort = process.env["PORT"]!;
 const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
