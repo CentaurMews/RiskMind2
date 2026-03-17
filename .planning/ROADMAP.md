@@ -27,7 +27,14 @@ RiskMind is a functioning ERM platform being migrated from Replit to a dedicated
   3. Express API returns 200 on `/api/v1/health` and serves the React SPA from port 4000
   4. Demo login with seeded credentials works and loads the dashboard
   5. PM2 shows the process as online; `pm2 startup` survives a reboot
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Strip Replit dependencies from all manifests and vite.config.ts
+- [ ] 01-02-PLAN.md — Env validation, rich seed integration, .env setup
+- [ ] 01-03-PLAN.md — Database provisioning (pgvector, drizzle push, manual migration)
+- [ ] 01-04-PLAN.md — Build workspace packages and wire Express static serving + SPA fallback
+- [ ] 01-05-PLAN.md — PM2 config, log rotation, boot persistence, end-to-end verification
 
 ### Phase 2: Public Access and Security
 **Goal**: The app is accessible via a stable, named Cloudflare tunnel URL with CORS locked to that origin and SSE streaming working end-to-end
@@ -71,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Server Foundation | 0/TBD | Not started | - |
+| 1. Server Foundation | 0/5 | Not started | - |
 | 2. Public Access and Security | 0/TBD | Not started | - |
 | 3. Dashboard Polish and Demo Readiness | 0/TBD | Not started | - |
 | 4. AI Differentiators Surfaced | 0/TBD | Not started | - |
