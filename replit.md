@@ -31,7 +31,7 @@ RiskMind is built as a pnpm workspace monorepo using TypeScript.
 
 **Database Schema & Features:**
 - All tables use UUID primary keys and `created_at`/`updated_at` timestamps. Tenant-scoped tables include `tenant_id`.
-- Key entities include `tenants`, `users` (with RBAC roles), `risks` (with pgvector embedding), `vendors`, `frameworks`, `controls`, `signals`, `findings`, `alerts`, `jobs` (async queue), and `llm_configs`.
+- Key entities include `tenants`, `users` (with RBAC roles), `risks` (with pgvector embedding), `vendors`, `questionnaire_questions` (seeded question bank with core and category-specific questions), `frameworks`, `controls`, `signals`, `findings`, `alerts`, `jobs` (async queue), and `llm_configs`.
 - `pgvector` is integral for embedding columns in `risks`, `vendors`, `signals`, and `framework_requirements` for AI-driven semantic search and clustering.
 
 **Authentication & Multi-Tenancy:**
@@ -44,7 +44,7 @@ RiskMind is built as a pnpm workspace monorepo using TypeScript.
 - **Public**: Health checks, user login/refresh, questionnaire submission.
 - **Protected**: Comprehensive endpoints covering:
     - **Risk Register**: CRUD operations for risks, treatments, KRIs, incidents, and review cycles.
-    - **TPRM**: Vendor management with 7-state lifecycle (identification → due_diligence → risk_assessment → contracting → onboarding → monitoring → offboarding), risk-tiered routing (full flow for critical/high, simplified 4-state flow for medium/low), transition validation with prerequisite checks, vendor_status_events audit trail, auto-tier computation from riskScore, manual tier overrides, questionnaires, document uploads.
+    - **TPRM**: Vendor management with 7-state lifecycle (identification → due_diligence → risk_assessment → contracting → onboarding → monitoring → offboarding), risk-tiered routing (full flow for critical/high, simplified 4-state flow for medium/low), transition validation with prerequisite checks, vendor_status_events audit trail, auto-tier computation from riskScore, manual tier overrides, questionnaires (with AI question generation, answer validation, weighted scoring), document uploads.
     - **Compliance**: Frameworks, controls, gap analysis, and control testing.
     - **Signals & Findings**: Management of incoming signals and derived findings.
     - **Alerts & Monitoring**: Listing, summarizing, acknowledging, and resolving system alerts.

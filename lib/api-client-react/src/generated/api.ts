@@ -64,6 +64,7 @@ import type {
   FrameworkListResponse,
   FrameworkWithRequirements,
   GapAnalysis,
+  GenerateAiQuestions503,
   GenerateMagicLink200,
   GenerateMagicLinkBody,
   GetAgentQueue200,
@@ -99,6 +100,7 @@ import type {
   PromoteSignalRequest,
   Questionnaire,
   QuestionnaireListResponse,
+  QuestionnaireScoreResponse,
   RFC7807Error,
   RefreshRequest,
   RespondToQuestionnaireBody,
@@ -126,12 +128,15 @@ import type {
   UpdateFindingRequest,
   UpdateIncidentRequest,
   UpdateLlmProvider,
+  UpdateQuestionnaireResponsesBody,
   UpdateRiskRequest,
   UpdateSignalStatusRequest,
   UpdateTreatmentRequest,
   UpdateUserRoleBody,
   UpdateVendorRequest,
   UserProfile,
+  ValidateQuestionnaireAnswers503,
+  ValidationFlagsResponse,
   Vendor,
   VendorListResponse,
   VendorStatusEventListResponse,
@@ -3407,6 +3412,387 @@ export const useCreateQuestionnaire = <
   TContext
 > => {
   return useMutation(getCreateQuestionnaireMutationOptions(options));
+};
+
+/**
+ * @summary Generate AI follow-up questions
+ */
+export const getGenerateAiQuestionsUrl = (vendorId: string, qId: string) => {
+  return `/api/v1/vendors/${vendorId}/questionnaires/${qId}/ai-questions`;
+};
+
+export const generateAiQuestions = async (
+  vendorId: string,
+  qId: string,
+  options?: RequestInit,
+): Promise<Questionnaire> => {
+  return customFetch<Questionnaire>(getGenerateAiQuestionsUrl(vendorId, qId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getGenerateAiQuestionsMutationOptions = <
+  TError = ErrorType<GenerateAiQuestions503>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateAiQuestions>>,
+    TError,
+    { vendorId: string; qId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateAiQuestions>>,
+  TError,
+  { vendorId: string; qId: string },
+  TContext
+> => {
+  const mutationKey = ["generateAiQuestions"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateAiQuestions>>,
+    { vendorId: string; qId: string }
+  > = (props) => {
+    const { vendorId, qId } = props ?? {};
+
+    return generateAiQuestions(vendorId, qId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateAiQuestionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateAiQuestions>>
+>;
+
+export type GenerateAiQuestionsMutationError =
+  ErrorType<GenerateAiQuestions503>;
+
+/**
+ * @summary Generate AI follow-up questions
+ */
+export const useGenerateAiQuestions = <
+  TError = ErrorType<GenerateAiQuestions503>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateAiQuestions>>,
+    TError,
+    { vendorId: string; qId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateAiQuestions>>,
+  TError,
+  { vendorId: string; qId: string },
+  TContext
+> => {
+  return useMutation(getGenerateAiQuestionsMutationOptions(options));
+};
+
+/**
+ * @summary Validate questionnaire answers against public knowledge
+ */
+export const getValidateQuestionnaireAnswersUrl = (
+  vendorId: string,
+  qId: string,
+) => {
+  return `/api/v1/vendors/${vendorId}/questionnaires/${qId}/validate-answers`;
+};
+
+export const validateQuestionnaireAnswers = async (
+  vendorId: string,
+  qId: string,
+  options?: RequestInit,
+): Promise<ValidationFlagsResponse> => {
+  return customFetch<ValidationFlagsResponse>(
+    getValidateQuestionnaireAnswersUrl(vendorId, qId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getValidateQuestionnaireAnswersMutationOptions = <
+  TError = ErrorType<ValidateQuestionnaireAnswers503>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof validateQuestionnaireAnswers>>,
+    TError,
+    { vendorId: string; qId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof validateQuestionnaireAnswers>>,
+  TError,
+  { vendorId: string; qId: string },
+  TContext
+> => {
+  const mutationKey = ["validateQuestionnaireAnswers"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof validateQuestionnaireAnswers>>,
+    { vendorId: string; qId: string }
+  > = (props) => {
+    const { vendorId, qId } = props ?? {};
+
+    return validateQuestionnaireAnswers(vendorId, qId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ValidateQuestionnaireAnswersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof validateQuestionnaireAnswers>>
+>;
+
+export type ValidateQuestionnaireAnswersMutationError =
+  ErrorType<ValidateQuestionnaireAnswers503>;
+
+/**
+ * @summary Validate questionnaire answers against public knowledge
+ */
+export const useValidateQuestionnaireAnswers = <
+  TError = ErrorType<ValidateQuestionnaireAnswers503>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof validateQuestionnaireAnswers>>,
+    TError,
+    { vendorId: string; qId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof validateQuestionnaireAnswers>>,
+  TError,
+  { vendorId: string; qId: string },
+  TContext
+> => {
+  return useMutation(getValidateQuestionnaireAnswersMutationOptions(options));
+};
+
+/**
+ * @summary Score questionnaire and update vendor risk
+ */
+export const getScoreQuestionnaireUrl = (vendorId: string, qId: string) => {
+  return `/api/v1/vendors/${vendorId}/questionnaires/${qId}/score`;
+};
+
+export const scoreQuestionnaire = async (
+  vendorId: string,
+  qId: string,
+  options?: RequestInit,
+): Promise<QuestionnaireScoreResponse> => {
+  return customFetch<QuestionnaireScoreResponse>(
+    getScoreQuestionnaireUrl(vendorId, qId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getScoreQuestionnaireMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scoreQuestionnaire>>,
+    TError,
+    { vendorId: string; qId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof scoreQuestionnaire>>,
+  TError,
+  { vendorId: string; qId: string },
+  TContext
+> => {
+  const mutationKey = ["scoreQuestionnaire"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof scoreQuestionnaire>>,
+    { vendorId: string; qId: string }
+  > = (props) => {
+    const { vendorId, qId } = props ?? {};
+
+    return scoreQuestionnaire(vendorId, qId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ScoreQuestionnaireMutationResult = NonNullable<
+  Awaited<ReturnType<typeof scoreQuestionnaire>>
+>;
+
+export type ScoreQuestionnaireMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Score questionnaire and update vendor risk
+ */
+export const useScoreQuestionnaire = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scoreQuestionnaire>>,
+    TError,
+    { vendorId: string; qId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof scoreQuestionnaire>>,
+  TError,
+  { vendorId: string; qId: string },
+  TContext
+> => {
+  return useMutation(getScoreQuestionnaireMutationOptions(options));
+};
+
+/**
+ * @summary Update questionnaire responses
+ */
+export const getUpdateQuestionnaireResponsesUrl = (
+  vendorId: string,
+  qId: string,
+) => {
+  return `/api/v1/vendors/${vendorId}/questionnaires/${qId}/responses`;
+};
+
+export const updateQuestionnaireResponses = async (
+  vendorId: string,
+  qId: string,
+  updateQuestionnaireResponsesBody: UpdateQuestionnaireResponsesBody,
+  options?: RequestInit,
+): Promise<Questionnaire> => {
+  return customFetch<Questionnaire>(
+    getUpdateQuestionnaireResponsesUrl(vendorId, qId),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateQuestionnaireResponsesBody),
+    },
+  );
+};
+
+export const getUpdateQuestionnaireResponsesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateQuestionnaireResponses>>,
+    TError,
+    {
+      vendorId: string;
+      qId: string;
+      data: BodyType<UpdateQuestionnaireResponsesBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateQuestionnaireResponses>>,
+  TError,
+  {
+    vendorId: string;
+    qId: string;
+    data: BodyType<UpdateQuestionnaireResponsesBody>;
+  },
+  TContext
+> => {
+  const mutationKey = ["updateQuestionnaireResponses"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateQuestionnaireResponses>>,
+    {
+      vendorId: string;
+      qId: string;
+      data: BodyType<UpdateQuestionnaireResponsesBody>;
+    }
+  > = (props) => {
+    const { vendorId, qId, data } = props ?? {};
+
+    return updateQuestionnaireResponses(vendorId, qId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateQuestionnaireResponsesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateQuestionnaireResponses>>
+>;
+export type UpdateQuestionnaireResponsesMutationBody =
+  BodyType<UpdateQuestionnaireResponsesBody>;
+export type UpdateQuestionnaireResponsesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update questionnaire responses
+ */
+export const useUpdateQuestionnaireResponses = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateQuestionnaireResponses>>,
+    TError,
+    {
+      vendorId: string;
+      qId: string;
+      data: BodyType<UpdateQuestionnaireResponsesBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateQuestionnaireResponses>>,
+  TError,
+  {
+    vendorId: string;
+    qId: string;
+    data: BodyType<UpdateQuestionnaireResponsesBody>;
+  },
+  TContext
+> => {
+  return useMutation(getUpdateQuestionnaireResponsesMutationOptions(options));
 };
 
 /**
