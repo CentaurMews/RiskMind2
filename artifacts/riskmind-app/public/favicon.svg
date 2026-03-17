@@ -1,3 +1,15 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+  <rect width="180" height="180" rx="36" fill="#0A0A0F"/>
+  <!-- Shield outline: hexagonal top, pointed bottom -->
+  <path d="M90 22 L148 52 L148 100 Q148 148 90 164 Q32 148 32 100 L32 52 Z"
+        stroke="#FF3C00" stroke-width="8" stroke-linejoin="round" fill="none"/>
+  <!-- Vertical center line -->
+  <line x1="90" y1="22" x2="90" y2="164" stroke="#FF3C00" stroke-width="6"/>
+  <!-- Horizontal center line -->
+  <line x1="32" y1="100" x2="148" y2="100" stroke="#FF3C00" stroke-width="6"/>
+  <!-- Upper diagonals: top-center to top-left and top-right corners -->
+  <line x1="90" y1="22" x2="32" y2="52" stroke="#FF3C00" stroke-width="5"/>
+  <line x1="90" y1="22" x2="148" y2="52" stroke="#FF3C00" stroke-width="5"/>
+  <!-- Lower-right diagonal: center to lower-right -->
+  <line x1="90" y1="100" x2="148" y2="148" stroke="#FF3C00" stroke-width="5"/>
 </svg>
