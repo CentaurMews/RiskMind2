@@ -2451,6 +2451,46 @@ paths:
                             type: string
                             format: uuid
 
+  /v1/agent/findings/{id}/create-risk:
+    post:
+      operationId: createRiskFromFinding
+      tags: [agent]
+      summary: Create a draft risk from an agent finding
+      description: Reads the finding's proposedAction, creates a draft risk pre-populated from the payload, links it via risk_sources with sourceType agent_detection, and transitions the finding to actioned.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Risk created and finding actioned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  finding:
+                    $ref: "#/components/schemas/AgentFinding"
+                  risk:
+                    $ref: "#/components/schemas/Risk"
+        "400":
+          description: Finding is not pending review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+        "404":
+          description: Finding not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundResponse"
+
   /v1/agent/findings/{id}/dismiss:
     post:
       operationId: dismissAgentFinding

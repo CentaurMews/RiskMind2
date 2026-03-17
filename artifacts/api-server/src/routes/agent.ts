@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { db, agentRunsTable, agentFindingsTable, tenantsTable, signalsTable, alertsTable } from "@workspace/db";
+import { db, agentRunsTable, agentFindingsTable, tenantsTable, signalsTable, alertsTable, risksTable, riskSourcesTable } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, sendError } from "../lib/errors";
@@ -201,6 +201,80 @@ router.post("/v1/agent/findings/:id/approve", requireRole("admin", "risk_manager
     res.json({ ...updated, actionResult });
   } catch (err) {
     console.error("Approve finding error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/agent/findings/:id/create-risk", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const findingId = String(req.params.id);
+
+    const [finding] = await db.select().from(agentFindingsTable)
+      .where(and(eq(agentFindingsTable.id, findingId), eq(agentFindingsTable.tenantId, tenantId)))
+      .limit(1);
+
+    if (!finding) { notFound(res, "Finding not found"); return; }
+    if (finding.status !== "pending_review") { badRequest(res, "Finding is not pending review"); return; }
+
+    const proposedAction = finding.proposedAction as Record<string, unknown> | null;
+    if (!proposedAction || String(proposedAction.type) !== "create_risk") {
+      badRequest(res, "Finding does not have a create_risk proposed action");
+      return;
+    }
+
+    const validCategories = ["operational", "financial", "compliance", "strategic", "technology", "reputational"];
+    let category = "operational";
+    if (proposedAction.category && validCategories.includes(String(proposedAction.category))) {
+      category = String(proposedAction.category);
+    }
+
+    const severityToLikelihood: Record<string, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
+    const likelihood = severityToLikelihood[finding.severity] || 3;
+    const impact = severityToLikelihood[finding.severity] || 3;
+
+    const riskTitle = proposedAction.title
+      ? String(proposedAction.title)
+      : `Agent finding: ${finding.title}`;
+    const riskDescription = proposedAction.description
+      ? String(proposedAction.description)
+      : finding.narrative;
+
+    const result = await db.transaction(async (tx) => {
+      const [risk] = await tx.insert(risksTable).values({
+        tenantId,
+        title: riskTitle,
+        description: riskDescription,
+        category: category as "operational" | "financial" | "compliance" | "strategic" | "technology" | "reputational",
+        status: "draft",
+        likelihood,
+        impact,
+      }).returning();
+
+      await tx.insert(riskSourcesTable).values({
+        riskId: risk.id,
+        sourceType: "agent_detection",
+        sourceId: findingId,
+      });
+
+      const [updated] = await tx.update(agentFindingsTable).set({
+        status: "actioned",
+        actionedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(agentFindingsTable.id, findingId)).returning();
+
+      return { risk, updated };
+    });
+
+    await recordAudit(req, "agent_finding_create_risk", "agent_finding", findingId, {
+      type: finding.type,
+      severity: finding.severity,
+      riskId: result.risk.id,
+    });
+
+    res.status(201).json({ finding: result.updated, risk: result.risk });
+  } catch (err) {
+    console.error("Create risk from finding error:", err);
     serverError(res);
   }
 });

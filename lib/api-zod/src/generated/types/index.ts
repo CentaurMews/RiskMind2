@@ -63,6 +63,7 @@ export * from "./createLlmProvider";
 export * from "./createQuestionnaireRequest";
 export * from "./createQuestionnaireRequestTemplate";
 export * from "./createReviewRequest";
+export * from "./createRiskFromFinding201";
 export * from "./createRiskRequest";
 export * from "./createSignalRequest";
 export * from "./createTreatmentRequest";
