@@ -10,6 +10,7 @@ export * from "./review-cycles";
 export * from "./signals";
 export * from "./findings";
 export * from "./vendors";
+export * from "./vendor-status-events";
 export * from "./questionnaires";
 export * from "./documents";
 export * from "./frameworks";

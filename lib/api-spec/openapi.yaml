@@ -729,7 +729,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateVendorRequest"
+              $ref: "#/components/schemas/UpdateVendorRequest"
       responses:
         "200":
           description: Vendor updated
@@ -771,6 +771,8 @@ paths:
               properties:
                 targetStatus:
                   $ref: "#/components/schemas/VendorStatus"
+                notes:
+                  type: string
               required:
                 - targetStatus
       responses:
@@ -786,6 +788,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/vendors/{id}/status-events:
+    get:
+      operationId: listVendorStatusEvents
+      tags: [vendors]
+      summary: List vendor lifecycle status events
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Vendor status events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorStatusEventListResponse"
 
   /v1/vendors/{id}/risk-score:
     post:
@@ -3401,7 +3420,7 @@ components:
 
     VendorStatus:
       type: string
-      enum: [onboarding, approved, active, suspended, offboarded]
+      enum: [identification, due_diligence, risk_assessment, contracting, onboarding, monitoring, offboarding]
 
     VendorTier:
       type: string
@@ -3434,12 +3453,50 @@ components:
         riskScore:
           type: string
           nullable: true
+        overrideTier:
+          $ref: "#/components/schemas/VendorTier"
+          nullable: true
+        overrideReason:
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+
+    VendorStatusEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendorId:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+        fromStatus:
+          $ref: "#/components/schemas/VendorStatus"
+        toStatus:
+          $ref: "#/components/schemas/VendorStatus"
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    VendorStatusEventListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/VendorStatusEvent"
 
     CreateVendorRequest:
       type: object
@@ -3448,16 +3505,39 @@ components:
           type: string
         description:
           type: string
-        tier:
-          $ref: "#/components/schemas/VendorTier"
         category:
           type: string
         contactEmail:
           type: string
         contactName:
           type: string
+        riskScore:
+          type: number
+          nullable: true
       required:
         - name
+
+    UpdateVendorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        contactEmail:
+          type: string
+        contactName:
+          type: string
+        riskScore:
+          type: number
+          nullable: true
+        overrideTier:
+          $ref: "#/components/schemas/VendorTier"
+          nullable: true
+        overrideReason:
+          type: string
 
     VendorListResponse:
       type: object

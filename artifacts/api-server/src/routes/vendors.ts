@@ -8,12 +8,31 @@ function p(req: Request, name: string): string {
 import {
   db,
   vendorsTable,
+  vendorStatusEventsTable,
   questionnairesTable,
   documentsTable,
 } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit, recordAuditDirect } from "../lib/audit";
 import { badRequest, notFound, serverError, conflict } from "../lib/errors";
+import {
+  getAllowedTransitions,
+  checkPrerequisites,
+  computeTierFromRiskScore,
+  getLifecycleFlow,
+} from "../lib/allowed-transitions";
+import type { VendorStatus, VendorTier } from "../lib/allowed-transitions";
+
+const VALID_STATUSES: VendorStatus[] = ["identification", "due_diligence", "risk_assessment", "contracting", "onboarding", "monitoring", "offboarding"];
+const VALID_TIERS: VendorTier[] = ["critical", "high", "medium", "low"];
+
+function isValidStatus(s: string): s is VendorStatus {
+  return VALID_STATUSES.includes(s as VendorStatus);
+}
+
+function isValidTier(t: string): t is VendorTier {
+  return VALID_TIERS.includes(t as VendorTier);
+}
 
 async function verifyVendorOwnership(vendorId: string, tenantId: string, res: Response): Promise<boolean> {
   const [vendor] = await db.select({ id: vendorsTable.id }).from(vendorsTable)
@@ -24,14 +43,6 @@ async function verifyVendorOwnership(vendorId: string, tenantId: string, res: Re
 
 const router = Router();
 
-const VENDOR_TRANSITIONS: Record<string, string[]> = {
-  onboarding: ["approved"],
-  approved: ["active", "offboarded"],
-  active: ["suspended", "offboarded"],
-  suspended: ["active", "offboarded"],
-  offboarded: [],
-};
-
 router.get("/v1/vendors", async (req, res) => {
   try {
     const { status, tier, search, page = "1", limit = "20" } = req.query;
@@ -39,8 +50,12 @@ router.get("/v1/vendors", async (req, res) => {
     const offset = (Number(page) - 1) * Number(limit);
 
     const conditions = [eq(vendorsTable.tenantId, tenantId)];
-    if (status) conditions.push(eq(vendorsTable.status, status as "onboarding" | "approved" | "active" | "suspended" | "offboarded"));
-    if (tier) conditions.push(eq(vendorsTable.tier, tier as "critical" | "high" | "medium" | "low"));
+    if (typeof status === "string" && isValidStatus(status)) {
+      conditions.push(eq(vendorsTable.status, status));
+    }
+    if (typeof tier === "string" && isValidTier(tier)) {
+      conditions.push(eq(vendorsTable.tier, tier));
+    }
     if (search) conditions.push(ilike(vendorsTable.name, `%${search}%`));
 
     const [vendors, countResult] = await Promise.all([
@@ -54,6 +69,8 @@ router.get("/v1/vendors", async (req, res) => {
         contactEmail: vendorsTable.contactEmail,
         contactName: vendorsTable.contactName,
         riskScore: vendorsTable.riskScore,
+        overrideTier: vendorsTable.overrideTier,
+        overrideReason: vendorsTable.overrideReason,
         createdAt: vendorsTable.createdAt,
         updatedAt: vendorsTable.updatedAt,
       }).from(vendorsTable).where(and(...conditions)).limit(Number(limit)).offset(offset).orderBy(vendorsTable.createdAt),
@@ -79,6 +96,8 @@ router.get("/v1/vendors/:id", async (req, res) => {
       contactEmail: vendorsTable.contactEmail,
       contactName: vendorsTable.contactName,
       riskScore: vendorsTable.riskScore,
+      overrideTier: vendorsTable.overrideTier,
+      overrideReason: vendorsTable.overrideReason,
       createdAt: vendorsTable.createdAt,
       updatedAt: vendorsTable.updatedAt,
     }).from(vendorsTable).where(and(eq(vendorsTable.id, p(req, "id")), eq(vendorsTable.tenantId, req.user!.tenantId))).limit(1);
@@ -93,17 +112,23 @@ router.get("/v1/vendors/:id", async (req, res) => {
 
 router.post("/v1/vendors", requireRole("admin", "risk_manager"), async (req, res) => {
   try {
-    const { name, description, tier, category, contactEmail, contactName } = req.body;
+    const { name, description, category, contactEmail, contactName, riskScore } = req.body;
     if (!name) { badRequest(res, "name is required"); return; }
+
+    let computedTier: VendorTier = "medium";
+    if (riskScore !== undefined && riskScore !== null) {
+      computedTier = computeTierFromRiskScore(Number(riskScore));
+    }
 
     const [vendor] = await db.insert(vendorsTable).values({
       tenantId: req.user!.tenantId,
       name,
       description,
-      tier: tier || "medium",
+      tier: computedTier,
       category,
       contactEmail,
       contactName,
+      ...(riskScore !== undefined && { riskScore: String(riskScore) }),
     }).returning();
 
     await recordAudit(req, "create", "vendor", vendor.id);
@@ -116,18 +141,85 @@ router.post("/v1/vendors", requireRole("admin", "risk_manager"), async (req, res
 
 router.put("/v1/vendors/:id", requireRole("admin", "risk_manager"), async (req, res) => {
   try {
-    const { name, description, tier, category, contactEmail, contactName } = req.body;
-    const [vendor] = await db.update(vendorsTable).set({
+    const { name, description, category, contactEmail, contactName, riskScore, overrideTier, overrideReason } = req.body;
+
+    const vendorId = p(req, "id");
+    const tenantId = req.user!.tenantId;
+
+    const [existingVendor] = await db.select({
+      id: vendorsTable.id,
+      status: vendorsTable.status,
+      overrideTier: vendorsTable.overrideTier,
+      riskScore: vendorsTable.riskScore,
+    }).from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId)))
+      .limit(1);
+
+    if (!existingVendor) { notFound(res, "Vendor not found"); return; }
+
+    const updates: Partial<{
+      name: string;
+      description: string | null;
+      category: string | null;
+      contactEmail: string | null;
+      contactName: string | null;
+      riskScore: string;
+      tier: VendorTier;
+      overrideTier: VendorTier | null;
+      overrideReason: string | null;
+      updatedAt: Date;
+    }> = {
       ...(name !== undefined && { name }),
       ...(description !== undefined && { description }),
-      ...(tier !== undefined && { tier }),
       ...(category !== undefined && { category }),
       ...(contactEmail !== undefined && { contactEmail }),
       ...(contactName !== undefined && { contactName }),
       updatedAt: new Date(),
-    }).where(and(eq(vendorsTable.id, p(req, "id")), eq(vendorsTable.tenantId, req.user!.tenantId))).returning();
+    };
+
+    if (overrideTier !== undefined) {
+      if (overrideTier !== null && !isValidTier(overrideTier)) {
+        badRequest(res, `Invalid overrideTier: ${overrideTier}`);
+        return;
+      }
+      if (overrideTier !== null && !overrideReason) {
+        badRequest(res, "overrideReason is required when setting overrideTier");
+        return;
+      }
+      updates.overrideTier = overrideTier;
+      updates.overrideReason = overrideTier !== null ? overrideReason : null;
+      if (overrideTier !== null) {
+        updates.tier = overrideTier;
+      } else if (riskScore !== undefined && riskScore !== null) {
+        updates.tier = computeTierFromRiskScore(Number(riskScore));
+      } else if (existingVendor.riskScore) {
+        updates.tier = computeTierFromRiskScore(Number(existingVendor.riskScore));
+      }
+    }
+
+    if (riskScore !== undefined && riskScore !== null) {
+      updates.riskScore = String(riskScore);
+      const effectiveOverride = overrideTier !== undefined ? overrideTier : existingVendor.overrideTier;
+      if (!effectiveOverride) {
+        updates.tier = computeTierFromRiskScore(Number(riskScore));
+      }
+    }
+
+    const [vendor] = await db.update(vendorsTable).set(updates)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId))).returning();
 
     if (!vendor) { notFound(res, "Vendor not found"); return; }
+
+    if (overrideTier !== undefined && overrideTier !== null) {
+      await db.insert(vendorStatusEventsTable).values({
+        vendorId: vendor.id,
+        actorId: req.user!.id,
+        fromStatus: vendor.status,
+        toStatus: vendor.status,
+        notes: `Tier manually overridden to '${overrideTier}'. Reason: ${overrideReason}`,
+      });
+    }
+
     await recordAudit(req, "update", "vendor", vendor.id);
     res.json(vendor);
   } catch (err) {
@@ -138,29 +230,77 @@ router.put("/v1/vendors/:id", requireRole("admin", "risk_manager"), async (req, 
 
 router.post("/v1/vendors/:id/transition", requireRole("admin", "risk_manager"), async (req, res) => {
   try {
-    const { targetStatus } = req.body;
+    const { targetStatus, notes } = req.body;
     if (!targetStatus) { badRequest(res, "targetStatus is required"); return; }
+    if (!isValidStatus(targetStatus)) { badRequest(res, `Invalid targetStatus: ${targetStatus}`); return; }
 
     const [vendor] = await db.select().from(vendorsTable)
       .where(and(eq(vendorsTable.id, p(req, "id")), eq(vendorsTable.tenantId, req.user!.tenantId))).limit(1);
 
     if (!vendor) { notFound(res, "Vendor not found"); return; }
 
-    const allowed = VENDOR_TRANSITIONS[vendor.status] || [];
+    const effectiveTier: VendorTier = vendor.overrideTier || vendor.tier;
+    const currentStatus: VendorStatus = vendor.status;
+    const allowed = getAllowedTransitions(effectiveTier, currentStatus);
     if (!allowed.includes(targetStatus)) {
-      conflict(res, `Cannot transition from '${vendor.status}' to '${targetStatus}'. Allowed: ${allowed.join(", ") || "none"}`);
+      const flow = getLifecycleFlow(effectiveTier);
+      conflict(res, `Cannot transition from '${currentStatus}' to '${targetStatus}'. Allowed next states: ${allowed.join(", ") || "none"}. This vendor follows the ${flow.length}-state lifecycle.`);
       return;
     }
+
+    const completedQ = await db.select({ id: questionnairesTable.id }).from(questionnairesTable)
+      .where(and(
+        eq(questionnairesTable.vendorId, vendor.id),
+        eq(questionnairesTable.tenantId, req.user!.tenantId),
+        eq(questionnairesTable.status, "completed"),
+      )).limit(1);
+
+    const prereq = await checkPrerequisites(
+      vendor.id,
+      currentStatus,
+      targetStatus,
+      { hasCompletedQuestionnaire: completedQ.length > 0 },
+    );
+
+    if (!prereq.allowed) {
+      conflict(res, prereq.reason || "Prerequisites not met for this transition.");
+      return;
+    }
+
+    await db.insert(vendorStatusEventsTable).values({
+      vendorId: vendor.id,
+      actorId: req.user!.id,
+      fromStatus: currentStatus,
+      toStatus: targetStatus,
+      notes: notes || null,
+    });
 
     const [updated] = await db.update(vendorsTable).set({
       status: targetStatus,
       updatedAt: new Date(),
     }).where(eq(vendorsTable.id, vendor.id)).returning();
 
-    await recordAudit(req, "transition", "vendor", vendor.id, { from: vendor.status, to: targetStatus });
+    await recordAudit(req, "transition", "vendor", vendor.id, { from: currentStatus, to: targetStatus });
     res.json(updated);
   } catch (err) {
     console.error("Vendor transition error:", err);
+    serverError(res);
+  }
+});
+
+router.get("/v1/vendors/:id/status-events", async (req, res) => {
+  try {
+    const [vendor] = await db.select({ id: vendorsTable.id }).from(vendorsTable)
+      .where(and(eq(vendorsTable.id, p(req, "id")), eq(vendorsTable.tenantId, req.user!.tenantId))).limit(1);
+    if (!vendor) { notFound(res, "Vendor not found"); return; }
+
+    const events = await db.select().from(vendorStatusEventsTable)
+      .where(eq(vendorStatusEventsTable.vendorId, vendor.id))
+      .orderBy(vendorStatusEventsTable.createdAt);
+
+    res.json({ data: events });
+  } catch (err) {
+    console.error("List vendor status events error:", err);
     serverError(res);
   }
 });
@@ -208,10 +348,15 @@ router.post("/v1/vendors/:id/risk-score", requireRole("admin", "risk_manager"), 
 
     score = Math.max(0, Math.min(100, Math.round(score * 100) / 100));
 
-    const [updated] = await db.update(vendorsTable).set({ riskScore: String(score), updatedAt: new Date() })
-      .where(eq(vendorsTable.id, vendorId)).returning();
+    const newTier: VendorTier = vendor.overrideTier ? vendor.tier : computeTierFromRiskScore(score);
 
-    await recordAudit(req, "calculate_risk_score", "vendor", vendorId, { score });
+    const [updated] = await db.update(vendorsTable).set({
+      riskScore: String(score),
+      ...(!vendor.overrideTier && { tier: newTier }),
+      updatedAt: new Date(),
+    }).where(eq(vendorsTable.id, vendorId)).returning();
+
+    await recordAudit(req, "calculate_risk_score", "vendor", vendorId, { score, tier: newTier });
     res.json({ riskScore: score, vendor: updated });
   } catch (err) {
     console.error("Risk score error:", err);

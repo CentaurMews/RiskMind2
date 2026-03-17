@@ -9,6 +9,7 @@ import {
   alertsTable,
   controlsTable,
 } from "@workspace/db";
+import { computeTierFromRiskScore } from "../lib/allowed-transitions";
 import {
   ListRisksQueryParams,
   CreateRiskBody,
@@ -179,14 +180,16 @@ export function registerMcpTools(mcp: McpServer) {
       if (!user) return authError(401, "Unauthorized", "Authentication required");
       if (!checkRole(user, "admin", "risk_manager")) return deny(user, "create_vendor", 403, "Forbidden", "Insufficient permissions");
 
+      const computedTier = args.riskScore != null ? computeTierFromRiskScore(args.riskScore) : "medium" as const;
       const [vendor] = await db.insert(vendorsTable).values({
         tenantId: user.tenantId,
         name: args.name,
         description: args.description || null,
         category: args.category || null,
-        tier: args.tier,
         contactName: args.contactName || null,
         contactEmail: args.contactEmail || null,
+        tier: computedTier,
+        ...(args.riskScore != null && { riskScore: String(args.riskScore) }),
       }).returning();
 
       await audit(user.tenantId, user.userId, "mcp_create", "vendor", vendor.id);

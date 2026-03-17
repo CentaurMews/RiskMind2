@@ -120,13 +120,13 @@ export async function checkFailedControlTests() {
 }
 
 export async function checkVendorStatusIssues() {
-  const suspendedVendors = await db.select().from(vendorsTable)
-    .where(eq(vendorsTable.status, "suspended"));
+  const offboardingVendors = await db.select().from(vendorsTable)
+    .where(eq(vendorsTable.status, "offboarding"));
 
   let alertCount = 0;
-  for (const vendor of suspendedVendors) {
-    await createAlert(vendor.tenantId, "vendor_status", `Vendor suspended: ${vendor.name}`, "high",
-      `Vendor "${vendor.name}" is currently suspended`,
+  for (const vendor of offboardingVendors) {
+    await createAlert(vendor.tenantId, "vendor_status", `Vendor offboarding: ${vendor.name}`, "high",
+      `Vendor "${vendor.name}" is currently being offboarded`,
       { vendorId: vendor.id });
     alertCount++;
   }

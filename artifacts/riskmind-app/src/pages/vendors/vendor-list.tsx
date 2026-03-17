@@ -1,17 +1,47 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useListVendors, useCreateVendor, type VendorTier } from "@workspace/api-client-react";
+import { useListVendors, useCreateVendor } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/severity-badge";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Building2, Loader2, ArrowRight } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
+
+const STATUS_LABELS: Record<string, string> = {
+  identification: "Identification",
+  due_diligence: "Due Diligence",
+  risk_assessment: "Risk Assessment",
+  contracting: "Contracting",
+  onboarding: "Onboarding",
+  monitoring: "Monitoring",
+  offboarding: "Offboarding",
+};
+
+function LifecycleBadge({ status }: { status?: string }) {
+  const s = status || "identification";
+  const label = STATUS_LABELS[s] || s;
+
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "font-mono text-[10px] px-2 py-0.5 tracking-wider font-medium",
+        (s === "monitoring" || s === "onboarding") && "bg-primary/10 text-primary border-primary/20",
+        (s === "identification" || s === "due_diligence" || s === "risk_assessment" || s === "contracting") && "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400",
+        s === "offboarding" && "bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400"
+      )}
+    >
+      {label}
+    </Badge>
+  );
+}
 
 export default function VendorList() {
   const [search, setSearch] = useState("");
@@ -22,7 +52,6 @@ export default function VendorList() {
   const [formData, setFormData] = useState({
     name: "",
     category: "",
-    tier: "medium" as VendorTier,
     contactEmail: ""
   });
 
@@ -71,18 +100,6 @@ export default function VendorList() {
                   <Input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} placeholder="Cloud Hosting" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Criticality Tier</Label>
-                  <Select value={formData.tier} onValueChange={(v) => setFormData({...formData, tier: v as typeof formData.tier})}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="critical">Critical</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
                   <Label>Primary Contact Email</Label>
                   <Input type="email" value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} placeholder="security@acme.com" />
                 </div>
@@ -115,7 +132,7 @@ export default function VendorList() {
                   <TableHead>Vendor</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Tier</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Lifecycle Stage</TableHead>
                   <TableHead>Risk Score</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
@@ -136,7 +153,7 @@ export default function VendorList() {
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{vendor.category || '-'}</TableCell>
                       <TableCell className="capitalize text-sm">{vendor.tier}</TableCell>
-                      <TableCell><StatusBadge status={vendor.status} /></TableCell>
+                      <TableCell><LifecycleBadge status={vendor.status} /></TableCell>
                       <TableCell>
                         {vendor.riskScore ? (
                           <div className="flex items-center gap-2">

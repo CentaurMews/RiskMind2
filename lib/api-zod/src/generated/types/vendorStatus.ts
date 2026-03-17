@@ -9,9 +9,11 @@
 export type VendorStatus = (typeof VendorStatus)[keyof typeof VendorStatus];
 
 export const VendorStatus = {
+  identification: "identification",
+  due_diligence: "due_diligence",
+  risk_assessment: "risk_assessment",
+  contracting: "contracting",
   onboarding: "onboarding",
-  approved: "approved",
-  active: "active",
-  suspended: "suspended",
-  offboarded: "offboarded",
+  monitoring: "monitoring",
+  offboarding: "offboarding",
 } as const;

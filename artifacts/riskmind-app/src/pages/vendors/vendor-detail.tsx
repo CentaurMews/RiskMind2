@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useRoute } from "wouter";
 import { useGetVendor, useListQuestionnaires, useListDocuments, useCalculateVendorRiskScore, useTransitionVendor, useCreateDocument, useSummarizeVendorDocument } from "@workspace/api-client-react";
+import type { VendorStatus, VendorTier } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/severity-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Mail, Loader2, FileText, ClipboardList, RefreshCw, Upload, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Building2, Mail, Loader2, FileText, ClipboardList, RefreshCw, Upload, ArrowRight, Sparkles, CheckCircle2, AlertCircle, Check } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,15 +15,96 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
-import type { VendorStatus } from "@workspace/api-client-react";
+const FULL_FLOW: VendorStatus[] = [
+  "identification",
+  "due_diligence",
+  "risk_assessment",
+  "contracting",
+  "onboarding",
+  "monitoring",
+  "offboarding",
+];
 
-const LIFECYCLE_TRANSITIONS: Record<string, { label: string; target: VendorStatus }[]> = {
-  onboarding: [{ label: "Approve Vendor", target: "approved" }],
-  approved: [{ label: "Activate", target: "active" }],
-  active: [{ label: "Suspend", target: "suspended" }, { label: "Start Offboarding", target: "offboarded" }],
-  suspended: [{ label: "Reactivate", target: "active" }, { label: "Offboard", target: "offboarded" }],
+const SIMPLIFIED_FLOW: VendorStatus[] = [
+  "identification",
+  "risk_assessment",
+  "monitoring",
+  "offboarding",
+];
+
+function getLifecycleFlow(tier?: VendorTier | null): VendorStatus[] {
+  if (tier === "critical" || tier === "high") return FULL_FLOW;
+  return SIMPLIFIED_FLOW;
+}
+
+function getNextStatus(tier: VendorTier | undefined | null, currentStatus: VendorStatus): VendorStatus | null {
+  const flow = getLifecycleFlow(tier);
+  const idx = flow.indexOf(currentStatus);
+  if (idx === -1 || idx >= flow.length - 1) return null;
+  return flow[idx + 1];
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  identification: "Identification",
+  due_diligence: "Due Diligence",
+  risk_assessment: "Risk Assessment",
+  contracting: "Contracting",
+  onboarding: "Onboarding",
+  monitoring: "Monitoring",
+  offboarding: "Offboarding",
 };
+
+function LifecycleStepper({ currentStatus, tier }: { currentStatus?: VendorStatus; tier?: VendorTier | null }) {
+  const flow = getLifecycleFlow(tier);
+  const currentIndex = currentStatus ? flow.indexOf(currentStatus) : -1;
+
+  return (
+    <div className="flex items-center w-full gap-1">
+      {flow.map((status, index) => {
+        const isCompleted = index < currentIndex;
+        const isCurrent = index === currentIndex;
+        const isFuture = index > currentIndex;
+
+        return (
+          <div key={status} className="flex items-center flex-1 min-w-0">
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 transition-all",
+                  isCompleted && "bg-emerald-500 border-emerald-500 text-white",
+                  isCurrent && "bg-primary border-primary text-primary-foreground ring-4 ring-primary/20",
+                  isFuture && "bg-muted border-border text-muted-foreground"
+                )}
+              >
+                {isCompleted ? <Check className="h-4 w-4" /> : index + 1}
+              </div>
+              <span
+                className={cn(
+                  "text-[10px] mt-1.5 text-center font-medium leading-tight truncate w-full",
+                  isCompleted && "text-emerald-600 dark:text-emerald-400",
+                  isCurrent && "text-primary font-semibold",
+                  isFuture && "text-muted-foreground"
+                )}
+              >
+                {STATUS_LABELS[status] || status}
+              </span>
+            </div>
+            {index < flow.length - 1 && (
+              <div
+                className={cn(
+                  "h-0.5 flex-1 min-w-4 mt-[-16px]",
+                  index < currentIndex ? "bg-emerald-500" : "bg-border"
+                )}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function VendorDetail() {
   const [, params] = useRoute("/vendors/:id");
@@ -31,6 +113,7 @@ export default function VendorDetail() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [docForm, setDocForm] = useState({ fileName: "", mimeType: "application/pdf" });
   const [summarizingDocs, setSummarizingDocs] = useState<Record<string, "pending" | "done">>({});
+  const [transitionError, setTransitionError] = useState<string | null>(null);
 
   const { data: vendor, isLoading } = useGetVendor(id);
   const { data: questionnaires } = useListQuestionnaires(id);
@@ -44,7 +127,15 @@ export default function VendorDetail() {
 
   const transitionMutation = useTransitionVendor({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/v1/vendors/${id}`] })
+      onSuccess: () => {
+        setTransitionError(null);
+        queryClient.invalidateQueries({ queryKey: [`/api/v1/vendors/${id}`] });
+      },
+      onError: (error: unknown) => {
+        const err = error as { detail?: string; message?: string } | undefined;
+        const detail = err?.detail || err?.message || "Transition failed";
+        setTransitionError(detail);
+      },
     }
   });
 
@@ -69,7 +160,8 @@ export default function VendorDetail() {
   if (isLoading) return <AppLayout><div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div></AppLayout>;
   if (!vendor) return <AppLayout><div className="p-8 text-center text-muted-foreground">Vendor not found</div></AppLayout>;
 
-  const availableTransitions = vendor.status ? LIFECYCLE_TRANSITIONS[vendor.status] || [] : [];
+  const effectiveTier = (vendor.overrideTier || vendor.tier) as VendorTier | undefined;
+  const nextStatus = getNextStatus(effectiveTier, vendor.status as VendorStatus);
 
   return (
     <AppLayout>
@@ -81,8 +173,37 @@ export default function VendorDetail() {
           <div className="font-mono text-sm text-muted-foreground">VND-{vendor.id?.split('-')[0].toUpperCase()}</div>
         </div>
 
+        <Card className="shadow-sm border-t-4 border-t-sidebar p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Lifecycle Progress</h3>
+            <StatusBadge status={vendor.status} />
+          </div>
+          <LifecycleStepper currentStatus={vendor.status as VendorStatus} tier={effectiveTier} />
+          {nextStatus && (
+            <div className="mt-4 flex items-center gap-3 pt-4 border-t">
+              <Button
+                size="sm"
+                disabled={transitionMutation.isPending}
+                onClick={() => {
+                  setTransitionError(null);
+                  transitionMutation.mutate({ id, data: { targetStatus: nextStatus } });
+                }}
+              >
+                {transitionMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ArrowRight className="h-3 w-3 mr-1" />}
+                Advance to {STATUS_LABELS[nextStatus] || nextStatus}
+              </Button>
+            </div>
+          )}
+          {transitionError && (
+            <div className="mt-3 flex items-start gap-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 rounded-md p-3">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{transitionError}</span>
+            </div>
+          )}
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="md:col-span-2 shadow-sm border-t-4 border-t-sidebar">
+          <Card className="md:col-span-2 shadow-sm">
             <CardContent className="p-8 flex flex-col md:flex-row gap-6 items-start">
               <div className="h-24 w-24 rounded-xl bg-secondary flex items-center justify-center shrink-0 border-2 border-border shadow-sm">
                 <Building2 className="h-10 w-10 text-muted-foreground" />
@@ -90,7 +211,6 @@ export default function VendorDetail() {
               <div className="flex-1 space-y-4">
                 <div className="flex items-center justify-between">
                   <h1 className="text-3xl font-bold tracking-tight">{vendor.name}</h1>
-                  <StatusBadge status={vendor.status} />
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Mail className="h-4 w-4" /> {vendor.contactEmail || "No contact email"}
@@ -102,26 +222,14 @@ export default function VendorDetail() {
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground uppercase font-mono tracking-wider">Criticality Tier</span>
-                    <div className="font-medium mt-1 capitalize">{vendor.tier}</div>
+                    <div className="font-medium mt-1 capitalize">
+                      {vendor.tier}
+                      {vendor.overrideTier && (
+                        <span className="text-xs text-muted-foreground ml-2">(overridden)</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {availableTransitions.length > 0 && (
-                  <div className="flex gap-2 pt-4 border-t">
-                    {availableTransitions.map((t: { label: string; target: VendorStatus }) => (
-                      <Button
-                        key={t.target}
-                        variant={t.target === "suspended" ? "destructive" : "default"}
-                        size="sm"
-                        disabled={transitionMutation.isPending}
-                        onClick={() => transitionMutation.mutate({ id, data: { targetStatus: t.target } })}
-                      >
-                        {transitionMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ArrowRight className="h-3 w-3 mr-1" />}
-                        {t.label}
-                      </Button>
-                    ))}
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>

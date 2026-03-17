@@ -44,7 +44,7 @@ RiskMind is built as a pnpm workspace monorepo using TypeScript.
 - **Public**: Health checks, user login/refresh, questionnaire submission.
 - **Protected**: Comprehensive endpoints covering:
     - **Risk Register**: CRUD operations for risks, treatments, KRIs, incidents, and review cycles.
-    - **TPRM**: Vendor management, questionnaires, document uploads, and lifecycle transitions.
+    - **TPRM**: Vendor management with 7-state lifecycle (identification → due_diligence → risk_assessment → contracting → onboarding → monitoring → offboarding), risk-tiered routing (full flow for critical/high, simplified 4-state flow for medium/low), transition validation with prerequisite checks, vendor_status_events audit trail, auto-tier computation from riskScore, manual tier overrides, questionnaires, document uploads.
     - **Compliance**: Frameworks, controls, gap analysis, and control testing.
     - **Signals & Findings**: Management of incoming signals and derived findings.
     - **Alerts & Monitoring**: Listing, summarizing, acknowledging, and resolving system alerts.

@@ -5,12 +5,15 @@
  * RiskMind API specification
  * OpenAPI spec version: 0.3.0
  */
+import type { VendorTier } from "./vendorTier";
 
-export interface CreateVendorRequest {
-  name: string;
+export interface UpdateVendorRequest {
+  name?: string;
   description?: string;
   category?: string;
   contactEmail?: string;
   contactName?: string;
   riskScore?: number | null;
+  overrideTier?: VendorTier | null;
+  overrideReason?: string;
 }

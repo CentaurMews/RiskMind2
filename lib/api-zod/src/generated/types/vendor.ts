@@ -18,6 +18,8 @@ export interface Vendor {
   contactEmail?: string | null;
   contactName?: string | null;
   riskScore?: string | null;
+  overrideTier?: VendorTier | null;
+  overrideReason?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

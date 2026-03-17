@@ -426,11 +426,13 @@ export interface ReviewListResponse {
 export type VendorStatus = (typeof VendorStatus)[keyof typeof VendorStatus];
 
 export const VendorStatus = {
+  identification: "identification",
+  due_diligence: "due_diligence",
+  risk_assessment: "risk_assessment",
+  contracting: "contracting",
   onboarding: "onboarding",
-  approved: "approved",
-  active: "active",
-  suspended: "suspended",
-  offboarded: "offboarded",
+  monitoring: "monitoring",
+  offboarding: "offboarding",
 } as const;
 
 export type VendorTier = (typeof VendorTier)[keyof typeof VendorTier];
@@ -452,17 +454,44 @@ export interface Vendor {
   contactEmail?: string | null;
   contactName?: string | null;
   riskScore?: string | null;
+  overrideTier?: VendorTier | null;
+  overrideReason?: string | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface VendorStatusEvent {
+  id?: string;
+  vendorId?: string;
+  actorId?: string | null;
+  fromStatus?: VendorStatus;
+  toStatus?: VendorStatus;
+  notes?: string | null;
+  createdAt?: string;
+}
+
+export interface VendorStatusEventListResponse {
+  data?: VendorStatusEvent[];
 }
 
 export interface CreateVendorRequest {
   name: string;
   description?: string;
-  tier?: VendorTier;
   category?: string;
   contactEmail?: string;
   contactName?: string;
+  riskScore?: number | null;
+}
+
+export interface UpdateVendorRequest {
+  name?: string;
+  description?: string;
+  category?: string;
+  contactEmail?: string;
+  contactName?: string;
+  riskScore?: number | null;
+  overrideTier?: VendorTier | null;
+  overrideReason?: string;
 }
 
 export interface VendorListResponse {
@@ -1222,6 +1251,7 @@ export type ListVendorsParams = {
 
 export type TransitionVendorBody = {
   targetStatus: VendorStatus;
+  notes?: string;
 };
 
 export type CalculateVendorRiskScore200 = {
