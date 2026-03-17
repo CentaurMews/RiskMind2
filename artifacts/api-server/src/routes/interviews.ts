@@ -664,7 +664,8 @@ Rules:
     }> = [];
 
     try {
-      const parsed = JSON.parse(response);
+      const cleaned = response.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "").trim();
+      const parsed = JSON.parse(cleaned);
       const validCategories = ["operational", "financial", "compliance", "strategic", "technology", "reputational"];
       scenarios = Array.isArray(parsed.scenarios)
         ? (parsed.scenarios as RawScenario[]).map((s) => ({

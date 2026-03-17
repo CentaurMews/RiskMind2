@@ -67,7 +67,8 @@ export default function RiskList() {
 
   const { data, isLoading } = useListRisks({
     search: search || undefined,
-    status: statusParam,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    status: statusParam as any,
     treatmentStrategy: strategyParam,
   });
 
@@ -75,8 +76,9 @@ export default function RiskList() {
   const [interviewOpen, setInterviewOpen] = useState(false);
   const [selectedSources, setSelectedSources] = useState<SourceItem[]>([]);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
-  const [rightPanelTab, setRightPanelTab] = useState<"intelligence" | "documents" | "configurator">("intelligence");
+  const [rightPanelTab, setRightPanelTab] = useState<"intelligence" | "documents">("intelligence");
   const [documentExtractedText, setDocumentExtractedText] = useState<string>("");
+  const [showConfigurator, setShowConfigurator] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     title: "",
@@ -245,6 +247,15 @@ export default function RiskList() {
           </div>
           
           <div className="flex items-center gap-2">
+            <Button
+              variant={showConfigurator ? "secondary" : "outline"}
+              onClick={() => setShowConfigurator(v => !v)}
+              className="gap-2 border-primary/40 text-primary hover:bg-primary/5 font-semibold"
+            >
+              <Wand2 className="h-4 w-4" />
+              AI Risk Scan
+              {showConfigurator && <X className="h-3.5 w-3.5 ml-1" />}
+            </Button>
             <Sheet open={isOpen} onOpenChange={handleOpenChange}>
               <SheetTrigger asChild>
                 <Button className="shadow-md">
@@ -334,16 +345,13 @@ export default function RiskList() {
                           </button>
                           {showMobilePanel && (
                             <div className="mt-2 border rounded-lg p-3 space-y-3">
-                              <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents" | "configurator")}>
+                              <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents")}>
                                 <TabsList className="w-full h-8">
                                   <TabsTrigger value="intelligence" className="flex-1 text-xs">
                                     <Brain className="h-3 w-3 mr-1" />Intel
                                   </TabsTrigger>
                                   <TabsTrigger value="documents" className="flex-1 text-xs">
                                     <FileText className="h-3 w-3 mr-1" />Docs
-                                  </TabsTrigger>
-                                  <TabsTrigger value="configurator" className="flex-1 text-xs">
-                                    <Wand2 className="h-3 w-3 mr-1" />AI
                                   </TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="intelligence" className="h-[300px] overflow-hidden mt-2">
@@ -356,9 +364,6 @@ export default function RiskList() {
                                 </TabsContent>
                                 <TabsContent value="documents" className="mt-2">
                                   <DocumentAnalysisPanel onPopulateForm={handlePopulateFromDocument} onTextExtracted={handleTextExtracted} />
-                                </TabsContent>
-                                <TabsContent value="configurator" className="mt-2">
-                                  <AiRiskConfigurator documentText={documentExtractedText} />
                                 </TabsContent>
                               </Tabs>
                             </div>
@@ -387,7 +392,7 @@ export default function RiskList() {
                   </div>
 
                   <div className="hidden md:flex w-[320px] border-l bg-muted/20 flex-col min-h-0">
-                    <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents" | "configurator")} className="flex flex-col h-full">
+                    <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents")} className="flex flex-col h-full">
                       <div className="px-3 pt-3 pb-0">
                         <TabsList className="w-full h-8">
                           <TabsTrigger value="intelligence" className="flex-1 text-xs">
@@ -395,9 +400,6 @@ export default function RiskList() {
                           </TabsTrigger>
                           <TabsTrigger value="documents" className="flex-1 text-xs">
                             <FileText className="h-3 w-3 mr-1" />Docs
-                          </TabsTrigger>
-                          <TabsTrigger value="configurator" className="flex-1 text-xs">
-                            <Wand2 className="h-3 w-3 mr-1" />AI
                           </TabsTrigger>
                         </TabsList>
                       </div>
@@ -412,11 +414,6 @@ export default function RiskList() {
                       <TabsContent value="documents" className="flex-1 min-h-0 mt-0 overflow-y-auto">
                         <div className="p-3">
                           <DocumentAnalysisPanel onPopulateForm={handlePopulateFromDocument} onTextExtracted={handleTextExtracted} />
-                        </div>
-                      </TabsContent>
-                      <TabsContent value="configurator" className="flex-1 min-h-0 mt-0 overflow-y-auto">
-                        <div className="p-3">
-                          <AiRiskConfigurator documentText={documentExtractedText} />
                         </div>
                       </TabsContent>
                     </Tabs>
@@ -436,6 +433,30 @@ export default function RiskList() {
             if (resultId) navigate(`/risks/${resultId}`);
           }}
         />
+
+        {showConfigurator && (
+          <div className="border border-primary/20 rounded-xl bg-primary/[0.03] p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 rounded-lg bg-foreground text-background flex items-center justify-center shrink-0">
+                <Wand2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-base leading-tight">AI Risk Configurator</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Analyses your signals, findings and agent detections to surface compound risk scenarios.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigurator(false)}
+                className="ml-auto text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <AiRiskConfigurator />
+          </div>
+        )}
 
         <Card className="flex-1 flex flex-col min-h-0 overflow-hidden shadow-sm">
           <div className="p-4 border-b bg-card flex items-center justify-between gap-4">

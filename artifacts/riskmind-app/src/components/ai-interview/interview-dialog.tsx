@@ -51,9 +51,14 @@ interface InterviewDialogProps {
   onCommitted?: (resultId: string | null, type: string) => void;
 }
 
+function stripCodeFences(text: string): string {
+  return text.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "").trim();
+}
+
 function parseAiMessage(raw: string): string {
+  const stripped = stripCodeFences(raw);
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(stripped);
     if (parsed.type === "question" && parsed.content) return parsed.content;
     if (parsed.type === "draft") return "I've prepared a draft based on what you've told me. Review it below.";
     return raw;
