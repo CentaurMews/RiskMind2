@@ -9,7 +9,7 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 
 ### Deployment
 
-- [ ] **DEPL-01**: Strip all Replit-specific dependencies (@replit/connectors-sdk, @replit/vite-plugin-*)
+- [x] **DEPL-01**: Strip all Replit-specific dependencies (@replit/connectors-sdk, @replit/vite-plugin-*)
 - [ ] **DEPL-02**: Configure environment variables (JWT_SECRET, ENCRYPTION_KEY, DATABASE_URL, PORT) with startup validation
 - [ ] **DEPL-03**: Install pnpm dependencies and build all workspace packages successfully
 - [ ] **DEPL-04**: Express serves both REST API and built React SPA from single port (4000)
@@ -106,7 +106,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEPL-01 | Phase 1 | Pending |
+| DEPL-01 | Phase 1 | Complete |
 | DEPL-02 | Phase 1 | Pending |
 | DEPL-03 | Phase 1 | Pending |
 | DEPL-04 | Phase 1 | Pending |
