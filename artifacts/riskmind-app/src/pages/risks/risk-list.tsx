@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useListRisks, useCreateRisk, type RiskCategory, type RiskSourceInput } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -44,6 +44,37 @@ export default function RiskList() {
     likelihood: "3",
     impact: "3"
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const findingId = params.get("findingId");
+    const prefillTitle = params.get("title");
+    const prefillDesc = params.get("description");
+    const prefillCategory = params.get("category");
+    const prefillLikelihood = params.get("likelihood");
+    const prefillImpact = params.get("impact");
+
+    if (findingId || prefillTitle) {
+      setFormData({
+        title: prefillTitle || "",
+        description: prefillDesc || "",
+        category: (prefillCategory as RiskCategory) || "operational",
+        likelihood: prefillLikelihood || "3",
+        impact: prefillImpact || "3",
+      });
+      if (findingId) {
+        setSelectedSources([{
+          id: findingId,
+          sourceType: "finding",
+          title: prefillTitle || "Finding",
+          description: prefillDesc || "",
+          category: prefillCategory || undefined,
+        }]);
+      }
+      setIsOpen(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const createMutation = useCreateRisk({
     mutation: {

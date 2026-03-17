@@ -5,11 +5,12 @@ function p(req: Request, name: string): string {
   return String(req.params[name]);
 }
 
-import { db, signalsTable } from "@workspace/db";
+import { db, signalsTable, findingsTable } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, conflict } from "../lib/errors";
 import { enqueueJob } from "../lib/job-queue";
+import { RiskSourceAggregator } from "../services/risk-source-aggregator";
 
 const SIGNAL_TRANSITIONS: Record<string, string[]> = {
   pending: ["triaged"],
@@ -133,6 +134,48 @@ router.patch("/v1/signals/:id/status", requireRole("admin", "risk_manager", "aud
     res.json(updated);
   } catch (err) {
     console.error("Update signal status error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/signals/:id/triage", requireRole("admin", "risk_manager", "auditor"), async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const signalId = p(req, "id");
+    const aggregator = new RiskSourceAggregator(tenantId);
+    const result = await aggregator.triageSignal(signalId);
+
+    await recordAudit(req, "triage", "signal", signalId, { findingId: result.finding.id });
+    res.status(201).json({ signal: result.signal, finding: result.finding });
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === "Signal not found") { notFound(res, err.message); return; }
+      if (err.message.includes("expected 'pending' or 'triaged'")) { conflict(res, err.message); return; }
+      if (err.message.includes("changed concurrently")) { conflict(res, err.message); return; }
+    }
+    console.error("Triage signal error:", err);
+    serverError(res);
+  }
+});
+
+router.get("/v1/signals/:id/finding", async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const signalId = p(req, "id");
+
+    const [signal] = await db.select().from(signalsTable)
+      .where(and(eq(signalsTable.id, signalId), eq(signalsTable.tenantId, tenantId)))
+      .limit(1);
+    if (!signal) { notFound(res, "Signal not found"); return; }
+
+    const [finding] = await db.select().from(findingsTable)
+      .where(and(eq(findingsTable.signalId, signalId), eq(findingsTable.tenantId, tenantId)))
+      .limit(1);
+    if (!finding) { notFound(res, "No finding linked to this signal"); return; }
+
+    res.json(finding);
+  } catch (err) {
+    console.error("Get signal finding error:", err);
     serverError(res);
   }
 });

@@ -797,6 +797,81 @@ export interface FindingListResponse {
   limit?: number;
 }
 
+export interface TriageSignalResponse {
+  signal?: Signal;
+  finding?: Finding;
+}
+
+export type RiskSuggestionCategory =
+  (typeof RiskSuggestionCategory)[keyof typeof RiskSuggestionCategory];
+
+export const RiskSuggestionCategory = {
+  operational: "operational",
+  financial: "financial",
+  compliance: "compliance",
+  strategic: "strategic",
+  technology: "technology",
+  reputational: "reputational",
+} as const;
+
+export type RiskSuggestionSource =
+  (typeof RiskSuggestionSource)[keyof typeof RiskSuggestionSource];
+
+export const RiskSuggestionSource = {
+  ai: "ai",
+  fallback: "fallback",
+} as const;
+
+export interface RiskSuggestion {
+  title?: string;
+  description?: string;
+  category?: RiskSuggestionCategory;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  likelihood?: number;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  impact?: number;
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
+  confidence?: number;
+  source?: RiskSuggestionSource;
+}
+
+export type ConvertFindingRequestCategory =
+  (typeof ConvertFindingRequestCategory)[keyof typeof ConvertFindingRequestCategory];
+
+export const ConvertFindingRequestCategory = {
+  operational: "operational",
+  financial: "financial",
+  compliance: "compliance",
+  strategic: "strategic",
+  technology: "technology",
+  reputational: "reputational",
+} as const;
+
+export interface ConvertFindingRequest {
+  title?: string;
+  description?: string;
+  category?: ConvertFindingRequestCategory;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  likelihood?: number;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  impact?: number;
+}
+
 export type AlertSeverity = (typeof AlertSeverity)[keyof typeof AlertSeverity];
 
 export const AlertSeverity = {
