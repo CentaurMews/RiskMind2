@@ -57,8 +57,9 @@ RiskMind is built as a pnpm workspace monorepo using TypeScript.
 
 **AI & Async Infrastructure:**
 - **Asynchronous Job Queue**: PostgreSQL-backed, supporting exponential backoff retries and dead-lettering, with workers for AI triage, AI enrichment, and document processing.
-- **LLM Service Architecture**: Multi-provider support (OpenAI-compatible, Anthropic), tenant-scoped configurations with AES-256-GCM encrypted API keys, auto-routing, and streaming capabilities.
+- **LLM Service Architecture**: Multi-provider support (OpenAI-compatible, Anthropic), tenant-scoped configurations with AES-256-GCM encrypted API keys, auto-routing, and streaming capabilities. When `AI_INTEGRATIONS_ANTHROPIC_BASE_URL` and `AI_INTEGRATIONS_ANTHROPIC_API_KEY` are present (set via the Replit Anthropic integration), the Anthropic client automatically uses the Replit proxy — no personal API key required.
 - **Monitoring Scheduler**: Daily automated checks generating alerts for KRI breaches, overdue reviews, failed documents, failed control tests, vendor status issues, and alert escalations.
+- **AI Risk Configurator**: Endpoint `POST /api/v1/ai/risk-configurator` analyses the tenant's recent signals, findings, and agent detections to synthesise 2–5 compound risk scenarios. A save endpoint (`POST /api/v1/ai/risk-configurator/save`) persists a chosen scenario directly to the risk register as active or draft. Scenarios include title, description, category, likelihood, impact, and source evidence strings.
 
 **Frontend Application (`artifacts/riskmind-app`):**
 - **Framework**: React + Vite, port 19534 (reads from PORT env var)
@@ -68,6 +69,7 @@ RiskMind is built as a pnpm workspace monorepo using TypeScript.
 - **Design**: Monochrome enterprise design with dark sidebar, clean typography
 - **Auth Flow**: JWT stored in localStorage, global fetch interceptor injects Bearer token for same-origin `/api/` requests, auto-clears on 401
 - **Pages**: Login, Dashboard (KPIs + alerts + risk heatmap preview), Risk Register/Detail/Heatmap, Signals/Findings, Vendors/Detail, Compliance Frameworks/Controls, Alerts, Foresight (autonomous agent), Settings (LLM config)
+- **Create Risk Sheet**: The "Create New Risk" sheet features an **AI Risk Discovery** section at the top of the left form panel (above the Title field). Clicking "Scan for risks with AI" calls the AI configurator endpoint and surfaces 2–5 scenario cards. Each card has a primary "Use this — fill form" button that auto-populates Title, Description, Category, Likelihood, and Impact — as well as "Record" (save immediately) and "Draft" (save as draft) secondary actions. The `AiRiskConfigurator` component accepts an optional `onPopulateForm` callback for form integration.
 - **Layout**: AppLayout wraps authenticated pages with sidebar nav, top bar with tenant badge, mobile-responsive hamburger menu
 
 **Development & Build:**
