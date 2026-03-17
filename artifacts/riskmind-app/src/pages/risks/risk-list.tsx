@@ -64,7 +64,7 @@ export default function RiskList() {
 
   const { data, isLoading } = useListRisks({
     search: search || undefined,
-    status: statusParam as never,
+    status: statusParam,
     treatmentStrategy: strategyParam,
   });
 

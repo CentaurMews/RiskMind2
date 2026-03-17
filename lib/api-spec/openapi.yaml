@@ -164,7 +164,8 @@ paths:
         - name: status
           in: query
           schema:
-            $ref: "#/components/schemas/RiskStatus"
+            type: string
+          description: "Comma-separated risk statuses to filter by (draft,open,mitigated,accepted,closed)"
         - name: category
           in: query
           schema:
@@ -3485,6 +3486,14 @@ components:
           type: string
           format: date-time
           nullable: true
+        rejectedById:
+          type: string
+          format: uuid
+          nullable: true
+        rejectedAt:
+          type: string
+          format: date-time
+          nullable: true
         rejectionReason:
           type: string
           nullable: true
@@ -3498,6 +3507,12 @@ components:
           type: string
           nullable: true
         approverEmail:
+          type: string
+          nullable: true
+        rejectorName:
+          type: string
+          nullable: true
+        rejectorEmail:
           type: string
           nullable: true
         createdAt:

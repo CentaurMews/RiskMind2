@@ -16,11 +16,15 @@ export interface AcceptanceMemorandum {
   requestedById?: string | null;
   approverId?: string | null;
   approvedAt?: Date | null;
+  rejectedById?: string | null;
+  rejectedAt?: Date | null;
   rejectionReason?: string | null;
   requesterName?: string | null;
   requesterEmail?: string | null;
   approverName?: string | null;
   approverEmail?: string | null;
+  rejectorName?: string | null;
+  rejectorEmail?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -73,27 +73,6 @@ router.get("/v1/risks", async (req, res) => {
       ? String(treatmentStrategy).split(",").filter(s => validStrategies.includes(s as StrategyType)) as StrategyType[]
       : [];
 
-    const selectFields = {
-      id: risksTable.id,
-      title: risksTable.title,
-      description: risksTable.description,
-      category: risksTable.category,
-      status: risksTable.status,
-      ownerId: risksTable.ownerId,
-      likelihood: risksTable.likelihood,
-      impact: risksTable.impact,
-      residualLikelihood: risksTable.residualLikelihood,
-      residualImpact: risksTable.residualImpact,
-      targetLikelihood: risksTable.targetLikelihood,
-      targetImpact: risksTable.targetImpact,
-      createdAt: risksTable.createdAt,
-      updatedAt: risksTable.updatedAt,
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let risks: any[] = [];
-    let countResult: { count: number }[] = [];
-
     if (strategyList.length > 0) {
       const subquery = db
         .selectDistinct({ riskId: treatmentsTable.riskId })
@@ -106,18 +85,35 @@ router.get("/v1/risks", async (req, res) => {
       conditions.push(sql`${risksTable.id} IN (${subquery})`);
     }
 
-    [risks, countResult] = await Promise.all([
+    const whereClause = and(...conditions);
+
+    const [risks, countResult] = await Promise.all([
       db
-        .select(selectFields)
+        .select({
+          id: risksTable.id,
+          title: risksTable.title,
+          description: risksTable.description,
+          category: risksTable.category,
+          status: risksTable.status,
+          ownerId: risksTable.ownerId,
+          likelihood: risksTable.likelihood,
+          impact: risksTable.impact,
+          residualLikelihood: risksTable.residualLikelihood,
+          residualImpact: risksTable.residualImpact,
+          targetLikelihood: risksTable.targetLikelihood,
+          targetImpact: risksTable.targetImpact,
+          createdAt: risksTable.createdAt,
+          updatedAt: risksTable.updatedAt,
+        })
         .from(risksTable)
-        .where(and(...conditions))
+        .where(whereClause)
         .limit(Number(limit))
         .offset(offset)
         .orderBy(risksTable.createdAt),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(risksTable)
-        .where(and(...conditions)),
+        .where(whereClause),
     ]);
 
     res.json({ data: risks, total: countResult[0].count, page: Number(page), limit: Number(limit) });
@@ -922,6 +918,8 @@ router.get("/v1/risks/:riskId/acceptance-memoranda", async (req, res) => {
         requestedById: acceptanceMemorandaTable.requestedById,
         approverId: acceptanceMemorandaTable.approverId,
         approvedAt: acceptanceMemorandaTable.approvedAt,
+        rejectedById: acceptanceMemorandaTable.rejectedById,
+        rejectedAt: acceptanceMemorandaTable.rejectedAt,
         rejectionReason: acceptanceMemorandaTable.rejectionReason,
         createdAt: acceptanceMemorandaTable.createdAt,
         updatedAt: acceptanceMemorandaTable.updatedAt,
@@ -929,10 +927,13 @@ router.get("/v1/risks/:riskId/acceptance-memoranda", async (req, res) => {
         requesterEmail: sql<string | null>`req_user.email`,
         approverName: sql<string | null>`appr_user.name`,
         approverEmail: sql<string | null>`appr_user.email`,
+        rejectorName: sql<string | null>`rej_user.name`,
+        rejectorEmail: sql<string | null>`rej_user.email`,
       })
       .from(acceptanceMemorandaTable)
       .leftJoin(sql`users req_user`, sql`req_user.id = ${acceptanceMemorandaTable.requestedById}`)
       .leftJoin(sql`users appr_user`, sql`appr_user.id = ${acceptanceMemorandaTable.approverId}`)
+      .leftJoin(sql`users rej_user`, sql`rej_user.id = ${acceptanceMemorandaTable.rejectedById}`)
       .where(and(
         eq(acceptanceMemorandaTable.riskId, riskId),
         eq(acceptanceMemorandaTable.tenantId, req.user!.tenantId),
@@ -1109,6 +1110,8 @@ router.post("/v1/risks/:riskId/acceptance-memoranda/:memorandumId/reject", requi
     const [updated] = await db.transaction(async (tx) => {
       const [updatedMemo] = await tx.update(acceptanceMemorandaTable).set({
         status: "rejected",
+        rejectedById: req.user!.id,
+        rejectedAt: new Date(),
         rejectionReason: String(rejectionReason).trim(),
         updatedAt: new Date(),
       }).where(eq(acceptanceMemorandaTable.id, memorandumId)).returning();

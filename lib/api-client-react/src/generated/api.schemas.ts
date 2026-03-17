@@ -319,11 +319,15 @@ export interface AcceptanceMemorandum {
   requestedById?: string | null;
   approverId?: string | null;
   approvedAt?: string | null;
+  rejectedById?: string | null;
+  rejectedAt?: string | null;
   rejectionReason?: string | null;
   requesterName?: string | null;
   requesterEmail?: string | null;
   approverName?: string | null;
   approverEmail?: string | null;
+  rejectorName?: string | null;
+  rejectorEmail?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1294,7 +1298,10 @@ export type PageParameter = number;
 export type LimitParameter = number;
 
 export type ListRisksParams = {
-  status?: RiskStatus;
+  /**
+   * Comma-separated risk statuses to filter by (draft,open,mitigated,accepted,closed)
+   */
+  status?: string;
   category?: RiskCategory;
   ownerId?: string;
   search?: string;

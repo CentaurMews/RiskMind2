@@ -22,6 +22,8 @@ export const acceptanceMemorandaTable = pgTable("acceptance_memoranda", {
   requestedById: uuid("requested_by_id").references(() => usersTable.id),
   approverId: uuid("approver_id").references(() => usersTable.id),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
+  rejectedById: uuid("rejected_by_id").references(() => usersTable.id),
+  rejectedAt: timestamp("rejected_at", { withTimezone: true }),
   rejectionReason: text("rejection_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

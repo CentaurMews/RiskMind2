@@ -88,9 +88,12 @@ export const listRisksQueryPageDefault = 1;
 export const listRisksQueryLimitDefault = 20;
 
 export const ListRisksQueryParams = zod.object({
-  status: zod
-    .enum(["draft", "open", "mitigated", "accepted", "closed"])
-    .optional(),
+  status: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated risk statuses to filter by (draft,open,mitigated,accepted,closed)",
+    ),
   category: zod
     .enum([
       "operational",
@@ -559,11 +562,15 @@ export const ListAcceptanceMemorandumResponse = zod.object({
         requestedById: zod.string().uuid().nullish(),
         approverId: zod.string().uuid().nullish(),
         approvedAt: zod.date().nullish(),
+        rejectedById: zod.string().uuid().nullish(),
+        rejectedAt: zod.date().nullish(),
         rejectionReason: zod.string().nullish(),
         requesterName: zod.string().nullish(),
         requesterEmail: zod.string().nullish(),
         approverName: zod.string().nullish(),
         approverEmail: zod.string().nullish(),
+        rejectorName: zod.string().nullish(),
+        rejectorEmail: zod.string().nullish(),
         createdAt: zod.date().optional(),
         updatedAt: zod.date().optional(),
       }),
@@ -599,11 +606,15 @@ export const ApproveAcceptanceMemorandumResponse = zod.object({
   requestedById: zod.string().uuid().nullish(),
   approverId: zod.string().uuid().nullish(),
   approvedAt: zod.date().nullish(),
+  rejectedById: zod.string().uuid().nullish(),
+  rejectedAt: zod.date().nullish(),
   rejectionReason: zod.string().nullish(),
   requesterName: zod.string().nullish(),
   requesterEmail: zod.string().nullish(),
   approverName: zod.string().nullish(),
   approverEmail: zod.string().nullish(),
+  rejectorName: zod.string().nullish(),
+  rejectorEmail: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -629,11 +640,15 @@ export const RejectAcceptanceMemorandumResponse = zod.object({
   requestedById: zod.string().uuid().nullish(),
   approverId: zod.string().uuid().nullish(),
   approvedAt: zod.date().nullish(),
+  rejectedById: zod.string().uuid().nullish(),
+  rejectedAt: zod.date().nullish(),
   rejectionReason: zod.string().nullish(),
   requesterName: zod.string().nullish(),
   requesterEmail: zod.string().nullish(),
   approverName: zod.string().nullish(),
   approverEmail: zod.string().nullish(),
+  rejectorName: zod.string().nullish(),
+  rejectorEmail: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });

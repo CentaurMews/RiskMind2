@@ -417,9 +417,12 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
                             Approved by {m.approverName}{m.approvedAt ? ` on ${format(new Date(m.approvedAt), "MMM d, yyyy")}` : ""}
                           </div>
                         )}
-                        {m.status === "rejected" && m.rejectionReason && (
-                          <div className="text-xs text-destructive italic">
-                            Rejected: {m.rejectionReason}
+                        {m.status === "rejected" && (
+                          <div className="text-xs text-destructive italic space-y-0.5">
+                            {m.rejectorName && (
+                              <div>Rejected by {m.rejectorName}{m.rejectedAt ? ` on ${format(new Date(m.rejectedAt), "MMM d, yyyy")}` : ""}</div>
+                            )}
+                            {m.rejectionReason && <div>Reason: {m.rejectionReason}</div>}
                           </div>
                         )}
                       </div>
@@ -626,10 +629,22 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
               {viewMemorandum?.memorandumText}
             </pre>
           </div>
-          {viewMemorandum?.status === "rejected" && viewMemorandum.rejectionReason && (
-            <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <p className="text-xs text-destructive font-medium">Rejection Reason:</p>
-              <p className="text-xs text-destructive/80 mt-1">{viewMemorandum.rejectionReason}</p>
+          {viewMemorandum?.status === "rejected" && (
+            <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg space-y-1">
+              {(viewMemorandum.rejectorName || viewMemorandum.rejectedAt) && (
+                <p className="text-xs text-destructive font-medium">
+                  Rejected by {viewMemorandum.rejectorName || "Unknown"}
+                  {viewMemorandum.rejectedAt
+                    ? ` on ${format(new Date(viewMemorandum.rejectedAt), "MMM d, yyyy")}`
+                    : ""}
+                </p>
+              )}
+              {viewMemorandum.rejectionReason && (
+                <>
+                  <p className="text-xs text-destructive font-medium">Rejection Reason:</p>
+                  <p className="text-xs text-destructive/80">{viewMemorandum.rejectionReason}</p>
+                </>
+              )}
             </div>
           )}
           <div className="flex items-center justify-between pt-4 border-t mt-4">
