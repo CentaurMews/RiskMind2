@@ -40,6 +40,7 @@ import type {
   ControlListResponse,
   ControlTest,
   ControlTestListResponse,
+  ConvertFindingRequest,
   CreateControlRequest,
   CreateControlTestRequest,
   CreateDocumentRequest,
@@ -105,6 +106,7 @@ import type {
   Risk,
   RiskListResponse,
   RiskSourceListResponse,
+  RiskSuggestion,
   SendInterviewMessageBody,
   Signal,
   SignalListResponse,
@@ -116,6 +118,7 @@ import type {
   TransitionVendorBody,
   Treatment,
   TreatmentListResponse,
+  TriageSignalResponse,
   UpdateAgentConfigBody,
   UpdateControlRequest,
   UpdateDocumentRequest,
@@ -5158,6 +5161,180 @@ export const useUpdateSignalStatus = <
 };
 
 /**
+ * Atomically transitions a pending signal to finding status and creates a linked finding record
+ * @summary Triage signal and create finding
+ */
+export const getTriageSignalUrl = (id: string) => {
+  return `/api/v1/signals/${id}/triage`;
+};
+
+export const triageSignal = async (
+  id: string,
+  options?: RequestInit,
+): Promise<TriageSignalResponse> => {
+  return customFetch<TriageSignalResponse>(getTriageSignalUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getTriageSignalMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof triageSignal>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof triageSignal>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["triageSignal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof triageSignal>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return triageSignal(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TriageSignalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof triageSignal>>
+>;
+
+export type TriageSignalMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Triage signal and create finding
+ */
+export const useTriageSignal = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof triageSignal>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof triageSignal>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getTriageSignalMutationOptions(options));
+};
+
+/**
+ * @summary Get finding linked to signal
+ */
+export const getGetSignalFindingUrl = (id: string) => {
+  return `/api/v1/signals/${id}/finding`;
+};
+
+export const getSignalFinding = async (
+  id: string,
+  options?: RequestInit,
+): Promise<Finding> => {
+  return customFetch<Finding>(getGetSignalFindingUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSignalFindingQueryKey = (id: string) => {
+  return [`/api/v1/signals/${id}/finding`] as const;
+};
+
+export const getGetSignalFindingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSignalFinding>>,
+  TError = ErrorType<NotFoundResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSignalFinding>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSignalFindingQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSignalFinding>>
+  > = ({ signal }) => getSignalFinding(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSignalFinding>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSignalFindingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSignalFinding>>
+>;
+export type GetSignalFindingQueryError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Get finding linked to signal
+ */
+
+export function useGetSignalFinding<
+  TData = Awaited<ReturnType<typeof getSignalFinding>>,
+  TError = ErrorType<NotFoundResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSignalFinding>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSignalFindingQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Promote signal to finding
  */
 export const getPromoteSignalToFindingUrl = (signalId: string) => {
@@ -5596,6 +5773,181 @@ export const useUpdateFinding = <
   TContext
 > => {
   return useMutation(getUpdateFindingMutationOptions(options));
+};
+
+/**
+ * Calls the LLM with finding context and returns a suggested risk without creating it
+ * @summary Get AI-suggested risk from finding
+ */
+export const getSuggestRiskFromFindingUrl = (id: string) => {
+  return `/api/v1/findings/${id}/suggest-risk`;
+};
+
+export const suggestRiskFromFinding = async (
+  id: string,
+  options?: RequestInit,
+): Promise<RiskSuggestion> => {
+  return customFetch<RiskSuggestion>(getSuggestRiskFromFindingUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSuggestRiskFromFindingMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof suggestRiskFromFinding>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof suggestRiskFromFinding>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["suggestRiskFromFinding"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof suggestRiskFromFinding>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return suggestRiskFromFinding(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SuggestRiskFromFindingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof suggestRiskFromFinding>>
+>;
+
+export type SuggestRiskFromFindingMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Get AI-suggested risk from finding
+ */
+export const useSuggestRiskFromFinding = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof suggestRiskFromFinding>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof suggestRiskFromFinding>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getSuggestRiskFromFindingMutationOptions(options));
+};
+
+/**
+ * Creates a risk in draft status from the finding, links via risk_sources, and returns the new risk
+ * @summary Create a draft risk from finding
+ */
+export const getConvertFindingToRiskUrl = (id: string) => {
+  return `/api/v1/findings/${id}/convert-to-risk`;
+};
+
+export const convertFindingToRisk = async (
+  id: string,
+  convertFindingRequest: ConvertFindingRequest,
+  options?: RequestInit,
+): Promise<Risk> => {
+  return customFetch<Risk>(getConvertFindingToRiskUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(convertFindingRequest),
+  });
+};
+
+export const getConvertFindingToRiskMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof convertFindingToRisk>>,
+    TError,
+    { id: string; data: BodyType<ConvertFindingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof convertFindingToRisk>>,
+  TError,
+  { id: string; data: BodyType<ConvertFindingRequest> },
+  TContext
+> => {
+  const mutationKey = ["convertFindingToRisk"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof convertFindingToRisk>>,
+    { id: string; data: BodyType<ConvertFindingRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return convertFindingToRisk(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConvertFindingToRiskMutationResult = NonNullable<
+  Awaited<ReturnType<typeof convertFindingToRisk>>
+>;
+export type ConvertFindingToRiskMutationBody = BodyType<ConvertFindingRequest>;
+export type ConvertFindingToRiskMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create a draft risk from finding
+ */
+export const useConvertFindingToRisk = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof convertFindingToRisk>>,
+    TError,
+    { id: string; data: BodyType<ConvertFindingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof convertFindingToRisk>>,
+  TError,
+  { id: string; data: BodyType<ConvertFindingRequest> },
+  TContext
+> => {
+  return useMutation(getConvertFindingToRiskMutationOptions(options));
 };
 
 /**

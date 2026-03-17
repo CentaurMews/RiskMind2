@@ -1,21 +1,254 @@
-import { useState } from "react";
-import { useListSignals, useUpdateSignalStatus, usePromoteSignalToFinding } from "@workspace/api-client-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  useListSignals,
+  useUpdateSignalStatus,
+  usePromoteSignalToFinding,
+  useTriageSignal,
+  useSuggestRiskFromFinding,
+  useConvertFindingToRisk,
+  useGetSignalFinding,
+} from "@workspace/api-client-react";
+import type { RiskSuggestion, RiskCategory } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, Search, Bot, ArrowRight, Check, X, Loader2, Sparkles } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { Activity, Search, Bot, ArrowRight, Check, X, Loader2, Sparkles, Eye, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+
+function statusBadge(status: string) {
+  const config: Record<string, { label: string; className: string }> = {
+    pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+    triaged: { label: "Triaged", className: "bg-blue-100 text-blue-800 border-blue-200" },
+    finding: { label: "Finding", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+    dismissed: { label: "Dismissed", className: "bg-gray-100 text-gray-600 border-gray-200" },
+  };
+  const c = config[status] || config.pending;
+  return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
+}
+
+function FindingPanel({
+  signalId,
+  open,
+  onClose,
+}: {
+  signalId: string | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const [suggestion, setSuggestion] = useState<RiskSuggestion | null>(null);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+  const [converting, setConverting] = useState(false);
+
+  useEffect(() => {
+    setSuggestion(null);
+    setLoadingSuggestion(false);
+    setConverting(false);
+  }, [signalId]);
+
+  const { data: finding, isLoading: findingLoading } = useGetSignalFinding(
+    signalId || "",
+    { query: { queryKey: ["/api/v1/signals", signalId, "finding"] as const, enabled: !!signalId && open } }
+  );
+
+  const suggestMutation = useSuggestRiskFromFinding();
+  const convertMutation = useConvertFindingToRisk();
+
+  const handleSuggestRisk = async () => {
+    if (!finding?.id) return;
+    setLoadingSuggestion(true);
+    try {
+      const result = await suggestMutation.mutateAsync({ id: finding.id });
+      setSuggestion(result);
+    } finally {
+      setLoadingSuggestion(false);
+    }
+  };
+
+  const handleConvertToRisk = () => {
+    if (!finding?.id) return;
+    setConverting(true);
+    const data = suggestion
+      ? {
+          title: suggestion.title || finding.title || "",
+          description: suggestion.description || finding.description || "",
+          category: (suggestion.category || "operational") as RiskCategory,
+          likelihood: suggestion.likelihood || 3,
+          impact: suggestion.impact || 3,
+        }
+      : {
+          title: finding.title || "",
+          description: finding.description || "",
+        };
+
+    convertMutation.mutate(
+      { id: finding.id, data },
+      {
+        onSuccess: (risk: { id?: string }) => {
+          queryClient.invalidateQueries({ queryKey: ["/api/v1/signals"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/v1/findings"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/v1/risks"] });
+          onClose();
+          if (risk?.id) setLocation(`/risks/${risk.id}`);
+        },
+        onSettled: () => setConverting(false),
+      },
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Finding Details</SheetTitle>
+          <SheetDescription>
+            View the finding linked to this signal and manage risk conversion.
+          </SheetDescription>
+        </SheetHeader>
+
+        {findingLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !finding ? (
+          <div className="py-8 text-center text-muted-foreground">
+            No finding linked to this signal.
+          </div>
+        ) : (
+          <div className="mt-6 space-y-6">
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Title</h3>
+              <p className="mt-1 text-sm">{finding.title}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Description</h3>
+              <p className="mt-1 text-sm whitespace-pre-wrap">{finding.description || "—"}</p>
+            </div>
+            <div className="flex gap-4">
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Status</h3>
+                <Badge variant="outline" className="mt-1">{finding.status}</Badge>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Created</h3>
+                <p className="mt-1 text-sm">{finding.createdAt ? format(new Date(finding.createdAt), "MMM d, HH:mm") : "—"}</p>
+              </div>
+            </div>
+
+            {finding.riskId ? (
+              <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/20 p-4">
+                <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                  This finding is already linked to a risk.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => { onClose(); setLocation(`/risks/${finding.riskId}`); }}
+                >
+                  View Risk
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-violet-500" />
+                    AI Risk Suggestion
+                  </h3>
+
+                  {!suggestion ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-3 text-violet-600 border-violet-200 hover:bg-violet-50"
+                      onClick={handleSuggestRisk}
+                      disabled={loadingSuggestion}
+                    >
+                      {loadingSuggestion ? (
+                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3 mr-2" />
+                      )}
+                      Get AI Suggestion
+                    </Button>
+                  ) : (
+                    <div className="mt-3 space-y-3 rounded-lg border bg-muted/30 p-4">
+                      <div>
+                        <span className="text-xs font-semibold text-muted-foreground">Suggested Title</span>
+                        <p className="text-sm font-medium">{suggestion.title}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-muted-foreground">Description</span>
+                        <p className="text-sm">{suggestion.description}</p>
+                      </div>
+                      <div className="flex gap-4 flex-wrap">
+                        <div>
+                          <span className="text-xs font-semibold text-muted-foreground">Category</span>
+                          <p className="text-sm capitalize">{suggestion.category}</p>
+                        </div>
+                        <div>
+                          <span className="text-xs font-semibold text-muted-foreground">Likelihood</span>
+                          <p className="text-sm">{suggestion.likelihood}/5</p>
+                        </div>
+                        <div>
+                          <span className="text-xs font-semibold text-muted-foreground">Impact</span>
+                          <p className="text-sm">{suggestion.impact}/5</p>
+                        </div>
+                        <div>
+                          <span className="text-xs font-semibold text-muted-foreground">Confidence</span>
+                          <p className="text-sm">{Math.round((suggestion.confidence || 0) * 100)}%</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <AlertTriangle className="h-3 w-3" />
+                        Source: {suggestion.source === "ai" ? "AI-generated" : "Fallback (no LLM configured)"}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  className="w-full"
+                  onClick={handleConvertToRisk}
+                  disabled={converting}
+                >
+                  {converting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                  )}
+                  Create Risk from Finding
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 export default function SignalList() {
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"pending" | "triaged">("pending");
+  const [tab, setTab] = useState<"pending" | "triaged" | "finding">("pending");
   const queryClient = useQueryClient();
   const [retriggering, setRetriggering] = useState<Record<string, boolean>>({});
+  const [findingPanelSignalId, setFindingPanelSignalId] = useState<string | null>(null);
 
   const handleRetriggerTriage = async (signalId: string) => {
     setRetriggering((prev) => ({ ...prev, [signalId]: true }));
@@ -41,6 +274,10 @@ export default function SignalList() {
     { status: "triaged", search: search || undefined },
     { query: { queryKey: ["/api/v1/signals", "triaged", search] } }
   );
+  const { data: findingData, isLoading: findingLoading } = useListSignals(
+    { status: "finding", search: search || undefined },
+    { query: { queryKey: ["/api/v1/signals", "finding", search] } }
+  );
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/v1/signals"] });
@@ -54,8 +291,16 @@ export default function SignalList() {
     mutation: { onSuccess: invalidate },
   });
 
+  const triageFullMutation = useTriageSignal({
+    mutation: { onSuccess: invalidate },
+  });
+
   const handleMarkTriaged = (id: string) => {
     triageMutation.mutate({ id, data: { status: "triaged" } });
+  };
+
+  const handleFullTriage = (id: string) => {
+    triageFullMutation.mutate({ id });
   };
 
   const handlePromote = (signalId: string, content?: string) => {
@@ -69,8 +314,18 @@ export default function SignalList() {
     triageMutation.mutate({ id, data: { status: "dismissed" } });
   };
 
-  const data = tab === "pending" ? pendingData : triagedData;
-  const isLoading = tab === "pending" ? pendingLoading : triagedLoading;
+  const data =
+    tab === "pending"
+      ? pendingData
+      : tab === "triaged"
+        ? triagedData
+        : findingData;
+  const isLoading =
+    tab === "pending"
+      ? pendingLoading
+      : tab === "triaged"
+        ? triagedLoading
+        : findingLoading;
 
   return (
     <AppLayout>
@@ -82,13 +337,16 @@ export default function SignalList() {
 
         <Card className="flex-1 flex flex-col min-h-0 shadow-sm border-t-4 border-t-primary">
           <div className="p-4 border-b bg-card flex items-center gap-4">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as "pending" | "triaged")} className="w-auto">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as "pending" | "triaged" | "finding")} className="w-auto">
               <TabsList className="h-8">
                 <TabsTrigger value="pending" className="text-xs px-3 h-7">
                   Pending ({pendingData?.data?.length || 0})
                 </TabsTrigger>
                 <TabsTrigger value="triaged" className="text-xs px-3 h-7">
                   Triaged ({triagedData?.data?.length || 0})
+                </TabsTrigger>
+                <TabsTrigger value="finding" className="text-xs px-3 h-7">
+                  Findings ({findingData?.data?.length || 0})
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -113,20 +371,21 @@ export default function SignalList() {
                 <TableRow>
                   <TableHead className="w-[120px]">Source</TableHead>
                   <TableHead>Content</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead className="w-[180px]">AI Classification</TableHead>
                   <TableHead className="w-[150px]">Received</TableHead>
-                  <TableHead className="text-right w-[140px]">Actions</TableHead>
+                  <TableHead className="text-right w-[220px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12"><Loader2 className="animate-spin mx-auto text-muted-foreground" /></TableCell>
+                    <TableCell colSpan={6} className="text-center py-12"><Loader2 className="animate-spin mx-auto text-muted-foreground" /></TableCell>
                   </TableRow>
                 ) : data?.data?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                      No {tab} signals.
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      No {tab === "finding" ? "finding" : tab} signals.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -134,6 +393,7 @@ export default function SignalList() {
                     <TableRow key={signal.id} className="group hover:bg-muted/30">
                       <TableCell className="font-mono text-xs uppercase text-muted-foreground">{signal.source}</TableCell>
                       <TableCell className="font-medium text-sm max-w-[400px] truncate" title={signal.content}>{signal.content}</TableCell>
+                      <TableCell>{statusBadge(signal.status || "pending")}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary flex w-fit items-center gap-1.5">
                           <Bot className="h-3 w-3" />
@@ -169,9 +429,33 @@ export default function SignalList() {
                                 <ArrowRight className="h-3 w-3 mr-1" />
                                 Triage
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="h-7 text-xs"
+                                disabled={triageFullMutation.isPending}
+                                onClick={() => signal.id && handleFullTriage(signal.id)}
+                                title="Triage and create finding in one step"
+                              >
+                                {triageFullMutation.isPending
+                                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  : <Sparkles className="h-3 w-3 mr-1" />
+                                }
+                                Auto-Triage
+                              </Button>
                             </>
-                          ) : (
+                          ) : tab === "triaged" ? (
                             <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                                onClick={() => signal.id && setFindingPanelSignalId(signal.id)}
+                                title="View linked finding (if exists)"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View Finding
+                              </Button>
                               <Button
                                 size="icon"
                                 variant="ghost"
@@ -193,6 +477,16 @@ export default function SignalList() {
                                 <X className="h-4 w-4" />
                               </Button>
                             </>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                              onClick={() => signal.id && setFindingPanelSignalId(signal.id)}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View Finding
+                            </Button>
                           )}
                         </div>
                       </TableCell>
@@ -204,6 +498,12 @@ export default function SignalList() {
           </div>
         </Card>
       </div>
+
+      <FindingPanel
+        signalId={findingPanelSignalId}
+        open={!!findingPanelSignalId}
+        onClose={() => setFindingPanelSignalId(null)}
+      />
     </AppLayout>
   );
 }

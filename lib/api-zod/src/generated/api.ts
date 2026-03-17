@@ -1510,6 +1510,36 @@ export const UpdateSignalStatusResponse = zod.object({
 });
 
 /**
+ * Atomically transitions a pending signal to finding status and creates a linked finding record
+ * @summary Triage signal and create finding
+ */
+export const TriageSignalParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Get finding linked to signal
+ */
+export const GetSignalFindingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetSignalFindingResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  signalId: zod.string().uuid().nullish(),
+  riskId: zod.string().uuid().nullish(),
+  vendorId: zod.string().uuid().nullish(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  status: zod
+    .enum(["open", "investigating", "resolved", "false_positive"])
+    .optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
  * @summary Promote signal to finding
  */
 export const PromoteSignalToFindingParams = zod.object({
@@ -1626,6 +1656,85 @@ export const UpdateFindingResponse = zod.object({
     .optional(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
+});
+
+/**
+ * Calls the LLM with finding context and returns a suggested risk without creating it
+ * @summary Get AI-suggested risk from finding
+ */
+export const SuggestRiskFromFindingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const suggestRiskFromFindingResponseLikelihoodMax = 5;
+
+export const suggestRiskFromFindingResponseImpactMax = 5;
+
+export const suggestRiskFromFindingResponseConfidenceMin = 0;
+export const suggestRiskFromFindingResponseConfidenceMax = 1;
+
+export const SuggestRiskFromFindingResponse = zod.object({
+  title: zod.string().optional(),
+  description: zod.string().optional(),
+  category: zod
+    .enum([
+      "operational",
+      "financial",
+      "compliance",
+      "strategic",
+      "technology",
+      "reputational",
+    ])
+    .optional(),
+  likelihood: zod
+    .number()
+    .min(1)
+    .max(suggestRiskFromFindingResponseLikelihoodMax)
+    .optional(),
+  impact: zod
+    .number()
+    .min(1)
+    .max(suggestRiskFromFindingResponseImpactMax)
+    .optional(),
+  confidence: zod
+    .number()
+    .min(suggestRiskFromFindingResponseConfidenceMin)
+    .max(suggestRiskFromFindingResponseConfidenceMax)
+    .optional(),
+  source: zod.enum(["ai", "fallback"]).optional(),
+});
+
+/**
+ * Creates a risk in draft status from the finding, links via risk_sources, and returns the new risk
+ * @summary Create a draft risk from finding
+ */
+export const ConvertFindingToRiskParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const convertFindingToRiskBodyLikelihoodMax = 5;
+
+export const convertFindingToRiskBodyImpactMax = 5;
+
+export const ConvertFindingToRiskBody = zod.object({
+  title: zod.string().optional(),
+  description: zod.string().optional(),
+  category: zod
+    .enum([
+      "operational",
+      "financial",
+      "compliance",
+      "strategic",
+      "technology",
+      "reputational",
+    ])
+    .optional(),
+  likelihood: zod
+    .number()
+    .min(1)
+    .max(convertFindingToRiskBodyLikelihoodMax)
+    .optional(),
+  impact: zod.number().min(1).max(convertFindingToRiskBodyImpactMax).optional(),
 });
 
 /**

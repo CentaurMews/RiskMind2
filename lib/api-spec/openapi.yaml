@@ -1309,6 +1309,47 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
+  /v1/signals/{id}/triage:
+    post:
+      operationId: triageSignal
+      tags: [signals, findings]
+      summary: Triage signal and create finding
+      description: Atomically transitions a pending signal to finding status and creates a linked finding record
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "201":
+          description: Signal triaged and finding created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TriageSignalResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /v1/signals/{id}/finding:
+    get:
+      operationId: getSignalFinding
+      tags: [signals, findings]
+      summary: Get finding linked to signal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Finding linked to the signal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /v1/signals/{signalId}/promote:
     post:
       operationId: promoteSignalToFinding
@@ -1429,6 +1470,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Finding"
+
+  /v1/findings/{id}/suggest-risk:
+    post:
+      operationId: suggestRiskFromFinding
+      tags: [findings]
+      summary: Get AI-suggested risk from finding
+      description: Calls the LLM with finding context and returns a suggested risk without creating it
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Suggested risk fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskSuggestion"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/findings/{id}/convert-to-risk:
+    post:
+      operationId: convertFindingToRisk
+      tags: [findings]
+      summary: Create a draft risk from finding
+      description: Creates a risk in draft status from the finding, links via risk_sources, and returns the new risk
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConvertFindingRequest"
+      responses:
+        "201":
+          description: Risk created from finding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Risk"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /v1/alerts:
     get:
@@ -3964,6 +4052,59 @@ components:
           type: integer
         limit:
           type: integer
+
+    TriageSignalResponse:
+      type: object
+      properties:
+        signal:
+          $ref: "#/components/schemas/Signal"
+        finding:
+          $ref: "#/components/schemas/Finding"
+
+    RiskSuggestion:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [operational, financial, compliance, strategic, technology, reputational]
+        likelihood:
+          type: integer
+          minimum: 1
+          maximum: 5
+        impact:
+          type: integer
+          minimum: 1
+          maximum: 5
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        source:
+          type: string
+          enum: [ai, fallback]
+
+    ConvertFindingRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [operational, financial, compliance, strategic, technology, reputational]
+        likelihood:
+          type: integer
+          minimum: 1
+          maximum: 5
+        impact:
+          type: integer
+          minimum: 1
+          maximum: 5
 
     AlertSeverity:
       type: string

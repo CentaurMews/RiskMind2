@@ -2,6 +2,7 @@ import { db, signalsTable, risksTable, documentsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { registerWorker, enqueueJob } from "./job-queue";
 import { complete, isAvailable, LLMUnavailableError } from "./llm-service";
+import { RiskSourceAggregator } from "../services/risk-source-aggregator";
 
 async function findSimilarRisks(embedding: number[], tenantId: string, threshold = 0.8) {
   if (!embedding.length) return [];
@@ -83,7 +84,27 @@ export function registerAIWorkers() {
         }
       }
 
-      return { status: "triaged", classification, confidence, correlatedRisks };
+      let aggregatorResult: { findingId?: string; clusteredCount?: number } = {};
+      if (confidence >= 0.7) {
+        try {
+          const aggregator = new RiskSourceAggregator(tenantId);
+          const result = await aggregator.triageSignal(signalId);
+          aggregatorResult = {
+            findingId: result.finding.id,
+            clusteredCount: result.clusteredSignalIds.length,
+          };
+          console.log(`[AI Triage] Signal ${signalId}: created finding ${result.finding.id}, clustered ${result.clusteredSignalIds.length} related signals`);
+        } catch (aggErr) {
+          const errMsg = aggErr instanceof Error ? aggErr.message : String(aggErr);
+          if (errMsg.includes("expected 'pending'") || errMsg.includes("changed concurrently")) {
+            console.log(`[AI Triage] Signal ${signalId} already triaged, skipping aggregation`);
+          } else {
+            console.warn(`[AI Triage] Aggregator failed for signal ${signalId}:`, aggErr);
+          }
+        }
+      }
+
+      return { status: "triaged", classification, confidence, correlatedRisks, ...aggregatorResult };
     } catch (err) {
       if (err instanceof LLMUnavailableError) {
         return { status: "manual_fallback", reason: err.message };

@@ -10,6 +10,7 @@ import {
 import { complete, isAvailable } from "./llm-service";
 import { recordAuditDirect } from "./audit";
 import { invokeTool } from "./tool-registry";
+import { RiskSourceAggregator } from "../services/risk-source-aggregator";
 
 async function agentAudit(
   tenantId: string,
@@ -709,6 +710,17 @@ export async function runAgentCycle(
     const available = await isAvailable(tenantId);
 
     const data = await observe(tenantId);
+
+    const aggregator = new RiskSourceAggregator(tenantId);
+    let aggregatedSources: Awaited<ReturnType<RiskSourceAggregator["aggregateRiskSources"]>> | null = null;
+    try {
+      aggregatedSources = await aggregator.aggregateRiskSources();
+      if (aggregatedSources.findings.length > 0 || aggregatedSources.agentDetections.length > 0) {
+        console.log(`[Agent] Aggregated sources for ${tenantId}: ${aggregatedSources.signals.length} signals, ${aggregatedSources.findings.length} unlinked findings, ${aggregatedSources.agentDetections.length} agent detections`);
+      }
+    } catch (aggErr) {
+      console.warn("[Agent] Risk source aggregation failed:", aggErr);
+    }
 
     const cascadeFindings = detectCascadeChains(data);
     const clusterFindings = await detectClusters(tenantId);
