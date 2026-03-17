@@ -212,6 +212,8 @@ export async function generateEmbedding(tenantId: string, text: string): Promise
   return resp.data[0].embedding;
 }
 
+const ANTHROPIC_PROBE_MODEL = "claude-haiku-4-5";
+
 export async function testConnection(configId: string, tenantId: string): Promise<{ success: boolean; message: string; latencyMs: number }> {
   const config = await resolveConfigById(configId, tenantId);
   if (!config) return { success: false, message: "Configuration not found", latencyMs: 0 };
@@ -220,11 +222,29 @@ export async function testConnection(configId: string, tenantId: string): Promis
   try {
     if (config.providerType === "anthropic") {
       const client = buildAnthropicClient(config);
-      await client.messages.create({
-        model: config.model,
-        max_tokens: 5,
-        messages: [{ role: "user", content: "Say hello" }],
-      });
+      try {
+        await client.messages.create({
+          model: config.model,
+          max_tokens: 5,
+          messages: [{ role: "user", content: "Say hello" }],
+        });
+        return { success: true, message: "Connection successful", latencyMs: Date.now() - start };
+      } catch (modelErr) {
+        const errMsg = modelErr instanceof Error ? modelErr.message : String(modelErr);
+        if (errMsg.includes("not_found") || errMsg.includes("404")) {
+          await client.messages.create({
+            model: ANTHROPIC_PROBE_MODEL,
+            max_tokens: 5,
+            messages: [{ role: "user", content: "Say hello" }],
+          });
+          return {
+            success: true,
+            message: `API key valid — but model "${config.model}" is deprecated. Update this provider to use a current model (e.g. ${ANTHROPIC_PROBE_MODEL}).`,
+            latencyMs: Date.now() - start,
+          };
+        }
+        throw modelErr;
+      }
     } else {
       const client = buildOpenAIClient(config);
       await client.chat.completions.create({
@@ -240,13 +260,11 @@ export async function testConnection(configId: string, tenantId: string): Promis
 }
 
 const ANTHROPIC_MODELS = [
+  "claude-opus-4-6",
   "claude-opus-4-5",
+  "claude-sonnet-4-6",
   "claude-sonnet-4-5",
-  "claude-3-7-sonnet-20250219",
-  "claude-3-5-sonnet-20241022",
-  "claude-3-5-haiku-20241022",
-  "claude-3-opus-20240229",
-  "claude-3-haiku-20240307",
+  "claude-haiku-4-5",
 ];
 
 export const KNOWN_VENDOR_BASE_URLS: Record<string, { baseUrl: string; providerType: "openai_compat" | "anthropic" }> = {
@@ -309,7 +327,7 @@ async function runAnthropicProbe(apiKey: string | undefined): Promise<ProbeResul
   const client = new Anthropic({ apiKey: apiKey || undefined });
   try {
     const resp = await client.messages.create({
-      model: "claude-3-haiku-20240307",
+      model: ANTHROPIC_PROBE_MODEL,
       max_tokens: 5,
       messages: [{ role: "user", content: "hi" }],
     });

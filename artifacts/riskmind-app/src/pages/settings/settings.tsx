@@ -585,7 +585,7 @@ export default function Settings() {
                   </div>
                   <div className="space-y-1">
                     <div className="font-mono text-xs font-bold">anthropic</div>
-                    <p className="text-muted-foreground text-xs">Anthropic Claude (claude-3-5-sonnet, claude-3-opus, etc). Requires an Anthropic API key.</p>
+                    <p className="text-muted-foreground text-xs">Anthropic Claude (claude-sonnet-4-6, claude-haiku-4-5, etc). Requires an Anthropic API key.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1287,13 +1287,13 @@ export default function Settings() {
               </div>
               <Input
                 required
-                placeholder={providerForm.providerType === "anthropic" ? "claude-3-5-sonnet-20241022" : "gpt-4o"}
+                placeholder={providerForm.providerType === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o"}
                 value={providerForm.model}
                 onChange={(e) => setProviderForm((prev) => ({ ...prev, model: e.target.value }))}
               />
               <p className="text-xs text-muted-foreground">
                 {providerForm.providerType === "anthropic"
-                  ? "claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307"
+                  ? "claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5"
                   : "gpt-4o, gpt-4o-mini, gpt-4-turbo, mistral-7b, llama-3-70b, etc."}
               </p>
             </div>
