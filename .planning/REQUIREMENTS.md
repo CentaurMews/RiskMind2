@@ -17,9 +17,9 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 
 ### Database
 
-- [ ] **DB-01**: Create fresh PostgreSQL database for RiskMind
-- [ ] **DB-02**: Install pgvector extension as superuser before migrations
-- [ ] **DB-03**: Run Drizzle migrations successfully
+- [x] **DB-01**: Create fresh PostgreSQL database for RiskMind
+- [x] **DB-02**: Install pgvector extension as superuser before migrations
+- [x] **DB-03**: Run Drizzle migrations successfully
 - [x] **DB-04**: Run seed scripts to populate demo data (risks, vendors, frameworks, alerts, signals, users)
 
 ### Network & Security
@@ -111,9 +111,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEPL-03 | Phase 1 | Pending |
 | DEPL-04 | Phase 1 | Pending |
 | DEPL-05 | Phase 1 | Pending |
-| DB-01 | Phase 1 | Pending |
-| DB-02 | Phase 1 | Pending |
-| DB-03 | Phase 1 | Pending |
+| DB-01 | Phase 1 | Complete |
+| DB-02 | Phase 1 | Complete |
+| DB-03 | Phase 1 | Complete |
 | DB-04 | Phase 1 | Complete |
 | NET-01 | Phase 2 | Pending |
 | NET-02 | Phase 2 | Pending |
