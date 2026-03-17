@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, interviewSessionsTable, risksTable, controlTestsTable, controlsTable } from "@workspace/db";
+import { eq, and, desc } from "drizzle-orm";
+import { db, interviewSessionsTable, risksTable, controlTestsTable, controlsTable, signalsTable, findingsTable, agentFindingsTable } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, sendError } from "../lib/errors";
@@ -46,18 +46,22 @@ const AI_UNAVAILABLE_MSG = "AI unavailable — manual mode active. Configure an 
 
 const router = Router();
 
-const RISK_SYSTEM_PROMPT = `You are a risk management interview assistant. You help users identify and document enterprise risks through a structured conversation. Ask focused questions one at a time about:
-1. What is the risk? (title/description)
-2. What category does it fall under? (operational, financial, compliance, strategic, technology, reputational)
-3. What is the likelihood? (1-5 scale)
-4. What is the potential impact? (1-5 scale)
-5. Who should own this risk?
-6. What controls exist or are needed?
+const RISK_SYSTEM_PROMPT = `You are a friendly risk management assistant helping users document enterprise risks through a short conversation. Ask at most 3 short, open-ended questions before proposing a draft — do not ask more questions than necessary.
 
-After gathering enough information, synthesize a draft risk record. Respond in JSON when you have a complete draft:
-{"type":"draft","data":{"title":"...","description":"...","category":"...","likelihood":N,"impact":N}}
-Otherwise respond with:
-{"type":"question","content":"your next question"}`;
+Good seed questions (ask only what you still need):
+- "What risk is on your mind?"
+- "What's the likely consequence if it happens?"
+- "How probable does it feel — rare, possible, or likely?"
+
+Once you have a reasonable sense of the risk (title, consequence, and rough probability), synthesise a draft immediately. Do not keep asking questions once you have enough to make a sensible draft.
+
+When ready to draft, respond ONLY with valid JSON:
+{"type":"draft","data":{"title":"...","description":"...","category":"operational|financial|compliance|strategic|technology|reputational","likelihood":1-5,"impact":1-5}}
+
+For all other turns respond ONLY with valid JSON:
+{"type":"question","content":"your next question"}
+
+Keep questions short and conversational. Never number them or list them all at once.`;
 
 const CONTROL_SYSTEM_PROMPT = `You are a control assessment interview assistant. You help users assess the effectiveness of security and compliance controls through structured questions:
 1. What control is being assessed?
@@ -251,10 +255,11 @@ router.post("/v1/ai/interview/:sessionId/commit", requireRole("admin", "risk_man
     }
 
     let resultId: string | null = null;
-    const { controlId } = req.body as { controlId?: string };
+    const { controlId, saveAsDraft } = req.body as { controlId?: string; saveAsDraft?: boolean };
 
     if (session.type === "risk_creation") {
       const draft = draftData as unknown as RiskDraft;
+      const riskStatus = saveAsDraft === false ? "open" : "draft";
       const [risk] = await db.insert(risksTable).values({
         tenantId,
         title: draft.title || "Untitled Risk",
@@ -262,7 +267,7 @@ router.post("/v1/ai/interview/:sessionId/commit", requireRole("admin", "risk_man
         category: (draft.category as "operational" | "financial" | "compliance" | "strategic" | "technology" | "reputational") || "operational",
         likelihood: draft.likelihood || 1,
         impact: draft.impact || 1,
-        status: "draft",
+        status: riskStatus,
       }).returning();
       resultId = risk.id;
     } else if (session.type === "control_assessment") {
@@ -540,6 +545,190 @@ Respond in JSON only: {"inherent":{"likelihood":N,"impact":N},"residual":{"likel
     console.error("AI score suggestions error:", err);
     const msg = err instanceof Error ? err.message : "AI service error";
     sendError(res, 502, "AI Service Error", msg);
+  }
+});
+
+router.post("/v1/ai/risk-configurator", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const { documentText } = req.body as { documentText?: string };
+
+    const available = await isAvailable(tenantId);
+    if (!available) {
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
+      return;
+    }
+
+    const [recentSignals, recentFindings, recentAgentFindings] = await Promise.all([
+      db.select({
+        id: signalsTable.id,
+        content: signalsTable.content,
+        classification: signalsTable.classification,
+        confidence: signalsTable.confidence,
+      }).from(signalsTable)
+        .where(eq(signalsTable.tenantId, tenantId))
+        .orderBy(desc(signalsTable.createdAt))
+        .limit(10),
+      db.select({
+        id: findingsTable.id,
+        title: findingsTable.title,
+        description: findingsTable.description,
+      }).from(findingsTable)
+        .where(eq(findingsTable.tenantId, tenantId))
+        .orderBy(desc(findingsTable.createdAt))
+        .limit(10),
+      db.select({
+        id: agentFindingsTable.id,
+        title: agentFindingsTable.title,
+        narrative: agentFindingsTable.narrative,
+        severity: agentFindingsTable.severity,
+        type: agentFindingsTable.type,
+      }).from(agentFindingsTable)
+        .where(eq(agentFindingsTable.tenantId, tenantId))
+        .orderBy(desc(agentFindingsTable.createdAt))
+        .limit(10),
+    ]);
+
+    const contextParts: string[] = [];
+
+    if (recentSignals.length > 0) {
+      contextParts.push(`## Recent Signals\n${recentSignals.map(s =>
+        `- [Signal ${s.id?.slice(0, 8)}] ${s.content?.slice(0, 200)}${s.classification ? ` (class: ${s.classification})` : ""}`
+      ).join("\n")}`);
+    }
+
+    if (recentFindings.length > 0) {
+      contextParts.push(`## Recent Findings\n${recentFindings.map(f =>
+        `- [Finding] ${f.title}: ${f.description?.slice(0, 150) || "No description"}`
+      ).join("\n")}`);
+    }
+
+    if (recentAgentFindings.length > 0) {
+      contextParts.push(`## Agent Detections\n${recentAgentFindings.map(a =>
+        `- [${a.severity?.toUpperCase()} ${a.type}] ${a.title}: ${a.narrative?.slice(0, 150) || ""}`
+      ).join("\n")}`);
+    }
+
+    if (documentText) {
+      contextParts.push(`## Uploaded Document Content\n${documentText.slice(0, 3000)}`);
+    }
+
+    const context = contextParts.length > 0
+      ? contextParts.join("\n\n")
+      : "No signals, findings, or agent detections are currently available.";
+
+    const systemPrompt = `You are an expert enterprise risk analyst. Based on the intelligence context provided, synthesise 2–5 compound risk scenarios that an organisation should be aware of. Each scenario should be grounded in the evidence provided.
+
+For each scenario, provide:
+- title: A clear, specific risk title (max 80 chars)
+- description: 1-2 sentence description of the risk scenario and potential impact
+- category: one of operational|financial|compliance|strategic|technology|reputational
+- likelihood: integer 1–5 (1=rare, 5=almost certain)
+- impact: integer 1–5 (1=negligible, 5=catastrophic)
+- sources: array of 1–3 short strings describing the evidence (e.g. "CVE signal: SQL injection vulnerability", "Finding: unpatched systems")
+
+Respond ONLY with valid JSON:
+{"scenarios":[{"title":"...","description":"...","category":"...","likelihood":N,"impact":N,"sources":["..."]}]}
+
+Rules:
+- Only include risks clearly evidenced by the context
+- Prefer compound scenarios that combine multiple signals where relevant
+- Keep titles and descriptions concise and actionable
+- If context is sparse, propose plausible general risks for the organisation type`;
+
+    const response = await complete(tenantId, {
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Analyse the following intelligence context and propose risk scenarios:\n\n${context}` },
+      ],
+      temperature: 0.3,
+      maxTokens: 2048,
+    });
+
+    interface RawScenario {
+      title?: unknown;
+      description?: unknown;
+      category?: unknown;
+      likelihood?: unknown;
+      impact?: unknown;
+      sources?: unknown;
+    }
+
+    let scenarios: Array<{
+      title: string;
+      description: string;
+      category: string;
+      likelihood: number;
+      impact: number;
+      sources: string[];
+    }> = [];
+
+    try {
+      const parsed = JSON.parse(response);
+      const validCategories = ["operational", "financial", "compliance", "strategic", "technology", "reputational"];
+      scenarios = Array.isArray(parsed.scenarios)
+        ? (parsed.scenarios as RawScenario[]).map((s) => ({
+            title: String(s.title || "Untitled Risk"),
+            description: String(s.description || ""),
+            category: validCategories.includes(String(s.category)) ? String(s.category) : "operational",
+            likelihood: Math.max(1, Math.min(5, Number(s.likelihood) || 3)),
+            impact: Math.max(1, Math.min(5, Number(s.impact) || 3)),
+            sources: Array.isArray(s.sources) ? (s.sources as unknown[]).map(String) : [],
+          })).filter(s => s.title && s.title !== "Untitled Risk")
+        : [];
+    } catch {
+      scenarios = [];
+    }
+
+    await recordAudit(req, "risk_configurator", "signal", undefined, {
+      scenarioCount: scenarios.length,
+      hadDocument: !!documentText,
+    });
+
+    res.json({ scenarios });
+  } catch (err) {
+    if (err instanceof LLMUnavailableError) {
+      sendError(res, 422, "AI Unavailable", AI_UNAVAILABLE_MSG);
+      return;
+    }
+    console.error("Risk configurator error:", err);
+    serverError(res);
+  }
+});
+
+router.post("/v1/ai/risk-configurator/save", requireRole("admin", "risk_manager"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const { title, description, category, likelihood, impact, saveAsDraft } = req.body as {
+      title?: string;
+      description?: string;
+      category?: string;
+      likelihood?: number;
+      impact?: number;
+      saveAsDraft?: boolean;
+    };
+
+    if (!title) { badRequest(res, "title is required"); return; }
+
+    const validCategories = ["operational", "financial", "compliance", "strategic", "technology", "reputational"];
+    const riskStatus = saveAsDraft !== false ? "draft" : "open";
+
+    const [risk] = await db.insert(risksTable).values({
+      tenantId,
+      title: title.slice(0, 200),
+      description: description || "",
+      category: (validCategories.includes(category || "") ? category : "operational") as "operational" | "financial" | "compliance" | "strategic" | "technology" | "reputational",
+      likelihood: Math.max(1, Math.min(5, likelihood || 3)),
+      impact: Math.max(1, Math.min(5, impact || 3)),
+      status: riskStatus,
+    }).returning();
+
+    await recordAudit(req, "create", "risk", risk.id, { fromRiskConfigurator: true, saveAsDraft: riskStatus === "draft" });
+
+    res.status(201).json({ risk });
+  } catch (err) {
+    console.error("Risk configurator save error:", err);
+    serverError(res);
   }
 });
 

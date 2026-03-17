@@ -19,9 +19,10 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Link } from "wouter";
 
 interface TranscriptEntry {
   role: "user" | "assistant";
@@ -54,7 +55,7 @@ function parseAiMessage(raw: string): string {
   try {
     const parsed = JSON.parse(raw);
     if (parsed.type === "question" && parsed.content) return parsed.content;
-    if (parsed.type === "draft") return "I've gathered enough information to create a draft. Review it below and click **Commit** to save.";
+    if (parsed.type === "draft") return "I've prepared a draft based on what you've told me. Review it below.";
     return raw;
   } catch {
     return raw;
@@ -103,22 +104,102 @@ function TypingIndicator() {
 }
 
 function StreamingBubble({ text }: { text: string }) {
+  const isJson = text.trimStart().startsWith("{");
+  if (isJson) {
+    return <TypingIndicator />;
+  }
   return (
     <div className="flex gap-3 items-start">
       <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border bg-foreground text-background">
         <Bot className="h-4 w-4" />
       </div>
       <div className="max-w-[80%] px-4 py-3 rounded-2xl rounded-tl-none bg-muted border text-sm leading-relaxed">
-        {parseAiMessage(text) || <span className="opacity-50">Thinking…</span>}
+        {text || <span className="opacity-50">Thinking…</span>}
         <span className="inline-block w-0.5 h-3.5 bg-foreground/60 animate-pulse ml-0.5 align-text-bottom" />
       </div>
     </div>
   );
 }
 
-function DraftPanel({ draft, type, onCommit, onContinue, isCommitting }: {
+const CATEGORY_COLORS: Record<string, string> = {
+  operational: "bg-orange-50 text-orange-700 border-orange-200",
+  financial: "bg-green-50 text-green-700 border-green-200",
+  compliance: "bg-purple-50 text-purple-700 border-purple-200",
+  strategic: "bg-blue-50 text-blue-700 border-blue-200",
+  technology: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  reputational: "bg-rose-50 text-rose-700 border-rose-200",
+};
+
+function LikelihoodImpactBadge({ label, value }: { label: string; value?: number }) {
+  if (!value) return null;
+  const color = value >= 4 ? "text-red-600 bg-red-50 border-red-200" :
+    value >= 3 ? "text-amber-600 bg-amber-50 border-amber-200" :
+    "text-emerald-600 bg-emerald-50 border-emerald-200";
+  return (
+    <span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded border font-semibold", color)}>
+      {label} {value}/5
+    </span>
+  );
+}
+
+function RiskPreviewCard({ draft, onCommitDraft, onCommitActive, onKeepRefining, isCommitting }: {
   draft: DraftData;
-  type: string;
+  onCommitDraft: () => void;
+  onCommitActive: () => void;
+  onKeepRefining: () => void;
+  isCommitting: boolean;
+}) {
+  const catColor = CATEGORY_COLORS[draft.category || ""] || "bg-muted text-foreground border-border";
+  return (
+    <div className="border-2 border-foreground/15 rounded-xl bg-card shadow-sm">
+      <div className="px-4 py-3 border-b border-foreground/10 flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">Draft Risk Ready</span>
+        <Badge variant="outline" className="text-[10px] ml-auto">Review before saving</Badge>
+      </div>
+      <div className="p-4 space-y-3">
+        <div>
+          <p className="font-semibold text-base leading-snug">{draft.title || "Untitled Risk"}</p>
+          {draft.description && (
+            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{draft.description}</p>
+          )}
+        </div>
+        <div className="flex items-center flex-wrap gap-2">
+          {draft.category && (
+            <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full border capitalize", catColor)}>
+              {draft.category}
+            </span>
+          )}
+          <LikelihoodImpactBadge label="L" value={draft.likelihood} />
+          <LikelihoodImpactBadge label="I" value={draft.impact} />
+        </div>
+        <div className="flex gap-2 pt-1">
+          <Button size="sm" onClick={onCommitActive} disabled={isCommitting} className="flex-1">
+            {isCommitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
+            Record Now
+          </Button>
+          <Button size="sm" variant="outline" onClick={onCommitDraft} disabled={isCommitting} className="flex-1">
+            {isCommitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+            Add to Register as Draft
+          </Button>
+        </div>
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={onKeepRefining}
+            disabled={isCommitting}
+            className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+          >
+            Keep refining →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ControlDraftPanel({ draft, onCommit, onContinue, isCommitting }: {
+  draft: DraftData;
   onCommit: () => void;
   onContinue: () => void;
   isCommitting: boolean;
@@ -127,48 +208,32 @@ function DraftPanel({ draft, type, onCommit, onContinue, isCommitting }: {
     <div className="border border-foreground/20 rounded-xl bg-muted/30 p-4 space-y-3">
       <div className="flex items-center gap-2 text-sm font-semibold">
         <Sparkles className="h-4 w-4" />
-        Draft Ready
+        Assessment Draft Ready
         <Badge variant="outline" className="text-[10px] ml-auto">Review before saving</Badge>
       </div>
       <div className="space-y-2 text-sm">
-        {type === "risk_creation" && (
-          <>
-            {draft.title && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Title</span><div className="font-medium mt-0.5">{draft.title}</div></div>}
-            {draft.description && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Description</span><div className="mt-0.5 text-muted-foreground">{draft.description}</div></div>}
-            <div className="flex gap-4">
-              {draft.category && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Category</span><div className="font-medium mt-0.5 capitalize">{draft.category}</div></div>}
-              {draft.likelihood && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Likelihood</span><div className="font-medium mt-0.5">{draft.likelihood}/5</div></div>}
-              {draft.impact && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Impact</span><div className="font-medium mt-0.5">{draft.impact}/5</div></div>}
-            </div>
-          </>
-        )}
-        {type === "control_assessment" && (
-          <>
-            {draft.result && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Result</span><div className="font-medium mt-0.5 capitalize">{draft.result?.replace("_", " ")}</div></div>}
-            {draft.notes && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Notes</span><div className="mt-0.5 text-muted-foreground">{draft.notes}</div></div>}
-            {draft.gaps && draft.gaps.length > 0 && (
-              <div>
-                <span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Gaps</span>
-                <ul className="mt-1 space-y-1">
-                  {draft.gaps.map((g, i) => (
-                    <li key={i} className="text-xs text-destructive flex items-start gap-1.5">
-                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />{g}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
+        {draft.result && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Result</span><div className="font-medium mt-0.5 capitalize">{draft.result?.replace("_", " ")}</div></div>}
+        {draft.notes && <div><span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Notes</span><div className="mt-0.5 text-muted-foreground">{draft.notes}</div></div>}
+        {draft.gaps && draft.gaps.length > 0 && (
+          <div>
+            <span className="text-muted-foreground text-xs uppercase font-mono tracking-wide">Gaps</span>
+            <ul className="mt-1 space-y-1">
+              {draft.gaps.map((g, i) => (
+                <li key={i} className="text-xs text-destructive flex items-start gap-1.5">
+                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />{g}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
       <div className="flex gap-2 pt-2 border-t border-foreground/10">
         <Button size="sm" onClick={onCommit} disabled={isCommitting} className="flex-1">
           {isCommitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-          {type === "risk_creation" ? "Create Risk" : "Save Assessment"}
+          Save Assessment
         </Button>
         <Button size="sm" variant="outline" onClick={onContinue} disabled={isCommitting}>
           Refine
-          <ChevronRight className="h-3.5 w-3.5 ml-1" />
         </Button>
       </div>
     </div>
@@ -194,6 +259,8 @@ export function InterviewDialog({
   const [showDraft, setShowDraft] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [committed, setCommitted] = useState(false);
+  const [committedId, setCommittedId] = useState<string | null>(null);
+  const [committedTitle, setCommittedTitle] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -207,13 +274,14 @@ export function InterviewDialog({
 
   useEffect(() => {
     scrollToBottom();
-  }, [transcript, streamingText, scrollToBottom]);
+  }, [transcript, streamingText, showDraft, scrollToBottom]);
 
   useEffect(() => {
     if (open && !sessionId) {
       setIsStarting(true);
       setError(null);
       setCommitted(false);
+      setCommittedId(null);
       setDraftData(null);
       setShowDraft(false);
       setTranscript([]);
@@ -246,6 +314,8 @@ export function InterviewDialog({
       setShowDraft(false);
       setError(null);
       setCommitted(false);
+      setCommittedId(null);
+      setCommittedTitle(null);
     }
   }, [open, type]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -332,7 +402,7 @@ export function InterviewDialog({
         ...prev,
         {
           role: "assistant",
-          content: `{"type":"question","content":"Sorry, I encountered an error: ${msg}. Please try again."}`,
+          content: `Sorry, I encountered an error: ${msg}. Please try again.`,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -342,7 +412,7 @@ export function InterviewDialog({
     }
   }, [inputValue, sessionId, isStreaming]);
 
-  const handleCommit = useCallback(async () => {
+  const handleCommit = useCallback(async (saveAsDraft: boolean) => {
     if (!sessionId || isCommitting) return;
     setIsCommitting(true);
     try {
@@ -353,7 +423,7 @@ export function InterviewDialog({
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(controlId ? { controlId } : {}),
+        body: JSON.stringify(controlId ? { controlId, saveAsDraft } : { saveAsDraft }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: "Commit failed" }));
@@ -361,13 +431,15 @@ export function InterviewDialog({
       }
       const result = await res.json() as { status: string; resultId?: string | null; type: string };
       setCommitted(true);
+      setCommittedId(result.resultId ?? null);
+      setCommittedTitle(draftData?.title ?? null);
       onCommitted?.(result.resultId ?? null, result.type);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create record");
     } finally {
       setIsCommitting(false);
     }
-  }, [sessionId, controlId, isCommitting, onCommitted]);
+  }, [sessionId, controlId, isCommitting, onCommitted, draftData]);
 
   const handleAbandon = useCallback(() => {
     if (sessionId && !committed) {
@@ -389,6 +461,9 @@ export function InterviewDialog({
       ? "Answer a few questions and the AI will draft a risk record for you."
       : "Walk through a structured assessment and AI will generate an evaluation."
   );
+
+  const isDraftVisible = showDraft && draftData && type === "risk_creation";
+  const isControlDraftVisible = showDraft && draftData && type === "control_assessment";
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleAbandon(); }}>
@@ -429,11 +504,24 @@ export function InterviewDialog({
               <CheckCircle2 className="h-10 w-10 text-emerald-600" />
               <div>
                 <p className="font-semibold">
-                  {type === "risk_creation" ? "Risk created successfully!" : "Assessment saved!"}
+                  {type === "risk_creation" ? "Risk saved successfully!" : "Assessment saved!"}
                 </p>
+                {committedTitle && type === "risk_creation" && (
+                  <p className="text-sm font-medium mt-1">{committedTitle}</p>
+                )}
                 <p className="text-sm text-muted-foreground mt-1">The record has been added to the register.</p>
               </div>
-              <Button size="sm" onClick={() => onOpenChange(false)}>Done</Button>
+              <div className="flex gap-2">
+                {committedId && type === "risk_creation" && (
+                  <Link href={`/risks/${committedId}`}>
+                    <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
+                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                      View in Register
+                    </Button>
+                  </Link>
+                )}
+                <Button size="sm" onClick={() => onOpenChange(false)}>Done</Button>
+              </div>
             </div>
           )}
 
@@ -444,11 +532,19 @@ export function InterviewDialog({
               ))}
               {isStreaming && !streamingText && <TypingIndicator />}
               {isStreaming && streamingText && <StreamingBubble text={streamingText} />}
-              {showDraft && draftData && (
-                <DraftPanel
+              {isDraftVisible && draftData && (
+                <RiskPreviewCard
                   draft={draftData}
-                  type={type}
-                  onCommit={handleCommit}
+                  onCommitActive={() => handleCommit(false)}
+                  onCommitDraft={() => handleCommit(true)}
+                  onKeepRefining={() => setShowDraft(false)}
+                  isCommitting={isCommitting}
+                />
+              )}
+              {isControlDraftVisible && draftData && (
+                <ControlDraftPanel
+                  draft={draftData}
+                  onCommit={() => handleCommit(true)}
                   onContinue={() => setShowDraft(false)}
                   isCommitting={isCommitting}
                 />
@@ -459,33 +555,42 @@ export function InterviewDialog({
         </div>
 
         {!isStarting && !error && !committed && (
-          <div className="border-t px-4 py-3">
-            <div className="flex gap-2 items-center">
-              <Input
-                ref={inputRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type your response…"
-                disabled={isStreaming || !sessionId}
-                className="flex-1 h-10 text-sm"
-              />
-              <Button
-                size="icon"
-                onClick={sendMessage}
-                disabled={isStreaming || !inputValue.trim() || !sessionId}
-                className="h-10 w-10 shrink-0"
-              >
-                {isStreaming ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-2 text-center">
-              Press Enter to send · Shift+Enter for new line · <button className="underline hover:text-foreground" onClick={handleAbandon}>Cancel session</button>
-            </p>
+          <div className={cn("border-t px-4 py-3", isDraftVisible && "bg-muted/30")}>
+            {isDraftVisible ? (
+              <p className="text-xs text-center text-muted-foreground py-1">
+                Draft is ready above. Choose an action or{" "}
+                <button className="underline hover:text-foreground" onClick={() => setShowDraft(false)}>keep refining</button>.
+              </p>
+            ) : (
+              <>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type your response…"
+                    disabled={isStreaming || !sessionId}
+                    className="flex-1 h-10 text-sm"
+                  />
+                  <Button
+                    size="icon"
+                    onClick={sendMessage}
+                    disabled={isStreaming || !inputValue.trim() || !sessionId}
+                    className="h-10 w-10 shrink-0"
+                  >
+                    {isStreaming ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                  Press Enter to send · <button className="underline hover:text-foreground" onClick={handleAbandon}>Cancel session</button>
+                </p>
+              </>
+            )}
           </div>
         )}
       </DialogContent>

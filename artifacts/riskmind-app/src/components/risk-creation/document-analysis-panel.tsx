@@ -47,6 +47,7 @@ export interface PopulateFormPayload {
 
 interface DocumentAnalysisPanelProps {
   onPopulateForm: (payload: PopulateFormPayload) => void;
+  onTextExtracted?: (text: string) => void;
 }
 
 const ALLOWED_EXTENSIONS = ["pdf", "docx", "xlsx", "pptx", "txt", "md", "csv"];
@@ -309,7 +310,7 @@ function AnalysisResults({
   );
 }
 
-export function DocumentAnalysisPanel({ onPopulateForm }: DocumentAnalysisPanelProps) {
+export function DocumentAnalysisPanel({ onPopulateForm, onTextExtracted }: DocumentAnalysisPanelProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [results, setResults] = useState<DocumentAnalysisResult[]>([]);
@@ -377,13 +378,24 @@ export function DocumentAnalysisPanel({ onPopulateForm }: DocumentAnalysisPanelP
 
       const data = await res.json() as { results: DocumentAnalysisResult[] };
       setResults(prev => [...prev, ...data.results]);
+
+      if (onTextExtracted) {
+        const textParts = data.results
+          .filter(r => r.summary && r.summary !== "Document appears to be empty or contains no extractable text.")
+          .map(r => `[${r.documentName}]\n${r.summary}\n${r.proposedRisks.map(p => `Risk: ${p.title} — ${p.description}`).join("\n")}`)
+          .filter(Boolean);
+        if (textParts.length > 0) {
+          onTextExtracted(textParts.join("\n\n"));
+        }
+      }
+
       setFiles([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setIsAnalysing(false);
     }
-  }, [files]);
+  }, [files, onTextExtracted]);
 
   const totalProposed = results.reduce((sum, r) => sum + r.proposedRisks.length, 0);
 

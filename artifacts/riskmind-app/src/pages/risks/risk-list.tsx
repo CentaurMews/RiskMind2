@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SeverityBadge, StatusBadge } from "@/components/ui/severity-badge";
-import { Plus, Search, Filter, Loader2, ArrowRight, Sparkles, X, Brain, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { Plus, Search, Filter, Loader2, ArrowRight, Sparkles, X, Brain, ChevronDown, ChevronUp, FileText, Wand2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { InterviewDialog } from "@/components/ai-interview/interview-dialog";
 import { AiIntelligencePanel } from "@/components/risk-creation/ai-intelligence-panel";
 import { DocumentAnalysisPanel, type PopulateFormPayload } from "@/components/risk-creation/document-analysis-panel";
+import { AiRiskConfigurator } from "@/components/risk-creation/ai-risk-configurator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -58,7 +59,7 @@ export default function RiskList() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
 
-  const statusParam = selectedStatuses.length > 0 && selectedStatuses.length < 5
+  const statusParam = selectedStatuses.length > 0 && selectedStatuses.length < ALL_STATUSES.length
     ? selectedStatuses.join(",")
     : undefined;
 
@@ -74,7 +75,8 @@ export default function RiskList() {
   const [interviewOpen, setInterviewOpen] = useState(false);
   const [selectedSources, setSelectedSources] = useState<SourceItem[]>([]);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
-  const [rightPanelTab, setRightPanelTab] = useState<"intelligence" | "documents">("intelligence");
+  const [rightPanelTab, setRightPanelTab] = useState<"intelligence" | "documents" | "configurator">("intelligence");
+  const [documentExtractedText, setDocumentExtractedText] = useState<string>("");
   const formRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     title: "",
@@ -135,6 +137,11 @@ export default function RiskList() {
     });
     setSelectedSources([]);
     setShowMobilePanel(false);
+    setDocumentExtractedText("");
+  }, []);
+
+  const handleTextExtracted = useCallback((text: string) => {
+    setDocumentExtractedText(prev => prev ? `${prev}\n\n${text}` : text);
   }, []);
 
   const handleOpenChange = useCallback((open: boolean) => {
@@ -327,13 +334,16 @@ export default function RiskList() {
                           </button>
                           {showMobilePanel && (
                             <div className="mt-2 border rounded-lg p-3 space-y-3">
-                              <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents")}>
+                              <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents" | "configurator")}>
                                 <TabsList className="w-full h-8">
                                   <TabsTrigger value="intelligence" className="flex-1 text-xs">
-                                    <Brain className="h-3 w-3 mr-1" />Intelligence
+                                    <Brain className="h-3 w-3 mr-1" />Intel
                                   </TabsTrigger>
                                   <TabsTrigger value="documents" className="flex-1 text-xs">
-                                    <FileText className="h-3 w-3 mr-1" />Documents
+                                    <FileText className="h-3 w-3 mr-1" />Docs
+                                  </TabsTrigger>
+                                  <TabsTrigger value="configurator" className="flex-1 text-xs">
+                                    <Wand2 className="h-3 w-3 mr-1" />AI
                                   </TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="intelligence" className="h-[300px] overflow-hidden mt-2">
@@ -345,7 +355,10 @@ export default function RiskList() {
                                   />
                                 </TabsContent>
                                 <TabsContent value="documents" className="mt-2">
-                                  <DocumentAnalysisPanel onPopulateForm={handlePopulateFromDocument} />
+                                  <DocumentAnalysisPanel onPopulateForm={handlePopulateFromDocument} onTextExtracted={handleTextExtracted} />
+                                </TabsContent>
+                                <TabsContent value="configurator" className="mt-2">
+                                  <AiRiskConfigurator documentText={documentExtractedText} />
                                 </TabsContent>
                               </Tabs>
                             </div>
@@ -374,14 +387,17 @@ export default function RiskList() {
                   </div>
 
                   <div className="hidden md:flex w-[320px] border-l bg-muted/20 flex-col min-h-0">
-                    <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents")} className="flex flex-col h-full">
+                    <Tabs value={rightPanelTab} onValueChange={v => setRightPanelTab(v as "intelligence" | "documents" | "configurator")} className="flex flex-col h-full">
                       <div className="px-3 pt-3 pb-0">
                         <TabsList className="w-full h-8">
                           <TabsTrigger value="intelligence" className="flex-1 text-xs">
-                            <Brain className="h-3 w-3 mr-1" />Intelligence
+                            <Brain className="h-3 w-3 mr-1" />Intel
                           </TabsTrigger>
                           <TabsTrigger value="documents" className="flex-1 text-xs">
-                            <FileText className="h-3 w-3 mr-1" />Documents
+                            <FileText className="h-3 w-3 mr-1" />Docs
+                          </TabsTrigger>
+                          <TabsTrigger value="configurator" className="flex-1 text-xs">
+                            <Wand2 className="h-3 w-3 mr-1" />AI
                           </TabsTrigger>
                         </TabsList>
                       </div>
@@ -395,7 +411,12 @@ export default function RiskList() {
                       </TabsContent>
                       <TabsContent value="documents" className="flex-1 min-h-0 mt-0 overflow-y-auto">
                         <div className="p-3">
-                          <DocumentAnalysisPanel onPopulateForm={handlePopulateFromDocument} />
+                          <DocumentAnalysisPanel onPopulateForm={handlePopulateFromDocument} onTextExtracted={handleTextExtracted} />
+                        </div>
+                      </TabsContent>
+                      <TabsContent value="configurator" className="flex-1 min-h-0 mt-0 overflow-y-auto">
+                        <div className="p-3">
+                          <AiRiskConfigurator documentText={documentExtractedText} />
                         </div>
                       </TabsContent>
                     </Tabs>
@@ -427,7 +448,16 @@ export default function RiskList() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={selectedStatuses.includes("draft") ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => toggleStatus("draft")}
+                className="text-xs"
+              >
+                {selectedStatuses.includes("draft") ? "Drafts On" : "Show Drafts"}
+              </Button>
+              <Popover open={filterOpen} onOpenChange={setFilterOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="relative">
                   <Filter className="h-4 w-4 mr-2" />
@@ -491,6 +521,7 @@ export default function RiskList() {
                 )}
               </PopoverContent>
             </Popover>
+            </div>
           </div>
           
           {(selectedStatuses.length > 0 || selectedStrategies.length > 0) && (
@@ -547,10 +578,15 @@ export default function RiskList() {
                       <TableRow key={risk.id} className={`group hover:bg-muted/30 transition-colors${isHistorical ? " opacity-60" : ""}`}>
                         <TableCell className="font-mono text-xs text-muted-foreground">{risk.id?.split('-')[0]}</TableCell>
                         <TableCell className="font-medium">
-                          {risk.title}
-                          {isHistorical && (
-                            <span className="ml-2 text-[10px] text-muted-foreground italic">historical</span>
-                          )}
+                          <span className="flex items-center gap-1.5">
+                            {risk.title}
+                            {risk.status === "draft" && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">Draft</Badge>
+                            )}
+                            {isHistorical && (
+                              <span className="text-[10px] text-muted-foreground italic">historical</span>
+                            )}
+                          </span>
                         </TableCell>
                         <TableCell className="capitalize">{risk.category}</TableCell>
                         <TableCell>
