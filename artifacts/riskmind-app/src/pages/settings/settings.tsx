@@ -18,6 +18,7 @@ import {
   useApproveAgentFinding,
   useDismissAgentFinding,
 } from "@workspace/api-client-react";
+import { OsintSourcesTab } from "./osint-sources-tab";
 import type { UpdateUserRoleBodyRole, LlmProvider, CreateLlmProvider, UpdateLlmProvider, AgentFinding } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -30,7 +31,7 @@ import {
   ShieldAlert, Bot, Server, Loader2, Users, Shield,
   Plus, Pencil, Trash2, CheckCircle2, XCircle,
   Play, RefreshCw, Clock, AlertTriangle, Eye,
-  Link2, Zap, TrendingUp, Search, Lightbulb, Ban
+  Link2, Zap, TrendingUp, Search, Lightbulb, Ban, Globe
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,41 @@ import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
+
+function parseCronHuman(cron: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return "Invalid cron expression";
+  const [minute, hour, dom, month, dow] = parts;
+
+  const dowNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const timeStr = (m: string, h: string): string => {
+    if (/^\d+$/.test(m) && /^\d+$/.test(h)) {
+      const hh = Number(h);
+      const mm = Number(m);
+      const period = hh >= 12 ? "PM" : "AM";
+      const displayH = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+      return `${displayH}:${mm.toString().padStart(2, "0")} ${period} UTC`;
+    }
+    if (m === "0" && h.startsWith("*/")) return `every ${h.slice(2)} hours`;
+    if (m.startsWith("*/")) return `every ${m.slice(2)} minutes`;
+    return `at minute ${m} of hour ${h}`;
+  };
+
+  if (minute === "*" && hour === "*") return "every minute";
+  if (dom === "*" && month === "*" && dow === "*") {
+    if (hour.startsWith("*/")) return `every ${hour.slice(2)} hours`;
+    return `daily at ${timeStr(minute, hour)}`;
+  }
+  if (dom === "*" && month === "*" && dow !== "*") {
+    const days = dow.split(",").map(d => dowNames[Number(d)] || d).join(", ");
+    return `weekly on ${days} at ${timeStr(minute, hour)}`;
+  }
+  if (dom !== "*" && month === "*" && dow === "*") {
+    return `monthly on day ${dom} at ${timeStr(minute, hour)}`;
+  }
+  return `cron: ${cron}`;
+}
 
 const ROLES: { value: UpdateUserRoleBodyRole; label: string }[] = [
   { value: "admin", label: "Admin" },
@@ -319,6 +355,9 @@ export default function Settings() {
             <TabsTrigger value="agent" className="data-[state=active]:shadow-sm rounded-md">
               <Bot className="h-4 w-4 mr-2" /> Agent Config
             </TabsTrigger>
+            <TabsTrigger value="sources" className="data-[state=active]:shadow-sm rounded-md">
+              <Globe className="h-4 w-4 mr-2" /> Search Sources
+            </TabsTrigger>
             <TabsTrigger value="users" className="data-[state=active]:shadow-sm rounded-md">
               <Users className="h-4 w-4 mr-2" /> Users & Roles
             </TabsTrigger>
@@ -490,6 +529,11 @@ export default function Settings() {
                           placeholder="0 6 * * *"
                           className="font-mono text-sm"
                         />
+                        {effectiveAgent.schedule && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                            Runs {parseCronHuman(effectiveAgent.schedule)}
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground">
                           Examples: <span className="font-mono">0 6 * * *</span> (daily 6am) · <span className="font-mono">0 */4 * * *</span> (every 4h) · <span className="font-mono">0 9 * * 1</span> (weekly Mon 9am)
                         </p>
@@ -545,6 +589,7 @@ export default function Settings() {
                           <TableHead>Policy</TableHead>
                           <TableHead>Findings</TableHead>
                           <TableHead>Actions</TableHead>
+                          <TableHead>OSINT</TableHead>
                           <TableHead>Started</TableHead>
                           <TableHead>Duration</TableHead>
                         </TableRow>
@@ -554,12 +599,32 @@ export default function Settings() {
                           const started = run.createdAt ? new Date(run.createdAt) : null;
                           const ended = (run as { completedAt?: string }).completedAt ? new Date((run as { completedAt: string }).completedAt) : null;
                           const durationMs = started && ended ? ended.getTime() - started.getTime() : null;
+                          const ctx = (run as { context?: Record<string, unknown> }).context;
+                          const osintCtx = ctx?.osint as { sourcesRun?: string[]; sourcesSucceeded?: string[]; sourcesFailed?: string[] } | undefined;
+                          const hasOsint = osintCtx && Array.isArray(osintCtx.sourcesRun) && osintCtx.sourcesRun.length > 0;
+                          const totalRun = hasOsint ? osintCtx!.sourcesRun!.length : 0;
+                          const totalSucceeded = hasOsint && Array.isArray(osintCtx!.sourcesSucceeded) ? osintCtx!.sourcesSucceeded.length : 0;
+                          const totalFailed = hasOsint && Array.isArray(osintCtx!.sourcesFailed) ? osintCtx!.sourcesFailed.length : 0;
+                          const sourceNames = hasOsint ? osintCtx!.sourcesRun!.join(", ") : "";
                           return (
                             <TableRow key={run.id}>
                               <TableCell><RunStatusBadge status={run.status} /></TableCell>
                               <TableCell className="text-xs font-mono capitalize">{run.policyTier}</TableCell>
                               <TableCell className="text-xs">{(run as { findingsCount?: number }).findingsCount ?? 0}</TableCell>
                               <TableCell className="text-xs">{(run as { actionsCount?: number }).actionsCount ?? 0}</TableCell>
+                              <TableCell className="text-xs">
+                                {hasOsint ? (
+                                  <span title={`Sources: ${sourceNames}`} className="cursor-help">
+                                    <span className="text-green-600 dark:text-green-400">{totalSucceeded}✓</span>
+                                    {totalFailed > 0 && (
+                                      <span className="text-red-500 ml-1">{totalFailed}✗</span>
+                                    )}
+                                    <span className="text-muted-foreground ml-1">/{totalRun}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
                               <TableCell className="text-xs text-muted-foreground">{started ? format(started, "MMM d, HH:mm") : "-"}</TableCell>
                               <TableCell className="text-xs text-muted-foreground font-mono">
                                 {durationMs !== null ? `${(durationMs / 1000).toFixed(1)}s` : "-"}
@@ -667,6 +732,11 @@ export default function Settings() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* SEARCH SOURCES TAB */}
+            <TabsContent value="sources" className="m-0">
+              <OsintSourcesTab />
             </TabsContent>
 
             {/* USERS TAB */}

@@ -6,11 +6,21 @@ import {
   alertsTable,
   agentRunsTable,
   agentFindingsTable,
+  osintSourceConfigsTable,
 } from "@workspace/db";
 import { complete, isAvailable } from "./llm-service";
 import { recordAuditDirect } from "./audit";
 import { invokeTool } from "./tool-registry";
 import { RiskSourceAggregator } from "../services/risk-source-aggregator";
+import { decrypt } from "./encryption";
+import {
+  runPerplexity,
+  runAlienVaultOTX,
+  runCensys,
+  runNvdCisa,
+  runEmailImap,
+  type OsintResult,
+} from "./osint-adapters";
 
 async function agentAudit(
   tenantId: string,
@@ -58,6 +68,108 @@ interface ObservationData {
   frameworks: Array<Record<string, unknown>>;
   unmappedRequirements: Array<Record<string, unknown>>;
   failedControlTests: Array<Record<string, unknown>>;
+}
+
+interface OsintContextBundle {
+  summaries: Array<{ source: string; summary: string }>;
+  highlights: string[];
+  sourcesRun: string[];
+  sourcesSucceeded: string[];
+  sourcesFailed: string[];
+}
+
+async function gatherOsintContext(tenantId: string): Promise<OsintContextBundle> {
+  const bundle: OsintContextBundle = { summaries: [], highlights: [], sourcesRun: [], sourcesSucceeded: [], sourcesFailed: [] };
+
+  try {
+    const enabledSources = await db.select().from(osintSourceConfigsTable)
+      .where(and(eq(osintSourceConfigsTable.tenantId, tenantId), eq(osintSourceConfigsTable.enabled, true)));
+
+    if (enabledSources.length === 0) return bundle;
+
+    const results: OsintResult[] = [];
+
+    for (const src of enabledSources) {
+      bundle.sourcesRun.push(src.sourceType);
+      let creds: Record<string, unknown> = {};
+      if (src.encryptedCredentials) {
+        try { creds = JSON.parse(decrypt(src.encryptedCredentials)) as Record<string, unknown>; } catch { }
+      }
+
+      let result: OsintResult;
+      try {
+        switch (src.sourceType) {
+          case "perplexity":
+            result = await runPerplexity(creds as { apiKey: string });
+            break;
+          case "alienvault_otx":
+            result = await runAlienVaultOTX(creds as { apiKey: string });
+            break;
+          case "censys":
+            result = await runCensys(creds as { apiId: string; apiSecret: string });
+            break;
+          case "nvd_cisa":
+            result = await runNvdCisa();
+            break;
+          case "email_imap":
+            result = await runEmailImap({ ...creds, port: Number(creds.port || 993) } as { host: string; port: number; username: string; password: string; mailbox: string });
+            break;
+          default:
+            continue;
+        }
+      } catch (err) {
+        result = { source: src.sourceType, success: false, data: [], summary: "", error: err instanceof Error ? err.message : String(err) };
+      }
+
+      results.push(result);
+
+      const statusUpdate: Record<string, unknown> = {
+        lastRunAt: new Date(),
+        lastRunStatus: result.success ? "success" : "failed",
+        lastRunError: result.success ? null : (result.error || "Unknown error"),
+        lastRunSummary: { summary: result.summary, dataCount: result.data.length },
+        updatedAt: new Date(),
+      };
+      await db.update(osintSourceConfigsTable).set(statusUpdate)
+        .where(and(eq(osintSourceConfigsTable.id, src.id), eq(osintSourceConfigsTable.tenantId, tenantId)))
+        .catch((err: unknown) => console.warn("[Agent] Failed to update OSINT source status:", err));
+
+      if (result.success) {
+        bundle.sourcesSucceeded.push(src.sourceType);
+        if (result.summary) bundle.summaries.push({ source: src.sourceType, summary: result.summary });
+        for (const item of result.data.slice(0, 3)) {
+          const highlight = extractHighlight(src.sourceType, item);
+          if (highlight) bundle.highlights.push(highlight);
+        }
+      } else {
+        bundle.sourcesFailed.push(src.sourceType);
+        console.warn(`[Agent] OSINT source ${src.sourceType} failed: ${result.error}`);
+      }
+    }
+  } catch (err) {
+    console.warn("[Agent] OSINT context gathering failed:", err instanceof Error ? err.message : err);
+  }
+
+  return bundle;
+}
+
+function extractHighlight(sourceType: string, item: Record<string, unknown>): string | null {
+  switch (sourceType) {
+    case "perplexity":
+      return typeof item.content === "string" ? item.content.slice(0, 200) : null;
+    case "alienvault_otx":
+      return typeof item.name === "string" ? `OTX Pulse: ${item.name}` : null;
+    case "censys":
+      return typeof item.ip === "string" ? `Censys host: ${item.ip} (${item.serviceCount || 0} services)` : null;
+    case "nvd_cisa": {
+      const nvdCves = item.nvdCves as Array<{ cveId?: string; description?: string }> | undefined;
+      return nvdCves && nvdCves.length > 0 ? `NVD: ${nvdCves[0].cveId} — ${(nvdCves[0].description || "").slice(0, 100)}` : null;
+    }
+    case "email_imap":
+      return typeof item.subject === "string" ? `Threat email: ${item.subject}` : null;
+    default:
+      return null;
+  }
 }
 
 export function getTenantAgentConfig(settings: unknown): TenantAgentConfig {
@@ -588,7 +700,7 @@ async function detectPredictiveSignals(tenantId: string, data: ObservationData):
   return findings;
 }
 
-async function reason(tenantId: string, data: ObservationData, localFindings: Finding[]): Promise<Finding[]> {
+async function reason(tenantId: string, data: ObservationData, localFindings: Finding[], osintContext?: OsintContextBundle): Promise<Finding[]> {
   const summary = {
     risks: { total: data.risks.length, open: data.risks.filter(r => r.status === "open").length, critical: data.risks.filter(r => (Number(r.likelihood) * Number(r.impact)) >= 20).length },
     kris: { total: data.kris.length, breaching: data.kris.filter(k => Number(k.currentValue) >= Number(k.criticalThreshold)).length },
@@ -598,6 +710,10 @@ async function reason(tenantId: string, data: ObservationData, localFindings: Fi
     controls: { total: data.controls.length, inactive: data.controls.filter(c => c.status === "inactive").length },
     compliance: { unmappedRequirements: data.unmappedRequirements.length, failedTests: data.failedControlTests.length },
   };
+
+  const osintSection = osintContext && osintContext.summaries.length > 0
+    ? `\n## External Threat Intelligence (OSINT)\n${osintContext.summaries.map(s => `### ${s.source}\n${s.summary}`).join("\n\n")}\n\nKey external signals:\n${osintContext.highlights.slice(0, 10).map(h => `- ${h}`).join("\n")}\n`
+    : "";
 
   const prompt = `You are the Autonomous Risk Intelligence Agent for an enterprise risk management platform. Analyze the following cross-domain data and identify insights that a human analyst would likely miss.
 
@@ -626,12 +742,13 @@ ${JSON.stringify(data.vendors, null, 2)}
 
 ### Compliance Gaps (unmapped requirements)
 ${JSON.stringify(data.unmappedRequirements.slice(0, 20), null, 2)}
-
+${osintSection}
 ## Instructions
 Identify up to 5 additional cross-domain findings NOT already covered by the local analysis above. Focus on:
 1. Cross-domain correlations (e.g., vendor issues that could impact compliance, signals that relate to open risks)
 2. Anomalies (unexpected patterns in the data)
 3. Recommendations for risk reduction
+${osintContext && osintContext.summaries.length > 0 ? "4. External threats from the OSINT intelligence above that may impact internal risks or vendors" : ""}
 
 Respond ONLY with valid JSON:
 {"findings":[{"type":"cross_domain|anomaly|recommendation","severity":"critical|high|medium|low|info","title":"...","narrative":"A detailed explanation of the finding and why it matters...","linkedEntities":[{"type":"risk|vendor|signal|alert|control|framework","id":"uuid","label":"name"}]}]}
@@ -796,13 +913,18 @@ export async function runAgentCycle(
 
     let localFindings = [...cascadeFindings, ...clusterFindings, ...predictiveFindings];
 
+    const osintContext = await gatherOsintContext(tenantId);
+    if (osintContext.sourcesRun.length > 0) {
+      console.log(`[Agent] OSINT gathered for ${tenantId}: ${osintContext.sourcesSucceeded.length}/${osintContext.sourcesRun.length} sources succeeded`);
+    }
+
     let llmFindings: Finding[] = [];
     let model: string | null = null;
     let tokenEstimate = 0;
 
     if (available) {
       try {
-        llmFindings = await reason(tenantId, data, localFindings);
+        llmFindings = await reason(tenantId, data, localFindings, osintContext);
         model = "configured";
         tokenEstimate = JSON.stringify(data).length / 4;
       } catch (err) {
@@ -917,6 +1039,11 @@ export async function runAgentCycle(
         llmAvailable: available,
         schedule: scheduleInfo?.schedule || null,
         triggeredBy: scheduleInfo?.triggeredBy || "manual",
+        osint: {
+          sourcesRun: osintContext.sourcesRun,
+          sourcesSucceeded: osintContext.sourcesSucceeded,
+          sourcesFailed: osintContext.sourcesFailed,
+        },
       },
     }).where(eq(agentRunsTable.id, run.id));
 

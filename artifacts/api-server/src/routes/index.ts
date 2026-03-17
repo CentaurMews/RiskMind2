@@ -14,6 +14,7 @@ import interviewsRouter from "./interviews";
 import foresightRouter from "./foresight";
 import agentRouter from "./agent";
 import documentsRouter from "./documents";
+import osintSourcesRouter from "./osint-sources";
 import { authMiddleware } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -40,5 +41,6 @@ router.use(interviewsRouter);
 router.use(foresightRouter);
 router.use(agentRouter);
 router.use(documentsRouter);
+router.use(osintSourcesRouter);
 
 export default router;

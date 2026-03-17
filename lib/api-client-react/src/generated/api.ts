@@ -100,6 +100,8 @@ import type {
   MapControlRequirementsBody,
   McpStreamableHttpBody,
   NotFoundResponse,
+  OsintSource,
+  OsintTestResult,
   PromoteSignalRequest,
   Questionnaire,
   QuestionnaireListResponse,
@@ -121,6 +123,7 @@ import type {
   SuggestTreatments200,
   TenantUser,
   TestLlmProvider200,
+  TestOsintSourceBody,
   TokenPair,
   TransitionVendorBody,
   Treatment,
@@ -132,6 +135,7 @@ import type {
   UpdateFindingRequest,
   UpdateIncidentRequest,
   UpdateLlmProvider,
+  UpdateOsintSource,
   UpdateQuestionnaireResponsesBody,
   UpdateRiskRequest,
   UpdateSignalStatusRequest,
@@ -10201,6 +10205,607 @@ export const useUpdateAgentConfig = <
   TContext
 > => {
   return useMutation(getUpdateAgentConfigMutationOptions(options));
+};
+
+/**
+ * @summary List OSINT source configurations for the tenant
+ */
+export const getListOsintSourcesUrl = () => {
+  return `/api/v1/agent/sources`;
+};
+
+export const listOsintSources = async (
+  options?: RequestInit,
+): Promise<OsintSource[]> => {
+  return customFetch<OsintSource[]>(getListOsintSourcesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListOsintSourcesQueryKey = () => {
+  return [`/api/v1/agent/sources`] as const;
+};
+
+export const getListOsintSourcesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOsintSources>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listOsintSources>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListOsintSourcesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listOsintSources>>
+  > = ({ signal }) => listOsintSources({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOsintSources>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOsintSourcesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOsintSources>>
+>;
+export type ListOsintSourcesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List OSINT source configurations for the tenant
+ */
+
+export function useListOsintSources<
+  TData = Awaited<ReturnType<typeof listOsintSources>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listOsintSources>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListOsintSourcesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a specific OSINT source configuration
+ */
+export const getGetOsintSourceUrl = (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+) => {
+  return `/api/v1/agent/sources/${sourceType}`;
+};
+
+export const getOsintSource = async (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+  options?: RequestInit,
+): Promise<OsintSource> => {
+  return customFetch<OsintSource>(getGetOsintSourceUrl(sourceType), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOsintSourceQueryKey = (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+) => {
+  return [`/api/v1/agent/sources/${sourceType}`] as const;
+};
+
+export const getGetOsintSourceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOsintSource>>,
+  TError = ErrorType<unknown>,
+>(
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOsintSource>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetOsintSourceQueryKey(sourceType);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getOsintSource>>> = ({
+    signal,
+  }) => getOsintSource(sourceType, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!sourceType,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOsintSource>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOsintSourceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOsintSource>>
+>;
+export type GetOsintSourceQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a specific OSINT source configuration
+ */
+
+export function useGetOsintSource<
+  TData = Awaited<ReturnType<typeof getOsintSource>>,
+  TError = ErrorType<unknown>,
+>(
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOsintSource>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOsintSourceQueryOptions(sourceType, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create or update an OSINT source configuration
+ */
+export const getUpdateOsintSourceUrl = (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+) => {
+  return `/api/v1/agent/sources/${sourceType}`;
+};
+
+export const updateOsintSource = async (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+  updateOsintSource: UpdateOsintSource,
+  options?: RequestInit,
+): Promise<OsintSource> => {
+  return customFetch<OsintSource>(getUpdateOsintSourceUrl(sourceType), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateOsintSource),
+  });
+};
+
+export const getUpdateOsintSourceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateOsintSource>>,
+    TError,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+      data: BodyType<UpdateOsintSource>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateOsintSource>>,
+  TError,
+  {
+    sourceType:
+      | "perplexity"
+      | "alienvault_otx"
+      | "censys"
+      | "nvd_cisa"
+      | "email_imap";
+    data: BodyType<UpdateOsintSource>;
+  },
+  TContext
+> => {
+  const mutationKey = ["updateOsintSource"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateOsintSource>>,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+      data: BodyType<UpdateOsintSource>;
+    }
+  > = (props) => {
+    const { sourceType, data } = props ?? {};
+
+    return updateOsintSource(sourceType, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateOsintSourceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateOsintSource>>
+>;
+export type UpdateOsintSourceMutationBody = BodyType<UpdateOsintSource>;
+export type UpdateOsintSourceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create or update an OSINT source configuration
+ */
+export const useUpdateOsintSource = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateOsintSource>>,
+    TError,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+      data: BodyType<UpdateOsintSource>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateOsintSource>>,
+  TError,
+  {
+    sourceType:
+      | "perplexity"
+      | "alienvault_otx"
+      | "censys"
+      | "nvd_cisa"
+      | "email_imap";
+    data: BodyType<UpdateOsintSource>;
+  },
+  TContext
+> => {
+  return useMutation(getUpdateOsintSourceMutationOptions(options));
+};
+
+/**
+ * @summary Delete an OSINT source configuration (clears credentials)
+ */
+export const getDeleteOsintSourceUrl = (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+) => {
+  return `/api/v1/agent/sources/${sourceType}`;
+};
+
+export const deleteOsintSource = async (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteOsintSourceUrl(sourceType), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteOsintSourceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOsintSource>>,
+    TError,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteOsintSource>>,
+  TError,
+  {
+    sourceType:
+      | "perplexity"
+      | "alienvault_otx"
+      | "censys"
+      | "nvd_cisa"
+      | "email_imap";
+  },
+  TContext
+> => {
+  const mutationKey = ["deleteOsintSource"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteOsintSource>>,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+    }
+  > = (props) => {
+    const { sourceType } = props ?? {};
+
+    return deleteOsintSource(sourceType, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteOsintSourceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteOsintSource>>
+>;
+
+export type DeleteOsintSourceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete an OSINT source configuration (clears credentials)
+ */
+export const useDeleteOsintSource = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOsintSource>>,
+    TError,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteOsintSource>>,
+  TError,
+  {
+    sourceType:
+      | "perplexity"
+      | "alienvault_otx"
+      | "censys"
+      | "nvd_cisa"
+      | "email_imap";
+  },
+  TContext
+> => {
+  return useMutation(getDeleteOsintSourceMutationOptions(options));
+};
+
+/**
+ * @summary Test connectivity for an OSINT source
+ */
+export const getTestOsintSourceUrl = (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+) => {
+  return `/api/v1/agent/sources/${sourceType}/test`;
+};
+
+export const testOsintSource = async (
+  sourceType:
+    | "perplexity"
+    | "alienvault_otx"
+    | "censys"
+    | "nvd_cisa"
+    | "email_imap",
+  testOsintSourceBody: TestOsintSourceBody,
+  options?: RequestInit,
+): Promise<OsintTestResult> => {
+  return customFetch<OsintTestResult>(getTestOsintSourceUrl(sourceType), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(testOsintSourceBody),
+  });
+};
+
+export const getTestOsintSourceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testOsintSource>>,
+    TError,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+      data: BodyType<TestOsintSourceBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testOsintSource>>,
+  TError,
+  {
+    sourceType:
+      | "perplexity"
+      | "alienvault_otx"
+      | "censys"
+      | "nvd_cisa"
+      | "email_imap";
+    data: BodyType<TestOsintSourceBody>;
+  },
+  TContext
+> => {
+  const mutationKey = ["testOsintSource"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testOsintSource>>,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+      data: BodyType<TestOsintSourceBody>;
+    }
+  > = (props) => {
+    const { sourceType, data } = props ?? {};
+
+    return testOsintSource(sourceType, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TestOsintSourceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof testOsintSource>>
+>;
+export type TestOsintSourceMutationBody = BodyType<TestOsintSourceBody>;
+export type TestOsintSourceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Test connectivity for an OSINT source
+ */
+export const useTestOsintSource = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testOsintSource>>,
+    TError,
+    {
+      sourceType:
+        | "perplexity"
+        | "alienvault_otx"
+        | "censys"
+        | "nvd_cisa"
+        | "email_imap";
+      data: BodyType<TestOsintSourceBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof testOsintSource>>,
+  TError,
+  {
+    sourceType:
+      | "perplexity"
+      | "alienvault_otx"
+      | "censys"
+      | "nvd_cisa"
+      | "email_imap";
+    data: BodyType<TestOsintSourceBody>;
+  },
+  TContext
+> => {
+  return useMutation(getTestOsintSourceMutationOptions(options));
 };
 
 /**

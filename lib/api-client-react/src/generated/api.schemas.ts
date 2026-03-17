@@ -1283,6 +1283,60 @@ export interface AgentConfig {
   tokenUsage?: AgentConfigTokenUsage;
 }
 
+export type OsintSourceSourceType =
+  (typeof OsintSourceSourceType)[keyof typeof OsintSourceSourceType];
+
+export const OsintSourceSourceType = {
+  perplexity: "perplexity",
+  alienvault_otx: "alienvault_otx",
+  censys: "censys",
+  nvd_cisa: "nvd_cisa",
+  email_imap: "email_imap",
+} as const;
+
+export type OsintSourceCredentials = { [key: string]: unknown };
+
+export type OsintSourceLastRunStatus =
+  (typeof OsintSourceLastRunStatus)[keyof typeof OsintSourceLastRunStatus];
+
+export const OsintSourceLastRunStatus = {
+  success: "success",
+  failed: "failed",
+  pending: "pending",
+  never_run: "never_run",
+} as const;
+
+export type OsintSourceLastRunSummary = { [key: string]: unknown };
+
+export interface OsintSource {
+  id?: string | null;
+  tenantId?: string;
+  sourceType?: OsintSourceSourceType;
+  enabled?: boolean;
+  credentials?: OsintSourceCredentials;
+  hasCredentials?: boolean;
+  lastRunAt?: string | null;
+  lastRunStatus?: OsintSourceLastRunStatus;
+  lastRunError?: string | null;
+  lastRunSummary?: OsintSourceLastRunSummary;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export type UpdateOsintSourceCredentials = { [key: string]: unknown };
+
+export interface UpdateOsintSource {
+  enabled?: boolean;
+  credentials?: UpdateOsintSourceCredentials;
+}
+
+export interface OsintTestResult {
+  success?: boolean;
+  summary?: string;
+  error?: string | null;
+  sampleCount?: number;
+}
+
 /**
  * Resource not found
  */
@@ -1688,6 +1742,12 @@ export type UpdateAgentConfigBody = {
   enabled?: boolean;
   policyTier?: UpdateAgentConfigBodyPolicyTier;
   schedule?: string;
+};
+
+export type TestOsintSourceBodyCredentials = { [key: string]: unknown };
+
+export type TestOsintSourceBody = {
+  credentials?: TestOsintSourceBodyCredentials;
 };
 
 export type McpStreamableHttpBodyJsonrpc =

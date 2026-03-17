@@ -31,7 +31,7 @@ RiskMind is built as a pnpm workspace monorepo using TypeScript.
 
 **Database Schema & Features:**
 - All tables use UUID primary keys and `created_at`/`updated_at` timestamps. Tenant-scoped tables include `tenant_id`.
-- Key entities include `tenants`, `users` (with RBAC roles), `risks` (with pgvector embedding), `vendors`, `questionnaire_questions` (seeded question bank with core and category-specific questions), `frameworks`, `controls`, `signals`, `findings`, `alerts`, `jobs` (async queue), and `llm_configs`.
+- Key entities include `tenants`, `users` (with RBAC roles), `risks` (with pgvector embedding), `vendors`, `questionnaire_questions` (seeded question bank with core and category-specific questions), `frameworks`, `controls`, `signals`, `findings`, `alerts`, `jobs` (async queue), `llm_configs`, `agent_runs`, `agent_findings`, and `osint_source_configs` (per-tenant OSINT adapter configurations).
 - `pgvector` is integral for embedding columns in `risks`, `vendors`, `signals`, and `framework_requirements` for AI-driven semantic search and clustering.
 
 **Authentication & Multi-Tenancy:**
@@ -52,6 +52,7 @@ RiskMind is built as a pnpm workspace monorepo using TypeScript.
     - **Settings**: Configuration of LLM providers per tenant.
     - **AI Interview Sessions**: Interactive AI-driven risk creation or control assessment.
     - **Autonomous Risk Intelligence Agent**: Manually triggering agent runs, managing findings, and configuring agent behavior (observe, advisory, active policy tiers).
+    - **OSINT Sources & Agent Search Tools**: Per-tenant CRUD configuration of external OSINT sources (Perplexity, AlienVault OTX, Censys, NVD+CISA KEV, Email IMAP). Credentials encrypted at rest with AES-256-GCM. Sources are queried each agent cycle and their outputs injected into the agent's analysis prompt as external threat intelligence context.
 - **Model Context Protocol (MCP)**: A streamable HTTP endpoint for AI agent integrations with 13 defined tools and JWT authentication.
 
 **AI & Async Infrastructure:**

@@ -2999,6 +2999,135 @@ export const UpdateAgentConfigResponse = zod.object({
 });
 
 /**
+ * @summary List OSINT source configurations for the tenant
+ */
+export const ListOsintSourcesResponseItem = zod.object({
+  id: zod.string().uuid().nullish(),
+  tenantId: zod.string().uuid().optional(),
+  sourceType: zod
+    .enum(["perplexity", "alienvault_otx", "censys", "nvd_cisa", "email_imap"])
+    .optional(),
+  enabled: zod.boolean().optional(),
+  credentials: zod.record(zod.string(), zod.unknown()).optional(),
+  hasCredentials: zod.boolean().optional(),
+  lastRunAt: zod.date().nullish(),
+  lastRunStatus: zod
+    .enum(["success", "failed", "pending", "never_run"])
+    .optional(),
+  lastRunError: zod.string().nullish(),
+  lastRunSummary: zod.record(zod.string(), zod.unknown()).optional(),
+  createdAt: zod.date().nullish(),
+  updatedAt: zod.date().nullish(),
+});
+export const ListOsintSourcesResponse = zod.array(ListOsintSourcesResponseItem);
+
+/**
+ * @summary Get a specific OSINT source configuration
+ */
+export const GetOsintSourceParams = zod.object({
+  sourceType: zod.enum([
+    "perplexity",
+    "alienvault_otx",
+    "censys",
+    "nvd_cisa",
+    "email_imap",
+  ]),
+});
+
+export const GetOsintSourceResponse = zod.object({
+  id: zod.string().uuid().nullish(),
+  tenantId: zod.string().uuid().optional(),
+  sourceType: zod
+    .enum(["perplexity", "alienvault_otx", "censys", "nvd_cisa", "email_imap"])
+    .optional(),
+  enabled: zod.boolean().optional(),
+  credentials: zod.record(zod.string(), zod.unknown()).optional(),
+  hasCredentials: zod.boolean().optional(),
+  lastRunAt: zod.date().nullish(),
+  lastRunStatus: zod
+    .enum(["success", "failed", "pending", "never_run"])
+    .optional(),
+  lastRunError: zod.string().nullish(),
+  lastRunSummary: zod.record(zod.string(), zod.unknown()).optional(),
+  createdAt: zod.date().nullish(),
+  updatedAt: zod.date().nullish(),
+});
+
+/**
+ * @summary Create or update an OSINT source configuration
+ */
+export const UpdateOsintSourceParams = zod.object({
+  sourceType: zod.enum([
+    "perplexity",
+    "alienvault_otx",
+    "censys",
+    "nvd_cisa",
+    "email_imap",
+  ]),
+});
+
+export const UpdateOsintSourceBody = zod.object({
+  enabled: zod.boolean().optional(),
+  credentials: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+export const UpdateOsintSourceResponse = zod.object({
+  id: zod.string().uuid().nullish(),
+  tenantId: zod.string().uuid().optional(),
+  sourceType: zod
+    .enum(["perplexity", "alienvault_otx", "censys", "nvd_cisa", "email_imap"])
+    .optional(),
+  enabled: zod.boolean().optional(),
+  credentials: zod.record(zod.string(), zod.unknown()).optional(),
+  hasCredentials: zod.boolean().optional(),
+  lastRunAt: zod.date().nullish(),
+  lastRunStatus: zod
+    .enum(["success", "failed", "pending", "never_run"])
+    .optional(),
+  lastRunError: zod.string().nullish(),
+  lastRunSummary: zod.record(zod.string(), zod.unknown()).optional(),
+  createdAt: zod.date().nullish(),
+  updatedAt: zod.date().nullish(),
+});
+
+/**
+ * @summary Delete an OSINT source configuration (clears credentials)
+ */
+export const DeleteOsintSourceParams = zod.object({
+  sourceType: zod.enum([
+    "perplexity",
+    "alienvault_otx",
+    "censys",
+    "nvd_cisa",
+    "email_imap",
+  ]),
+});
+
+/**
+ * @summary Test connectivity for an OSINT source
+ */
+export const TestOsintSourceParams = zod.object({
+  sourceType: zod.enum([
+    "perplexity",
+    "alienvault_otx",
+    "censys",
+    "nvd_cisa",
+    "email_imap",
+  ]),
+});
+
+export const TestOsintSourceBody = zod.object({
+  credentials: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+export const TestOsintSourceResponse = zod.object({
+  success: zod.boolean().optional(),
+  summary: zod.string().optional(),
+  error: zod.string().nullish(),
+  sampleCount: zod.number().optional(),
+});
+
+/**
  * Model Context Protocol (MCP) Streamable HTTP endpoint for AI agent integrations.
 Mounted at `/mcp` (root path, not under `/api`).
 

@@ -2787,6 +2787,118 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentConfig"
 
+  /v1/agent/sources:
+    get:
+      operationId: listOsintSources
+      tags: [agent]
+      summary: List OSINT source configurations for the tenant
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of OSINT source configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OsintSource"
+
+  /v1/agent/sources/{sourceType}:
+    get:
+      operationId: getOsintSource
+      tags: [agent]
+      summary: Get a specific OSINT source configuration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sourceType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [perplexity, alienvault_otx, censys, nvd_cisa, email_imap]
+      responses:
+        "200":
+          description: OSINT source configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OsintSource"
+    put:
+      operationId: updateOsintSource
+      tags: [agent]
+      summary: Create or update an OSINT source configuration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sourceType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [perplexity, alienvault_otx, censys, nvd_cisa, email_imap]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOsintSource"
+      responses:
+        "200":
+          description: Updated OSINT source configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OsintSource"
+    delete:
+      operationId: deleteOsintSource
+      tags: [agent]
+      summary: Delete an OSINT source configuration (clears credentials)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sourceType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [perplexity, alienvault_otx, censys, nvd_cisa, email_imap]
+      responses:
+        "204":
+          description: Source configuration deleted
+
+  /v1/agent/sources/{sourceType}/test:
+    post:
+      operationId: testOsintSource
+      tags: [agent]
+      summary: Test connectivity for an OSINT source
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sourceType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [perplexity, alienvault_otx, censys, nvd_cisa, email_imap]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                credentials:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OsintTestResult"
+
   /mcp:
     post:
       operationId: mcpStreamableHttp
@@ -4963,3 +5075,67 @@ components:
               type: integer
             totalRuns:
               type: integer
+
+    OsintSource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+        tenantId:
+          type: string
+          format: uuid
+        sourceType:
+          type: string
+          enum: [perplexity, alienvault_otx, censys, nvd_cisa, email_imap]
+        enabled:
+          type: boolean
+        credentials:
+          type: object
+          additionalProperties: true
+        hasCredentials:
+          type: boolean
+        lastRunAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastRunStatus:
+          type: string
+          enum: [success, failed, pending, never_run]
+        lastRunError:
+          type: string
+          nullable: true
+        lastRunSummary:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdateOsintSource:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        credentials:
+          type: object
+          additionalProperties: true
+
+    OsintTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        summary:
+          type: string
+        error:
+          type: string
+          nullable: true
+        sampleCount:
+          type: integer
