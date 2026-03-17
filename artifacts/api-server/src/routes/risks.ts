@@ -965,6 +965,10 @@ router.post("/v1/risks/:riskId/acceptance-memoranda/generate", requireRole("admi
       const [t] = await db.select().from(treatmentsTable)
         .where(and(eq(treatmentsTable.id, treatmentId), eq(treatmentsTable.riskId, riskId), eq(treatmentsTable.tenantId, tenantId)))
         .limit(1);
+      if (!t) { notFound(res, "Treatment not found"); return; }
+      if (t.strategy !== "tolerate") {
+        badRequest(res, "Acceptance memoranda can only be generated for treatments with 'tolerate' strategy"); return;
+      }
       treatment = t;
     }
 
