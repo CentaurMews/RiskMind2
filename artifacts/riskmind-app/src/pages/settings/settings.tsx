@@ -13,8 +13,12 @@ import {
   useListAgentRuns,
   useTriggerAgentRun,
   useUpdateAgentConfig,
+  useListAgentFindings,
+  useCreateRiskFromFinding,
+  useApproveAgentFinding,
+  useDismissAgentFinding,
 } from "@workspace/api-client-react";
-import type { UpdateUserRoleBodyRole, LlmProvider, CreateLlmProvider, UpdateLlmProvider } from "@workspace/api-client-react";
+import type { UpdateUserRoleBodyRole, LlmProvider, CreateLlmProvider, UpdateLlmProvider, AgentFinding } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,9 +29,10 @@ import { Input } from "@/components/ui/input";
 import {
   ShieldAlert, Bot, Server, Loader2, Users, Shield,
   Plus, Pencil, Trash2, CheckCircle2, XCircle,
-  Play, RefreshCw, Clock, AlertTriangle, Eye
+  Play, RefreshCw, Clock, AlertTriangle, Eye,
+  Link2, Zap, TrendingUp, Search, Lightbulb, Ban
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
@@ -76,12 +81,45 @@ function RunStatusBadge({ status }: { status?: string }) {
   return <Badge variant="outline" className="text-muted-foreground"><Clock className="h-3 w-3 mr-1" />{status || "Unknown"}</Badge>;
 }
 
+const FINDING_TYPE_CONFIG: Record<string, { icon: typeof Link2; label: string; color: string }> = {
+  cascade_chain: { icon: Link2, label: "Cascade Chain", color: "text-orange-700 border-orange-200 bg-orange-50" },
+  cluster: { icon: Zap, label: "Cluster", color: "text-purple-700 border-purple-200 bg-purple-50" },
+  predictive_signal: { icon: TrendingUp, label: "Predictive", color: "text-blue-700 border-blue-200 bg-blue-50" },
+  anomaly: { icon: Search, label: "Anomaly", color: "text-red-700 border-red-200 bg-red-50" },
+  cross_domain: { icon: Zap, label: "Cross-Domain", color: "text-indigo-700 border-indigo-200 bg-indigo-50" },
+  recommendation: { icon: Lightbulb, label: "Recommendation", color: "text-emerald-700 border-emerald-200 bg-emerald-50" },
+};
+
+function FindingTypeBadge({ type }: { type?: string }) {
+  const config = FINDING_TYPE_CONFIG[type || ""] || { icon: AlertTriangle, label: type || "Unknown", color: "text-muted-foreground" };
+  const Icon = config.icon;
+  return <Badge variant="outline" className={config.color}><Icon className="h-3 w-3 mr-1" />{config.label}</Badge>;
+}
+
+function FindingStatusBadge({ status }: { status?: string }) {
+  if (status === "pending_review") return <Badge variant="outline" className="text-amber-700 border-amber-200 bg-amber-50"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+  if (status === "actioned") return <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50"><CheckCircle2 className="h-3 w-3 mr-1" />Actioned</Badge>;
+  if (status === "dismissed") return <Badge variant="outline" className="text-muted-foreground"><Ban className="h-3 w-3 mr-1" />Dismissed</Badge>;
+  if (status === "acknowledged") return <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50"><Eye className="h-3 w-3 mr-1" />Acknowledged</Badge>;
+  return <Badge variant="outline">{status || "Unknown"}</Badge>;
+}
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "text-red-700 border-red-200 bg-red-50",
+  high: "text-orange-700 border-orange-200 bg-orange-50",
+  medium: "text-amber-700 border-amber-200 bg-amber-50",
+  low: "text-blue-700 border-blue-200 bg-blue-50",
+  info: "text-muted-foreground",
+};
+
 export default function Settings() {
   const { data: user, isLoading: userLoading } = useGetMe();
   const { data: providers, isLoading: providersLoading } = useListLlmProviders();
   const { data: agentConfig, isLoading: agentLoading } = useGetAgentConfig();
   const { data: usersList, isLoading: usersLoading } = useListUsers({ query: { queryKey: ["/api/v1/users"], retry: false } });
   const { data: agentRuns } = useListAgentRuns({ limit: 10 }, { query: { queryKey: ["/api/v1/agent/runs"] } });
+  const { data: agentFindings, isLoading: findingsLoading } = useListAgentFindings({ limit: 20 }, { query: { queryKey: ["/api/v1/agent/findings"] } });
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
   const [providerSheet, setProviderSheet] = useState<"closed" | "add" | "edit">("closed");
@@ -161,6 +199,34 @@ export default function Settings() {
     },
   });
 
+  const createRiskFromFindingMutation = useCreateRiskFromFinding({
+    mutation: {
+      onSuccess: (data: { risk?: { id?: string } }) => {
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/agent/findings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/risks"] });
+        if (data?.risk?.id) {
+          navigate(`/risks/${data.risk.id}`);
+        }
+      },
+    },
+  });
+
+  const approveFindingMutation = useApproveAgentFinding({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/agent/findings"] });
+      },
+    },
+  });
+
+  const dismissFindingMutation = useDismissAgentFinding({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/v1/agent/findings"] });
+      },
+    },
+  });
+
   if (userLoading) {
     return (
       <AppLayout>
@@ -185,6 +251,7 @@ export default function Settings() {
   const users = Array.isArray(usersList) ? usersList : [];
   const providerList: LlmProvider[] = providers || [];
   const runList = agentRuns?.data || [];
+  const findingList: AgentFinding[] = agentFindings?.data || [];
 
   const openAddProvider = () => {
     setProviderForm(EMPTY_PROVIDER_FORM);
@@ -502,6 +569,101 @@ export default function Settings() {
                         })}
                       </TableBody>
                     </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-semibold">Agent Findings</CardTitle>
+                    <CardDescription>Intelligence findings from agent analysis — cascade chains, clusters, predictive signals, and more.</CardDescription>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/v1/agent/findings"] })}>
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {findingsLoading ? (
+                    <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground" /></div>
+                  ) : findingList.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      <Search className="h-6 w-6 mx-auto mb-2 opacity-40" />
+                      No findings yet. Agent findings will appear here after running an analysis cycle.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {findingList.map((finding) => {
+                        const proposedAction = finding.proposedAction as Record<string, unknown> | null;
+                        const hasCreateRisk = proposedAction?.type === "create_risk";
+                        const isPending = finding.status === "pending_review";
+                        return (
+                          <div key={finding.id} className="border rounded-xl p-4 space-y-2 hover:bg-muted/20 transition-colors">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="space-y-1 flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <FindingTypeBadge type={finding.type} />
+                                  <Badge variant="outline" className={SEVERITY_COLORS[finding.severity || "medium"]}>{finding.severity}</Badge>
+                                  <FindingStatusBadge status={finding.status} />
+                                </div>
+                                <div className="font-medium text-sm mt-1">{finding.title}</div>
+                                <div className="text-xs text-muted-foreground line-clamp-2">{finding.narrative}</div>
+                              </div>
+                              {isPending && (
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {hasCreateRisk && (
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      className="h-7 text-xs"
+                                      disabled={createRiskFromFindingMutation.isPending}
+                                      onClick={() => finding.id && createRiskFromFindingMutation.mutate({ id: finding.id })}
+                                    >
+                                      {createRiskFromFindingMutation.isPending ? (
+                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      ) : (
+                                        <Plus className="h-3 w-3 mr-1" />
+                                      )}
+                                      Create Risk
+                                    </Button>
+                                  )}
+                                  {!hasCreateRisk && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      disabled={approveFindingMutation.isPending}
+                                      onClick={() => finding.id && approveFindingMutation.mutate({ id: finding.id })}
+                                    >
+                                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                                      Approve
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs text-muted-foreground"
+                                    disabled={dismissFindingMutation.isPending}
+                                    onClick={() => finding.id && dismissFindingMutation.mutate({ id: finding.id, data: { reason: "Dismissed from settings" } })}
+                                  >
+                                    <Ban className="h-3 w-3 mr-1" />
+                                    Dismiss
+                                  </Button>
+                                </div>
+                              )}
+                              {finding.status === "actioned" && (
+                                <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 shrink-0">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />Actioned
+                                </Badge>
+                              )}
+                              {finding.status === "dismissed" && (
+                                <span className="text-xs text-muted-foreground shrink-0">{finding.dismissedReason || "Dismissed"}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </CardContent>
               </Card>

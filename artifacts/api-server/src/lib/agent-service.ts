@@ -104,7 +104,7 @@ async function observe(tenantId: string): Promise<ObservationData> {
   return { risks, kris, vendors, signals, alerts, controls, frameworks, unmappedRequirements, failedControlTests };
 }
 
-function detectCascadeChains(data: ObservationData): Finding[] {
+async function detectCascadeChains(tenantId: string, data: ObservationData): Promise<Finding[]> {
   const findings: Finding[] = [];
 
   const krisByRisk = new Map<string, Array<Record<string, unknown>>>();
@@ -198,7 +198,69 @@ function detectCascadeChains(data: ObservationData): Finding[] {
       chainSegments.push(`${controlsWithFailures.length} control(s) with test failures`);
     }
 
-    if (chainSegments.length < 2) continue;
+    let relatedSignals: Array<Record<string, unknown>> = [];
+    try {
+      const signalRows = await db.execute(sql`
+        WITH fk_signals AS (
+          SELECT s.id, LEFT(s.content, 200) AS content, s.classification,
+                 CASE WHEN r.embedding IS NOT NULL AND s.embedding IS NOT NULL
+                      THEN 1 - (r.embedding <=> s.embedding)
+                      ELSE 0.5
+                 END AS similarity,
+                 'fk' AS match_source
+          FROM risks r
+          JOIN signals s ON s.tenant_id = r.tenant_id
+          WHERE r.id = ${riskId}
+            AND s.status = 'pending'
+            AND s.tenant_id = ${tenantId}
+            AND (s.context->>'riskId' = ${riskId}
+                 OR s.context->>'sourceRiskId' = ${riskId})
+        ),
+        embedding_signals AS (
+          SELECT s.id, LEFT(s.content, 200) AS content, s.classification,
+                 1 - (r.embedding <=> s.embedding) AS similarity,
+                 'embedding' AS match_source
+          FROM risks r
+          JOIN signals s ON s.tenant_id = r.tenant_id
+          WHERE r.id = ${riskId}
+            AND r.embedding IS NOT NULL
+            AND s.embedding IS NOT NULL
+            AND s.status = 'pending'
+            AND s.tenant_id = ${tenantId}
+            AND 1 - (r.embedding <=> s.embedding) > 0.7
+            AND s.id NOT IN (SELECT id FROM fk_signals)
+        ),
+        combined AS (
+          SELECT * FROM fk_signals
+          UNION ALL
+          SELECT * FROM embedding_signals
+        )
+        SELECT DISTINCT ON (id) id, content, classification, similarity, match_source
+        FROM combined
+        ORDER BY id, similarity DESC
+        LIMIT 10
+      `);
+      relatedSignals = signalRows.rows as Array<Record<string, unknown>>;
+    } catch {
+      const fkSignals = data.signals.filter(s => {
+        const ctx = s.context as Record<string, unknown> | null;
+        return s.status === "pending" && ctx && (ctx.riskId === riskId || ctx.sourceRiskId === riskId);
+      });
+      relatedSignals = fkSignals;
+    }
+
+    let relatedSignalCount = 0;
+    if (relatedSignals.length >= 2) {
+      relatedSignalCount = relatedSignals.length;
+      for (const s of relatedSignals.slice(0, 5)) {
+        const label = (s.content as string || "").substring(0, 80);
+        chain.push({ type: "signal", id: s.id as string, label });
+      }
+      chainSegments.push(`${relatedSignals.length} related open signal(s) (FK/embedding match)`);
+    }
+
+    const hasSignalCascade = relatedSignalCount >= 2;
+    if (!hasSignalCascade && chainSegments.length < 2) continue;
 
     const severity = chainSegments.length >= 4 ? "critical" :
                      chainSegments.length >= 3 ? "high" : "medium";
@@ -211,11 +273,13 @@ function detectCascadeChains(data: ObservationData): Finding[] {
       narrative: `Risk "${risk.title}" participates in a cross-domain cascade chain: ${chainPath}. This ${chain.length}-node graph spans multiple entity types indicating systemic exposure that requires coordinated remediation.`,
       linkedEntities: chain,
       proposedAction: {
-        type: "create_review_flag",
-        title: `Review cascade: ${risk.title}`,
+        type: "create_risk",
+        title: `Downstream risk: Cascading impact from ${risk.title}`,
+        description: `Auto-generated from cascade chain detection. Original risk "${risk.title}" has ${chain.length} linked entities across ${chainSegments.length} domains: ${chainPath}. This downstream risk captures the knock-on effects requiring separate monitoring and mitigation.`,
+        category: riskCategory,
         severity,
         context: {
-          riskId,
+          sourceRiskId: riskId,
           chainDepth: chainSegments.length,
           entityCount: chain.length,
           domains: chainSegments,
@@ -334,6 +398,7 @@ async function detectClusters(tenantId: string): Promise<Finding[]> {
         SELECT id, title, category, embedding
         FROM risks
         WHERE tenant_id = ${tenantId} AND embedding IS NOT NULL
+          AND status = 'open'
       ),
       signal_embeddings AS (
         SELECT id, content AS label, classification AS source_type, 'signal' AS entity_type, embedding
@@ -358,7 +423,7 @@ async function detectClusters(tenantId: string): Promise<Finding[]> {
           1 - (r.embedding <=> s.embedding) AS similarity
         FROM risk_embeddings r
         CROSS JOIN all_sources s
-        WHERE 1 - (r.embedding <=> s.embedding) > 0.75
+        WHERE 1 - (r.embedding <=> s.embedding) > 0.85
       )
       SELECT risk_id, risk_title, category,
         json_agg(json_build_object(
@@ -371,7 +436,7 @@ async function detectClusters(tenantId: string): Promise<Finding[]> {
         COUNT(*) AS source_count
       FROM similarities
       GROUP BY risk_id, risk_title, category
-      HAVING COUNT(*) >= 2
+      HAVING COUNT(*) >= 3
       ORDER BY COUNT(*) DESC
       LIMIT 10
     `);
@@ -390,16 +455,19 @@ async function detectClusters(tenantId: string): Promise<Finding[]> {
       const hasVendors = sources.some(s => s.entityType === "vendor");
       const clusterLabel = hasVendors ? "risks, signals, and vendor issues" : "risks and signals";
 
+      const clusterSeverity = (sources.length >= 5 ? "high" : "medium") as Finding["severity"];
       findings.push({
         type: "cluster",
-        severity: (sources.length >= 5 ? "high" : "medium") as Finding["severity"],
+        severity: clusterSeverity,
         title: `Threat cluster: ${row.risk_title} — ${row.source_count} correlated sources`,
-        narrative: `Risk "${row.risk_title}" (${row.category}) has ${row.source_count} semantically correlated source(s) across ${clusterLabel} detected in the past 30 days. These form a coherent threat cluster that may indicate an emerging risk pattern.`,
+        narrative: `Risk "${row.risk_title}" (${row.category}) has ${row.source_count} semantically correlated source(s) across ${clusterLabel} detected in the past 30 days. These form a coherent threat cluster that may indicate an emerging risk pattern. Consider consolidating into a single risk for coordinated response.`,
         linkedEntities: entities,
         proposedAction: {
-          type: "create_alert",
-          title: `Threat cluster detected: ${row.risk_title}`,
-          severity: sources.length >= 5 ? "high" : "medium",
+          type: "create_risk",
+          title: `Consolidated cluster risk: ${row.risk_title} and ${row.source_count} correlated items`,
+          description: `Auto-generated from cluster detection. Risk "${row.risk_title}" (${row.category}) has ${row.source_count} semantically correlated source(s) across ${clusterLabel}. This consolidated risk captures the common thread across the cluster for unified tracking and mitigation.`,
+          category: row.category as string,
+          severity: clusterSeverity,
           context: { riskId: row.risk_id, sourceCount: row.source_count },
         },
       });
@@ -722,7 +790,7 @@ export async function runAgentCycle(
       console.warn("[Agent] Risk source aggregation failed:", aggErr);
     }
 
-    const cascadeFindings = detectCascadeChains(data);
+    const cascadeFindings = await detectCascadeChains(tenantId, data);
     const clusterFindings = await detectClusters(tenantId);
     const predictiveFindings = await detectPredictiveSignals(tenantId, data);
 

@@ -50,6 +50,7 @@ import type {
   CreateLlmProvider,
   CreateQuestionnaireRequest,
   CreateReviewRequest,
+  CreateRiskFromFinding201,
   CreateRiskRequest,
   CreateSignalRequest,
   CreateTreatmentRequest,
@@ -9078,6 +9079,96 @@ export const useApproveAgentFinding = <
   TContext
 > => {
   return useMutation(getApproveAgentFindingMutationOptions(options));
+};
+
+/**
+ * Reads the finding's proposedAction, creates a draft risk pre-populated from the payload, links it via risk_sources with sourceType agent_detection, and transitions the finding to actioned.
+ * @summary Create a draft risk from an agent finding
+ */
+export const getCreateRiskFromFindingUrl = (id: string) => {
+  return `/api/v1/agent/findings/${id}/create-risk`;
+};
+
+export const createRiskFromFinding = async (
+  id: string,
+  options?: RequestInit,
+): Promise<CreateRiskFromFinding201> => {
+  return customFetch<CreateRiskFromFinding201>(
+    getCreateRiskFromFindingUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getCreateRiskFromFindingMutationOptions = <
+  TError = ErrorType<RFC7807Error | NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createRiskFromFinding>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createRiskFromFinding>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["createRiskFromFinding"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createRiskFromFinding>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return createRiskFromFinding(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateRiskFromFindingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createRiskFromFinding>>
+>;
+
+export type CreateRiskFromFindingMutationError = ErrorType<
+  RFC7807Error | NotFoundResponse
+>;
+
+/**
+ * @summary Create a draft risk from an agent finding
+ */
+export const useCreateRiskFromFinding = <
+  TError = ErrorType<RFC7807Error | NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createRiskFromFinding>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createRiskFromFinding>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getCreateRiskFromFindingMutationOptions(options));
 };
 
 /**

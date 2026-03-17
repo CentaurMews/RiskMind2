@@ -2629,6 +2629,14 @@ export const ApproveAgentFindingResponse = zod
   );
 
 /**
+ * Reads the finding's proposedAction, creates a draft risk pre-populated from the payload, links it via risk_sources with sourceType agent_detection, and transitions the finding to actioned.
+ * @summary Create a draft risk from an agent finding
+ */
+export const CreateRiskFromFindingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
  * @summary Dismiss a pending agent finding
  */
 export const DismissAgentFindingParams = zod.object({

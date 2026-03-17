@@ -1552,6 +1552,11 @@ export type ApproveAgentFinding200 = AgentFinding & {
   actionResult?: ApproveAgentFinding200ActionResult;
 };
 
+export type CreateRiskFromFinding201 = {
+  finding?: AgentFinding;
+  risk?: Risk;
+};
+
 export type DismissAgentFindingBody = {
   reason?: string;
 };
