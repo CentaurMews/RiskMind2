@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { db, llmConfigsTable, llmTaskRoutingTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, llmConfigsTable, llmTaskRoutingTable, llmBenchmarkResultsTable } from "@workspace/db";
+import { eq, and, desc } from "drizzle-orm";
 import { decrypt } from "./encryption";
 
 export type LLMTaskType =
@@ -11,6 +11,30 @@ export type LLMTaskType =
   | "embeddings"
   | "agent"
   | "general";
+
+// Hardcoded Anthropic models — used as fallback when anthropic.models.list() is unavailable or errors
+export const ANTHROPIC_MODELS = [
+  { id: "claude-opus-4-5", displayName: "Claude Opus 4.5", capability: ["chat"] },
+  { id: "claude-sonnet-4-5", displayName: "Claude Sonnet 4.5", capability: ["chat"] },
+  { id: "claude-haiku-3-5", displayName: "Claude Haiku 3.5", capability: ["chat"] },
+  { id: "claude-opus-4", displayName: "Claude Opus 4", capability: ["chat"] },
+  { id: "claude-sonnet-4", displayName: "Claude Sonnet 4", capability: ["chat"] },
+  { id: "claude-haiku-3", displayName: "Claude Haiku 3", capability: ["chat"] },
+];
+
+const BENCHMARK_PROMPT = `You are a risk analyst. Respond ONLY with valid JSON.
+Assess this risk: "Vendor XYZ lacks SOC 2 certification."
+Return: {"severity":"high|medium|low","category":"vendor|compliance|operational","summary":"one sentence"}`;
+
+// OpenAI model IDs allowed through the discovery filter
+const OPENAI_MODEL_PREFIXES = ["gpt-4", "gpt-3.5", "o1", "o3", "text-embedding-", "gpt-4o"];
+
+export interface DiscoveredModel {
+  id: string;
+  displayName?: string;
+  capability: string[];       // "chat" | "embeddings" | "code"
+  contextWindow?: number;
+}
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -138,6 +162,81 @@ function buildAnthropicClient(config: ResolvedConfig): Anthropic {
   return new Anthropic({
     apiKey: config.apiKey || undefined,
   });
+}
+
+function scoreQuality(response: string): number {
+  try {
+    const parsed = JSON.parse(response);
+    const hasAllKeys = parsed.severity && parsed.category && parsed.summary;
+    const validSeverity = ["high", "medium", "low"].includes(parsed.severity);
+    const validCategory = ["vendor", "compliance", "operational"].includes(parsed.category);
+    if (hasAllKeys && validSeverity && validCategory) return 3;
+    if (hasAllKeys) return 2;
+    return 1;
+  } catch {
+    return response.toLowerCase().includes("risk") ? 1 : 0;
+  }
+}
+
+async function discoverOllamaModels(baseUrl: string): Promise<{ models: DiscoveredModel[]; error?: string }> {
+  try {
+    const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return { models: [], error: `Ollama returned ${res.status}` };
+    const data = await res.json() as { models: Array<{ name: string; details?: { family?: string } }> };
+    return {
+      models: data.models.map((m) => ({
+        id: m.name,
+        displayName: m.name,
+        capability: m.details?.family?.toLowerCase().includes("bert") ? ["embeddings"] : ["chat"],
+      })),
+    };
+  } catch (err) {
+    return { models: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function discoverAnthropicModels(config: ResolvedConfig): Promise<{ models: DiscoveredModel[]; error?: string }> {
+  try {
+    const client = buildAnthropicClient(config);
+    const page = await client.models.list({ limit: 100 });
+    if (page.data.length > 0) {
+      return {
+        models: page.data.map((m) => ({
+          id: m.id,
+          displayName: m.display_name,
+          capability: ["chat"],
+        })),
+      };
+    }
+  } catch (err) {
+    console.warn("[LLMService] anthropic.models.list() failed, using hardcoded fallback:", err instanceof Error ? err.message : err);
+  }
+  // Fallback to hardcoded constant
+  return { models: ANTHROPIC_MODELS };
+}
+
+async function discoverOpenAICompatModels(config: ResolvedConfig): Promise<{ models: DiscoveredModel[]; error?: string }> {
+  try {
+    const client = buildOpenAIClient(config);
+    const list = await client.models.list();
+    const allModels = list.data || [];
+
+    // Filter to relevant models only
+    const isOpenAI = !config.baseUrl || config.baseUrl.includes("api.openai.com");
+    const filtered = isOpenAI
+      ? allModels.filter((m) => OPENAI_MODEL_PREFIXES.some((prefix) => m.id.startsWith(prefix)))
+      : allModels.filter((m) => !m.id.includes("deprecated") && !m.id.includes("instruct-0"));
+
+    return {
+      models: filtered.map((m) => ({
+        id: m.id,
+        displayName: m.id,
+        capability: m.id.includes("embedding") ? ["embeddings"] : ["chat"],
+      })),
+    };
+  } catch (err) {
+    return { models: [], error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function complete(tenantId: string, opts: CompletionOptions, taskType: LLMTaskType = "general"): Promise<string> {
@@ -275,6 +374,148 @@ export async function testConnection(configId: string, tenantId: string): Promis
 export async function isAvailable(tenantId: string): Promise<boolean> {
   const config = await resolveConfig(tenantId);
   return config !== null;
+}
+
+export async function discoverModels(
+  configId: string,
+  tenantId: string,
+): Promise<{ models: DiscoveredModel[]; error?: string }> {
+  const config = await resolveConfigById(configId, tenantId);
+  if (!config) return { models: [], error: "Configuration not found" };
+
+  const isOllama =
+    config.baseUrl?.includes(":11434") ||
+    (config.baseUrl?.includes("localhost") && !config.baseUrl?.includes("openai"));
+
+  if (config.providerType === "anthropic") {
+    return discoverAnthropicModels(config);
+  }
+  if (isOllama) {
+    return discoverOllamaModels(config.baseUrl!);
+  }
+  return discoverOpenAICompatModels(config);
+}
+
+export async function runBenchmark(
+  configId: string,
+  tenantId: string,
+  modelOverride?: string,
+): Promise<{ ttftMs: number; totalLatencyMs: number; qualityScore: number; tokensPerSecond?: number; model: string }> {
+  const config = await resolveConfigById(configId, tenantId);
+  if (!config) throw new Error("Configuration not found");
+
+  const model = modelOverride || config.model;
+
+  type CallResult = { ttftMs: number; totalLatencyMs: number; response: string };
+  const results: CallResult[] = [];
+
+  for (let i = 0; i < 3; i++) {
+    const startMs = Date.now();
+    let ttft = 0;
+    let fullResponse = "";
+
+    try {
+      if (config.providerType === "anthropic") {
+        const client = buildAnthropicClient(config);
+        const stream = await client.messages.stream({
+          model,
+          max_tokens: 50,
+          temperature: 0,
+          messages: [{ role: "user", content: BENCHMARK_PROMPT }],
+        });
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            if (!ttft) ttft = Date.now() - startMs;
+            fullResponse += event.delta.text;
+          }
+        }
+      } else {
+        const client = buildOpenAIClient({ ...config, model });
+        const stream = await client.chat.completions.create({
+          model,
+          messages: [{ role: "user", content: BENCHMARK_PROMPT }],
+          max_tokens: 50,
+          temperature: 0,
+          stream: true,
+        });
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta?.content;
+          if (delta) {
+            if (!ttft) ttft = Date.now() - startMs;
+            fullResponse += delta;
+          }
+        }
+      }
+    } catch (err) {
+      throw new Error(`Benchmark call ${i + 1} failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    results.push({ ttftMs: ttft || (Date.now() - startMs), totalLatencyMs: Date.now() - startMs, response: fullResponse });
+  }
+
+  // Discard call 1 (cold start), use calls 2 and 3
+  const warmResults = results.slice(1);
+  const ttftMedian = Math.round((warmResults[0].ttftMs + warmResults[1].ttftMs) / 2);
+  const latencyMedian = Math.round((warmResults[0].totalLatencyMs + warmResults[1].totalLatencyMs) / 2);
+  const qualityScore = scoreQuality(warmResults[1].response); // Use last call for quality check
+
+  // Persist to llm_benchmark_results
+  await db.insert(llmBenchmarkResultsTable).values({
+    configId,
+    tenantId,
+    model,
+    ttftMs: ttftMedian,
+    totalLatencyMs: latencyMedian,
+    qualityScore,
+  });
+
+  return { ttftMs: ttftMedian, totalLatencyMs: latencyMedian, qualityScore, model };
+}
+
+export async function suggestRouting(
+  tenantId: string,
+): Promise<Record<LLMTaskType, { configId: string; model: string } | null>> {
+  // Read latest benchmark results per config
+  const recent = await db
+    .select()
+    .from(llmBenchmarkResultsTable)
+    .where(eq(llmBenchmarkResultsTable.tenantId, tenantId))
+    .orderBy(desc(llmBenchmarkResultsTable.createdAt))
+    .limit(50);
+
+  if (recent.length === 0) {
+    return { enrichment: null, triage: null, treatment: null, embeddings: null, agent: null, general: null };
+  }
+
+  // Group by configId, pick best per task heuristic:
+  // triage: lowest TTFT (speed matters most)
+  // enrichment, agent: highest quality score (reasoning matters most)
+  // treatment: best quality + reasonable latency
+  // embeddings: pick embedding-capable config if available
+  // general: lowest total latency
+  const byConfig = new Map<string, typeof recent[0]>();
+  for (const r of recent) {
+    const existing = byConfig.get(r.configId);
+    if (!existing || r.createdAt > existing.createdAt) {
+      byConfig.set(r.configId, r);
+    }
+  }
+
+  const all = [...byConfig.values()];
+  const fastest = all.sort((a, b) => (a.ttftMs ?? 9999) - (b.ttftMs ?? 9999))[0];
+  const bestQuality = all.sort((a, b) => b.qualityScore - a.qualityScore)[0];
+  const balanced = all.sort((a, b) => b.qualityScore * 0.7 + (1 / ((a.totalLatencyMs || 1) / 1000)) * 0.3 - (b.qualityScore * 0.7 + (1 / ((b.totalLatencyMs || 1) / 1000)) * 0.3))[0];
+
+  const toEntry = (r: typeof recent[0] | undefined) => r ? { configId: r.configId, model: r.model } : null;
+
+  return {
+    triage: toEntry(fastest),
+    enrichment: toEntry(bestQuality),
+    agent: toEntry(bestQuality),
+    treatment: toEntry(balanced),
+    general: toEntry(fastest),
+    embeddings: null, // User should pick explicit embeddings config
+  };
 }
 
 export class LLMUnavailableError extends Error {
