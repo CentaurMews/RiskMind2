@@ -193,6 +193,6 @@ v1.0 phases complete. v1.1 executes in order: 5 → 6 → 7
 | 2. Public Access and Security | v1.0 | 3/3 | Complete | 2026-03-18 |
 | 3. Dashboard Polish and Demo Readiness | v1.0 | 4/4 | Complete | 2026-03-18 |
 | 4. AI Differentiators Surfaced | v1.0 | 2/2 | Complete | 2026-03-18 |
-| 5. LLM Intelligence Backend | 1/3 | In Progress|  | - |
+| 5. LLM Intelligence Backend | 2/3 | In Progress|  | - |
 | 6. Bug Fixes and Wizard UI | v1.1 | 0/2 | Not started | - |
 | 7. Foresight Teaser | v1.1 | 0/1 | Not started | - |

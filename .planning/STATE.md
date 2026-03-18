@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LLM Intelligence + Fixes + Polish
 status: planning
-stopped_at: "Completed 05-01-PLAN.md: DB schema + OpenAPI contracts"
-last_updated: "2026-03-18T16:51:09.620Z"
+stopped_at: "Completed 05-02-PLAN.md: LLM routing, discovery, benchmarking"
+last_updated: "2026-03-18T16:57:58.044Z"
 last_activity: 2026-03-18 — v1.1 roadmap finalized, Phase 5 next
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -47,6 +47,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 05-llm-intelligence-backend P01 | 3 minutes | 2 tasks | 20 files |
+| Phase 05-llm-intelligence-backend P02 | 5 minutes | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,8 @@ Recent decisions affecting current work:
 - [v1.1 Scope]: Wizard frontend built last against real endpoints — no mocks to diverge from
 - [Phase 05-llm-intelligence-backend]: task_type stored as plain text in llm_task_routing to avoid PostgreSQL ALTER TYPE ADD VALUE transaction trap
 - [Phase 05-llm-intelligence-backend]: display_provider column added as nullable text to llm_configs for provider UI labeling without breaking existing rows
+- [Phase 05-llm-intelligence-backend]: ANTHROPIC_MODELS hardcoded constant maintained regardless of SDK availability
+- [Phase 05-llm-intelligence-backend]: resolveConfig() routing priority: task routing table first, then isDefault, then any active config
 
 ### Pending Todos
 
@@ -75,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T16:51:09.611Z
-Stopped at: Completed 05-01-PLAN.md: DB schema + OpenAPI contracts
+Last session: 2026-03-18T16:57:58.038Z
+Stopped at: Completed 05-02-PLAN.md: LLM routing, discovery, benchmarking
 Resume file: None

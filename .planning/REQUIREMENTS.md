@@ -20,8 +20,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [x] **ROUTE-01**: Routing table maps 6 task types (enrichment, triage, treatment, embeddings, agent, general) to specific model configurations
 - [x] **ROUTE-02**: Admin can view and override the routing table in Settings
-- [ ] **ROUTE-03**: Each AI operation uses its routed model (not just the tenant default)
-- [ ] **ROUTE-04**: Routing falls back to tenant default when no task-specific assignment exists
+- [x] **ROUTE-03**: Each AI operation uses its routed model (not just the tenant default)
+- [x] **ROUTE-04**: Routing falls back to tenant default when no task-specific assignment exists
 
 ### Bug Fixes
 
@@ -76,8 +76,8 @@ Deferred to v2. Tracked but not in current roadmap.
 | LLM-06 | Phase 5 | Complete |
 | ROUTE-01 | Phase 5 | Complete |
 | ROUTE-02 | Phase 5 | Complete |
-| ROUTE-03 | Phase 5 | Pending |
-| ROUTE-04 | Phase 5 | Pending |
+| ROUTE-03 | Phase 5 | Complete |
+| ROUTE-04 | Phase 5 | Complete |
 | FIX-01 | Phase 6 | Pending |
 | FIX-02 | Phase 5 | Pending |
 | FIX-03 | Phase 6 | Pending |
