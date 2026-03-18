@@ -195,4 +195,4 @@ v1.0 phases complete. v1.1 executes in order: 5 → 6 → 7
 | 4. AI Differentiators Surfaced | v1.0 | 2/2 | Complete | 2026-03-18 |
 | 5. LLM Intelligence Backend | 3/3 | Complete    | 2026-03-18 | - |
 | 6. Bug Fixes and Wizard UI | 2/2 | Complete    | 2026-03-18 | - |
-| 7. Foresight Teaser | v1.1 | 0/1 | Not started | - |
+| 7. Foresight Teaser | 1/1 | Complete   | 2026-03-18 | - |

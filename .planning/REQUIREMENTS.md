@@ -35,7 +35,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Foresight Teaser
 
-- [ ] **FORE-01**: Foresight page shows polished "Coming Soon" preview with visual mockups of planned features (Monte Carlo, OSINT, scenario modeling, agent inbox)
+- [x] **FORE-01**: Foresight page shows polished "Coming Soon" preview with visual mockups of planned features (Monte Carlo, OSINT, scenario modeling, agent inbox)
 
 ## Future Requirements
 
@@ -85,7 +85,7 @@ Deferred to v2. Tracked but not in current roadmap.
 | FIX-05 | Phase 6 | Complete |
 | FIX-06 | Phase 6 | Complete |
 | FIX-07 | Phase 6 | Complete |
-| FORE-01 | Phase 7 | Pending |
+| FORE-01 | Phase 7 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 18 total

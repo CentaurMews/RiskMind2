@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LLM Intelligence + Fixes + Polish
 status: completed
-stopped_at: Phase 7 context gathered
-last_updated: "2026-03-18T19:43:53.521Z"
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-03-18T20:06:50.979Z"
 last_activity: 2026-03-18 — Phase 6 Plan 02 complete; wizard end-to-end verified by human; all LLM-01–LLM-06 requirements satisfied
 progress:
   total_phases: 3
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -50,6 +50,7 @@ Progress: [██████████] 100%
 | Phase 05-llm-intelligence-backend P02 | 5 minutes | 2 tasks | 1 files |
 | Phase 05-llm-intelligence-backend P03 | 4 minutes | 2 tasks | 4 files |
 | Phase 06-bug-fixes-and-wizard-ui P02 | 6 | 2 tasks | 3 files |
+| Phase 07-foresight-teaser P01 | 5 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 06-bug-fixes-and-wizard-ui]: useDiscoverLlmModels requires saved provider ID — Load models button shown only in edit mode
 - [Phase 06-bug-fixes-and-wizard-ui]: LlmConfigWizard mounted as sibling to existing provider Sheet to avoid nested Radix Dialog portals
 - [Phase 06-bug-fixes-and-wizard-ui]: Wizard createProvider success triggers useEffect discover automatically via configId change
+- [Phase 07-foresight-teaser]: FeatureCard built manually inside CardContent for full layout control over icon, title, and badge
+- [Phase 07-foresight-teaser]: Card gradient (from-muted/40 to-card) visually distinguishes preview features from live features
 
 ### Pending Todos
 
@@ -88,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T19:43:53.499Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-foresight-teaser/07-CONTEXT.md
+Last session: 2026-03-18T20:06:50.974Z
+Stopped at: Completed 07-01-PLAN.md
+Resume file: None
