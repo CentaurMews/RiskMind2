@@ -1,6 +1,6 @@
 import { useRoute } from "wouter";
 import { useState, useEffect, useCallback } from "react";
-import { useGetRisk, useListTreatments, useListKRIs, useAiEnrichRisk, useListIncidents, useListReviews, useUpdateRisk, useAiScoreSuggestions } from "@workspace/api-client-react";
+import { useGetRisk, useListTreatments, useListKRIs, useAiEnrichRisk, useListIncidents, useListReviews, useUpdateRisk, useAiScoreSuggestions, useListRiskSources } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -193,6 +193,8 @@ export default function RiskDetail() {
   const { data: kris } = useListKRIs(id);
   const { data: incidents } = useListIncidents(id);
   const { data: reviews } = useListReviews(id);
+  const { data: sourcesData, isLoading: sourcesLoading } = useListRiskSources(id);
+  const sources = sourcesData?.data ?? [];
   const [enrichmentOpen, setEnrichmentOpen] = useState(false);
 
   interface AiSuggestionsState {
@@ -438,6 +440,48 @@ export default function RiskDetail() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <CardTitle>Sources</CardTitle>
+              <AiProvenance action="Traceability via" className="ml-2" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {sourcesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading sources...
+              </div>
+            ) : sources.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No linked sources recorded for this risk.</p>
+            ) : (
+              <div className="space-y-2">
+                {sources.map((src) => (
+                  <div key={src.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/20">
+                    <Badge variant="outline" className="text-[10px] capitalize shrink-0">
+                      {src.sourceType?.replace("_", " ") ?? "unknown"}
+                    </Badge>
+                    <span className="text-sm font-mono text-muted-foreground text-xs truncate">
+                      {src.sourceId ?? "—"}
+                    </span>
+                    {src.sourceType === "signal" && (
+                      <Link href="/signals" className="ml-auto text-xs text-primary hover:underline shrink-0">
+                        View Signals
+                      </Link>
+                    )}
+                    {src.createdAt && (
+                      <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                        {format(new Date(src.createdAt), "MMM d, yyyy")}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Tabs defaultValue="treatments" className="w-full mt-8">
           <TabsList className="bg-muted/50 p-1 w-full justify-start h-12 rounded-lg">

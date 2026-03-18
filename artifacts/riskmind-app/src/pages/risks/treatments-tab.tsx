@@ -19,6 +19,7 @@ import type {
   TreatmentStatusEvent,
   AcceptanceMemorandum,
 } from "@workspace/api-client-react";
+import { AiProvenance } from "@/components/ai/ai-provenance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -408,6 +409,11 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            )}
+            {aiMutation.data?.recommendations && aiMutation.data.recommendations.length > 0 && (
+              <div className="mt-3 pt-3 border-t">
+                <AiProvenance action="Suggested by" className="justify-end" />
               </div>
             )}
             {aiMutation.isSuccess && (!aiMutation.data?.recommendations || aiMutation.data.recommendations.length === 0) && (
