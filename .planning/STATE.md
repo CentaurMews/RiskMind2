@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LLM Intelligence + Fixes + Polish
 status: planning
-stopped_at: "Completed 05-02-PLAN.md: LLM routing, discovery, benchmarking"
-last_updated: "2026-03-18T16:57:58.044Z"
-last_activity: 2026-03-18 — v1.1 roadmap finalized, Phase 5 next
+stopped_at: "Completed 05-03-PLAN.md: LLM wiring, taskType threading, FIX-02"
+last_updated: "2026-03-18T17:02:00.000Z"
+last_activity: 2026-03-18 — Phase 5 Plan 03 completed
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 0
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 ## Current Position
 
 Phase: 5 of 7 (LLM Intelligence Backend)
-Plan: — (not started)
-Status: Ready to plan
-Last activity: 2026-03-18 — v1.1 roadmap finalized, Phase 5 next
+Plan: 03 of 03 (completed)
+Status: Phase complete
+Last activity: 2026-03-18 — Phase 5 Plan 03 completed (LLM wiring, FIX-02)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 05-llm-intelligence-backend P01 | 3 minutes | 2 tasks | 20 files |
 | Phase 05-llm-intelligence-backend P02 | 5 minutes | 2 tasks | 1 files |
+| Phase 05-llm-intelligence-backend P03 | 4 minutes | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - [Phase 05-llm-intelligence-backend]: display_provider column added as nullable text to llm_configs for provider UI labeling without breaking existing rows
 - [Phase 05-llm-intelligence-backend]: ANTHROPIC_MODELS hardcoded constant maintained regardless of SDK availability
 - [Phase 05-llm-intelligence-backend]: resolveConfig() routing priority: task routing table first, then isDefault, then any active config
+- [Phase 05-llm-intelligence-backend]: FIX-02: act(localFindings) before reason() — agent findings survive LLM errors; status='completed' when localSavedCount>0
+- [Phase 05-llm-intelligence-backend]: taskType strings: triage/enrichment/treatment/agent/general threaded to all AI callers
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T16:57:58.038Z
-Stopped at: Completed 05-02-PLAN.md: LLM routing, discovery, benchmarking
+Last session: 2026-03-18T17:02:00.000Z
+Stopped at: Completed 05-03-PLAN.md: LLM wiring, taskType threading, FIX-02
 Resume file: None

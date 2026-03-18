@@ -26,7 +26,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Bug Fixes
 
 - [ ] **FIX-01**: Document processing worker extracts real file content (not just filename) or shows clear "coming soon" instead of hallucinated summaries
-- [ ] **FIX-02**: Autonomous agent persists local findings (cascade, cluster, predictive) before LLM reasoning call — findings survive LLM errors
+- [x] **FIX-02**: Autonomous agent persists local findings (cascade, cluster, predictive) before LLM reasoning call — findings survive LLM errors
 - [ ] **FIX-03**: Re-enriching a risk replaces existing AI enrichment section instead of appending duplicate blocks
 - [ ] **FIX-04**: Vendor AI question generation returns clear error message on LLM parse failure (not confusing "invalid format" 400)
 - [ ] **FIX-05**: Vendor scorecard displays real data — last assessment date and open findings count computed from related tables
@@ -79,7 +79,7 @@ Deferred to v2. Tracked but not in current roadmap.
 | ROUTE-03 | Phase 5 | Complete |
 | ROUTE-04 | Phase 5 | Complete |
 | FIX-01 | Phase 6 | Pending |
-| FIX-02 | Phase 5 | Pending |
+| FIX-02 | Phase 5 | Complete |
 | FIX-03 | Phase 6 | Pending |
 | FIX-04 | Phase 6 | Pending |
 | FIX-05 | Phase 6 | Pending |
