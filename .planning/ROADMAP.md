@@ -84,6 +84,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Server Foundation | 5/5 | Complete    | 2026-03-18 |
-| 2. Public Access and Security | 1/3 | In Progress|  |
+| 2. Public Access and Security | 2/3 | In Progress|  |
 | 3. Dashboard Polish and Demo Readiness | 0/TBD | Not started | - |
 | 4. AI Differentiators Surfaced | 0/TBD | Not started | - |

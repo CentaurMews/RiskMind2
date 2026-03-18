@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-03-18T06:08:32.804Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-03-18T06:33:10.886Z"
 last_activity: 2026-03-17 — Roadmap created, all 35 v1 requirements mapped to 4 phases
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-server-foundation P05 | 5 | 1 tasks | 3 files |
 | Phase 01-server-foundation P05 | 731min | 2 tasks | 3 files |
 | Phase 02-public-access-and-security P01 | 8 | 3 tasks | 2 files |
+| Phase 02-public-access-and-security P02 | 10 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,7 @@ Recent decisions affecting current work:
 - [Phase 01-server-foundation]: Boot persistence via systemd pm2-root.service (pm2 startup + pm2 save)
 - [Phase 02-public-access-and-security]: Function-based CORS origin whitelist with credentials: true for JWT Authorization header support
 - [Phase 02-public-access-and-security]: res.flushHeaders() after SSE header block prevents Cloudflare from buffering SSE until stream close
+- [Phase 02-public-access-and-security]: Separate named systemd unit (cloudflared-riskmind.service) per tunnel coexists with existing cloudflared.service without disrupting pdpl.pulsebridge.me
 
 ### Pending Todos
 
@@ -96,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T06:08:32.798Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-03-18T06:33:10.877Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
