@@ -56,13 +56,14 @@ Plans:
 ### Phase 3: Dashboard Polish and Demo Readiness
 **Goal**: The dashboard and all list views look professional — consistent card design, populated with seed data, RBAC-correct, with empty/loading/error states everywhere
 **Depends on**: Phase 2
-**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, VEND-01, VEND-02, COMP-01, EXP-01
+**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-07, UI-08, UI-09, VEND-01, VEND-02, COMP-01, EXP-01
 **Success Criteria** (what must be TRUE):
-  1. Dashboard shows KPI cards, risk heatmap with clickable drill-down, executive summary, KRI threshold indicators, and alert badge — all populated with seed data
+  1. Dashboard shows KPI cards with trends, risk heatmap with clickable drill-down, executive summary, KRI threshold indicators, and alert badge — all populated with seed data
   2. Every list view has pagination, search, and filter controls; every empty list shows a friendly empty state with a CTA
   3. All pages show skeleton loaders while fetching and toast notifications on error — no blank boxes or raw error text anywhere
   4. Vendor scorecard shows score, tier, assessment date, and open findings; vendor pipeline shows lifecycle stages visually
   5. Compliance posture percentage displays per framework; admin-only controls are hidden from viewer/auditor roles
+  6. ⌘K command palette provides semantic search across risks, vendors, frameworks, and signals via pgvector
 **Plans**: TBD
 
 ### Phase 4: AI Differentiators Surfaced
