@@ -1,11 +1,11 @@
 import { Router, type Request, type Response } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, llmConfigsTable } from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
+import { db, llmConfigsTable, llmTaskRoutingTable, llmBenchmarkResultsTable } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, conflict } from "../lib/errors";
 import { encrypt } from "../lib/encryption";
-import { testConnection } from "../lib/llm-service";
+import { testConnection, discoverModels, runBenchmark, suggestRouting } from "../lib/llm-service";
 
 const router = Router();
 
@@ -193,6 +193,202 @@ router.post("/v1/settings/llm-providers/:id/test", requireRole("admin"), async (
     res.json(result);
   } catch (err) {
     console.error("Test LLM provider error:", err);
+    serverError(res);
+  }
+});
+
+// POST /v1/settings/llm-providers/:id/discover
+router.post("/v1/settings/llm-providers/:id/discover", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const configId = String(req.params.id);
+
+    // Verify config belongs to tenant
+    const [config] = await db.select({ id: llmConfigsTable.id }).from(llmConfigsTable)
+      .where(and(eq(llmConfigsTable.id, configId), eq(llmConfigsTable.tenantId, tenantId)))
+      .limit(1);
+    if (!config) { notFound(res, "LLM provider not found"); return; }
+
+    const result = await discoverModels(configId, tenantId);
+    res.json(result);
+  } catch (err) {
+    console.error("Discover models error:", err);
+    serverError(res);
+  }
+});
+
+// POST /v1/settings/llm-providers/:id/benchmark
+router.post("/v1/settings/llm-providers/:id/benchmark", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const configId = String(req.params.id);
+    const { model } = req.body as { model?: string };
+
+    // Verify config belongs to tenant
+    const [config] = await db.select({ id: llmConfigsTable.id }).from(llmConfigsTable)
+      .where(and(eq(llmConfigsTable.id, configId), eq(llmConfigsTable.tenantId, tenantId)))
+      .limit(1);
+    if (!config) { notFound(res, "LLM provider not found"); return; }
+
+    const result = await runBenchmark(configId, tenantId, model);
+    res.json(result);
+  } catch (err) {
+    console.error("Benchmark error:", err);
+    const msg = err instanceof Error ? err.message : "Benchmark failed";
+    res.status(422).json({ error: msg });
+  }
+});
+
+// GET /v1/settings/llm-routing
+router.get("/v1/settings/llm-routing", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+
+    const rows = await db.select().from(llmTaskRoutingTable)
+      .where(eq(llmTaskRoutingTable.tenantId, tenantId));
+
+    // Enrich each row with the config name for display
+    const ALL_TASK_TYPES = ["enrichment", "triage", "treatment", "embeddings", "agent", "general"];
+    const rowsByType = new Map(rows.map((r) => [r.taskType, r]));
+
+    const entries = await Promise.all(
+      ALL_TASK_TYPES.map(async (taskType) => {
+        const row = rowsByType.get(taskType);
+        if (!row?.configId) return { taskType, configId: null, modelOverride: null, effectiveModel: null, providerName: null };
+
+        const [cfg] = await db.select({ model: llmConfigsTable.model, name: llmConfigsTable.name })
+          .from(llmConfigsTable)
+          .where(eq(llmConfigsTable.id, row.configId))
+          .limit(1);
+
+        return {
+          taskType,
+          configId: row.configId,
+          modelOverride: row.modelOverride || null,
+          effectiveModel: row.modelOverride || cfg?.model || null,
+          providerName: cfg?.name || null,
+        };
+      })
+    );
+
+    // Also return benchmark-based suggestions
+    const suggestions = await suggestRouting(tenantId);
+    const suggestionMap: Record<string, string | null> = {};
+    for (const [taskType, entry] of Object.entries(suggestions)) {
+      suggestionMap[taskType] = entry?.model || null;
+    }
+
+    res.json({ entries, suggestions: suggestionMap });
+  } catch (err) {
+    console.error("Get routing table error:", err);
+    serverError(res);
+  }
+});
+
+// PUT /v1/settings/llm-routing
+router.put("/v1/settings/llm-routing", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const { entries } = req.body as { entries: Array<{ taskType: string; configId?: string | null; modelOverride?: string | null }> };
+
+    if (!Array.isArray(entries) || entries.length === 0) {
+      badRequest(res, "entries array is required and must not be empty");
+      return;
+    }
+
+    const VALID_TASK_TYPES = ["enrichment", "triage", "treatment", "embeddings", "agent", "general"];
+    for (const entry of entries) {
+      if (!VALID_TASK_TYPES.includes(entry.taskType)) {
+        badRequest(res, `Invalid taskType: ${entry.taskType}. Must be one of: ${VALID_TASK_TYPES.join(", ")}`);
+        return;
+      }
+      // Verify configId belongs to this tenant if provided
+      if (entry.configId) {
+        const [cfg] = await db.select({ id: llmConfigsTable.id }).from(llmConfigsTable)
+          .where(and(eq(llmConfigsTable.id, entry.configId), eq(llmConfigsTable.tenantId, tenantId)))
+          .limit(1);
+        if (!cfg) {
+          badRequest(res, `configId ${entry.configId} not found for this tenant`);
+          return;
+        }
+      }
+    }
+
+    for (const entry of entries) {
+      await db.insert(llmTaskRoutingTable).values({
+        tenantId,
+        taskType: entry.taskType,
+        configId: entry.configId || null,
+        modelOverride: entry.modelOverride || null,
+        updatedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: [llmTaskRoutingTable.tenantId, llmTaskRoutingTable.taskType],
+        set: {
+          configId: sql`excluded.config_id`,
+          modelOverride: sql`excluded.model_override`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      });
+    }
+
+    // Return updated routing table
+    const updated = await db.select().from(llmTaskRoutingTable)
+      .where(eq(llmTaskRoutingTable.tenantId, tenantId));
+    res.json({ entries: updated });
+  } catch (err) {
+    console.error("Update routing table error:", err);
+    serverError(res);
+  }
+});
+
+// DELETE /v1/settings/llm-routing/:taskType
+router.delete("/v1/settings/llm-routing/:taskType", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const taskType = String(req.params.taskType);
+
+    const result = await db.delete(llmTaskRoutingTable)
+      .where(and(
+        eq(llmTaskRoutingTable.tenantId, tenantId),
+        eq(llmTaskRoutingTable.taskType, taskType)
+      ))
+      .returning({ id: llmTaskRoutingTable.id });
+
+    if (result.length === 0) {
+      notFound(res, `No routing entry found for task type: ${taskType}`);
+      return;
+    }
+
+    res.status(204).end();
+  } catch (err) {
+    console.error("Delete routing entry error:", err);
+    serverError(res);
+  }
+});
+
+// GET /v1/settings/embeddings-health
+router.get("/v1/settings/embeddings-health", requireRole("admin"), async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user!.tenantId;
+
+    const [embeddingsConfig] = await db.select({
+      id: llmConfigsTable.id,
+      name: llmConfigsTable.name,
+    }).from(llmConfigsTable)
+      .where(and(
+        eq(llmConfigsTable.tenantId, tenantId),
+        eq(llmConfigsTable.useCase, "embeddings"),
+        eq(llmConfigsTable.isActive, true),
+      ))
+      .limit(1);
+
+    if (embeddingsConfig) {
+      res.json({ configured: true, providerId: embeddingsConfig.id, providerName: embeddingsConfig.name });
+    } else {
+      res.json({ configured: false });
+    }
+  } catch (err) {
+    console.error("Embeddings health error:", err);
     serverError(res);
   }
 });
