@@ -1,8 +1,16 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { db, llmConfigsTable } from "@workspace/db";
+import { db, llmConfigsTable, llmTaskRoutingTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { decrypt } from "./encryption";
+
+export type LLMTaskType =
+  | "enrichment"
+  | "triage"
+  | "treatment"
+  | "embeddings"
+  | "agent"
+  | "general";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -38,8 +46,33 @@ function safeDecrypt(encrypted: string | null): string | null {
   }
 }
 
-async function resolveConfig(tenantId: string, useCase: "general" | "embeddings" = "general"): Promise<ResolvedConfig | null> {
+async function resolveConfig(tenantId: string, taskType: LLMTaskType = "general"): Promise<ResolvedConfig | null> {
   try {
+    // Step 1: Task-specific routing lookup
+    const [routing] = await db.select().from(llmTaskRoutingTable)
+      .where(and(
+        eq(llmTaskRoutingTable.tenantId, tenantId),
+        eq(llmTaskRoutingTable.taskType, taskType)
+      )).limit(1);
+
+    if (routing?.configId) {
+      const [routedConfig] = await db.select().from(llmConfigsTable)
+        .where(and(
+          eq(llmConfigsTable.id, routing.configId),
+          eq(llmConfigsTable.isActive, true)
+        )).limit(1);
+      if (routedConfig) {
+        return {
+          providerType: routedConfig.providerType,
+          baseUrl: routedConfig.baseUrl,
+          apiKey: safeDecrypt(routedConfig.encryptedApiKey),
+          model: routing.modelOverride || routedConfig.model,
+        };
+      }
+    }
+
+    // Step 2: Existing fallback logic (preserved exactly)
+    const useCase = taskType === "embeddings" ? "embeddings" : "general";
     const [config] = await db.select().from(llmConfigsTable)
       .where(and(
         eq(llmConfigsTable.tenantId, tenantId),
@@ -107,8 +140,8 @@ function buildAnthropicClient(config: ResolvedConfig): Anthropic {
   });
 }
 
-export async function complete(tenantId: string, opts: CompletionOptions): Promise<string> {
-  const config = await resolveConfig(tenantId);
+export async function complete(tenantId: string, opts: CompletionOptions, taskType: LLMTaskType = "general"): Promise<string> {
+  const config = await resolveConfig(tenantId, taskType);
   if (!config) throw new LLMUnavailableError();
 
   const model = opts.model || config.model;
@@ -141,8 +174,8 @@ export async function complete(tenantId: string, opts: CompletionOptions): Promi
   return resp.choices[0]?.message?.content || "";
 }
 
-export async function* streamComplete(tenantId: string, opts: CompletionOptions): AsyncGenerator<StreamChunk> {
-  const config = await resolveConfig(tenantId);
+export async function* streamComplete(tenantId: string, opts: CompletionOptions, taskType: LLMTaskType = "general"): AsyncGenerator<StreamChunk> {
+  const config = await resolveConfig(tenantId, taskType);
   if (!config) throw new LLMUnavailableError();
 
   const model = opts.model || config.model;
@@ -190,7 +223,7 @@ export async function* streamComplete(tenantId: string, opts: CompletionOptions)
 export async function generateEmbedding(tenantId: string, text: string): Promise<number[]> {
   const config = await resolveConfig(tenantId, "embeddings");
   if (!config) {
-    const generalConfig = await resolveConfig(tenantId, "general");
+    const generalConfig = await resolveConfig(tenantId, "general" as LLMTaskType);
     if (!generalConfig || generalConfig.providerType === "anthropic") throw new LLMUnavailableError();
     const client = buildOpenAIClient(generalConfig);
     const resp = await client.embeddings.create({
