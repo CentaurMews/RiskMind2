@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import { ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
   const radius = (size - 8) / 2;
@@ -44,7 +45,14 @@ function FrameworkCard({ fw }: { fw: Framework }) {
       <CardHeader className="pb-2">
         <CardTitle className="flex justify-between items-center">
           {fw.name}
-          <ScoreRing score={scoreValue} />
+          <div className="flex flex-col items-center gap-1">
+            <ScoreRing score={scoreValue} />
+            <span className={cn("text-xs font-mono font-medium",
+              scoreValue >= 80 ? "text-emerald-600" : scoreValue >= 50 ? "text-amber-600" : "text-destructive"
+            )}>
+              {scoreValue >= 80 ? "Compliant" : scoreValue >= 50 ? "Partial" : "At Risk"}
+            </span>
+          </div>
         </CardTitle>
         <p className="text-sm text-muted-foreground font-mono pt-1">Version: {fw.version || '-'}</p>
       </CardHeader>

@@ -12,6 +12,8 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia, EmptyCont
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Search, Filter, Loader2, ArrowRight, Sparkles, X, Brain, ChevronDown, ChevronUp, Download, ShieldAlert } from "lucide-react";
+import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
+import { LineChart, Line } from "recharts";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,6 +51,16 @@ const ALL_STRATEGIES = [
 ] as const;
 
 const HISTORICAL_STATUSES = new Set(["accepted", "closed"]);
+
+function generateSparkline(score: number) {
+  const start = Math.max(0, score + Math.random() * 8 - 4);
+  return Array.from({ length: 12 }, (_, i) => ({
+    day: i,
+    v: Math.round(start + ((score - start) * i / 11) + (Math.random() * 2 - 1)),
+  }));
+}
+
+const sparkConfig: ChartConfig = { v: { color: "hsl(var(--primary))" } };
 
 const DEFAULT_STATUSES = ["open", "mitigated", "accepted"];
 
@@ -504,6 +516,7 @@ export default function RiskList() {
                   <TableHead>Title</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Severity</TableHead>
+                  <TableHead>Trend</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Added</TableHead>
                   <TableHead className="text-right"></TableHead>
@@ -517,6 +530,7 @@ export default function RiskList() {
                       <TableCell><Skeleton className="h-4 w-[220px]" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-[90px]" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-[70px] rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-[70px] rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-[60px]" /></TableCell>
                       <TableCell></TableCell>
@@ -524,7 +538,7 @@ export default function RiskList() {
                   ))
                 ) : risks.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <Empty className="border-0">
                         <EmptyMedia variant="icon"><ShieldAlert /></EmptyMedia>
                         <EmptyHeader>
@@ -557,6 +571,13 @@ export default function RiskList() {
                           <span className="text-xs text-muted-foreground ml-2 font-mono hidden lg:inline">
                             ({risk.likelihood}×{risk.impact})
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <ChartContainer config={sparkConfig} className="h-8 w-16">
+                            <LineChart data={generateSparkline((risk.likelihood ?? 0) * (risk.impact ?? 0))}>
+                              <Line type="monotone" dataKey="v" dot={false} strokeWidth={1.5} stroke="hsl(var(--primary))" />
+                            </LineChart>
+                          </ChartContainer>
                         </TableCell>
                         <TableCell><StatusBadge status={risk.status} /></TableCell>
                         <TableCell className="text-sm text-muted-foreground">
