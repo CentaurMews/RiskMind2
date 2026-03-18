@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-18T11:08:06.038Z"
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-03-18T11:13:19.755Z"
 last_activity: "2026-03-18 — Phase 2 verified complete; app publicly accessible at https://app.riskmind.net with CORS enforced and SSE streaming working"
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 50
 ---
 
@@ -62,6 +62,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03-dashboard-polish-and-demo-readiness P01 | 15 | 2 tasks | 3 files |
 | Phase 03-dashboard-polish-and-demo-readiness P03 | 10min | 3 tasks | 11 files |
 | Phase 03-dashboard-polish-and-demo-readiness P02 | 25 | 2 tasks | 9 files |
+| Phase 03-dashboard-polish-and-demo-readiness P04 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase 03-dashboard-polish-and-demo-readiness]: Vendor scorecard shows placeholder 'Never'/'—' for lastAssessmentDate/openFindingsCount (fields not in Vendor schema)
 - [Phase 03-dashboard-polish-and-demo-readiness]: HeatmapGrid uses compact prop for shared use in dashboard (mini) and heatmap page (full)
 - [Phase 03-dashboard-polish-and-demo-readiness]: customFetch exported from api-client-react index to avoid subpath export config
+- [Phase 03-dashboard-polish-and-demo-readiness]: CommandPalette mounted inside WouterRouter to provide wouter useLocation context
+- [Phase 03-dashboard-polish-and-demo-readiness]: generateSparkline uses synthetic data ending at likelihood*impact score for visual trajectory
 
 ### Pending Todos
 
@@ -109,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T11:08:06.027Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-03-18T11:13:19.743Z
+Stopped at: Completed 03-04-PLAN.md
 Resume file: None

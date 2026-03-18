@@ -47,7 +47,7 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 - [x] **UI-05**: Consistent navigation — sidebar active states, breadcrumbs on detail pages, page titles
 - [x] **UI-06**: Role-based UI enforcement — admin controls hidden for viewers, read-only for auditors
 - [x] **UI-07**: Pagination, search, and filter controls on all list views (risks, vendors, controls, signals)
-- [ ] **UI-08**: Risk trend sparklines on risk cards showing 30-day score trajectory
+- [x] **UI-08**: Risk trend sparklines on risk cards showing 30-day score trajectory
 - [x] **UI-09**: Command palette (⌘K) with semantic search — global search across risks, vendors, frameworks, signals via pgvector
 
 ### Vendor Management
@@ -133,7 +133,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-05 | Phase 3 | Complete |
 | UI-06 | Phase 3 | Complete |
 | UI-07 | Phase 3 | Complete |
-| UI-08 | Phase 3 | Pending |
+| UI-08 | Phase 3 | Complete |
 | UI-09 | Phase 3 | Complete |
 | VEND-01 | Phase 3 | Complete |
 | VEND-02 | Phase 3 | Complete |
