@@ -115,7 +115,7 @@ Plans:
   5. Settings shows a visible warning banner when no embeddings provider is configured, explaining that semantic search and agent clustering will degrade
   6. Model name input in provider configuration uses a selection component from the discovered list — free-text entry is blocked, and the backend rejects configs with model IDs that fail provider validation
   7. Admin can complete the full 6-step LLM Config Wizard (provider select → API key → model discovery → model select → benchmark → routing assignment) and have the resulting config and routing assignments active without leaving Settings
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 06-01-PLAN.md — Bug fixes: FIX-01 doc processor stub, FIX-03 enrichment idempotency, FIX-04 vendor 400 error, FIX-05 scorecard real data, FIX-06 embeddings warning, FIX-07 model name validation
@@ -164,7 +164,7 @@ Plans:
   5. Settings shows a visible warning banner when no embeddings provider is configured, explaining that semantic search and agent clustering will degrade
   6. Model name input in provider configuration uses a selection component from the discovered list — free-text entry is blocked, and the backend rejects configs with model IDs that fail provider validation
   7. Admin can complete the full 6-step LLM Config Wizard (provider select → API key → model discovery → model select → benchmark → routing assignment) and have the resulting config and routing assignments active without leaving Settings
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 06-01-PLAN.md — Bug fixes: FIX-01 doc processor stub, FIX-03 enrichment idempotency, FIX-04 vendor 400 error, FIX-05 scorecard real data, FIX-06 embeddings warning, FIX-07 model name validation
