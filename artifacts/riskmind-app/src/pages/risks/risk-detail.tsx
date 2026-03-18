@@ -11,8 +11,23 @@ import { ArrowLeft, Sparkles, AlertCircle, Activity, ShieldCheck, Clock, Loader2
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AiProvenance } from "@/components/ai/ai-provenance";
 import { ScoreProgressionBar } from "@/components/score-progression-bar";
 import { TreatmentsTab } from "./treatments-tab";
+
+const AI_ENRICHMENT_SEPARATOR = "\n\n---AI Enrichment---\n";
+
+function parseRiskDescription(description: string | null | undefined) {
+  if (!description) return { base: null, enrichment: null };
+  const idx = description.indexOf(AI_ENRICHMENT_SEPARATOR);
+  if (idx === -1) return { base: description, enrichment: null };
+  return {
+    base: description.slice(0, idx),
+    enrichment: description.slice(idx + AI_ENRICHMENT_SEPARATOR.length),
+  };
+}
 
 interface ScorePair { likelihood: number; impact: number }
 
@@ -178,6 +193,7 @@ export default function RiskDetail() {
   const { data: kris } = useListKRIs(id);
   const { data: incidents } = useListIncidents(id);
   const { data: reviews } = useListReviews(id);
+  const [enrichmentOpen, setEnrichmentOpen] = useState(false);
 
   interface AiSuggestionsState {
     inherent?: ScorePair;
@@ -250,6 +266,8 @@ export default function RiskDetail() {
   if (isLoading) return <AppLayout><div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div></AppLayout>;
   if (!risk) return <AppLayout><div className="p-8 text-center text-muted-foreground">Risk not found</div></AppLayout>;
 
+  const { base: baseDescription, enrichment } = parseRiskDescription(risk.description);
+
   return (
     <AppLayout>
       <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -276,6 +294,12 @@ export default function RiskDetail() {
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{risk.title}</h1>
               <StatusBadge status={risk.status} className="text-sm px-3 py-1" />
+              {enrichment && (
+                <Badge variant="outline" className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-primary/5 text-primary border-primary/20 font-medium">
+                  <Sparkles className="h-3 w-3" />
+                  AI Enhanced
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="capitalize border-r pr-4">{risk.category}</span>
@@ -314,8 +338,25 @@ export default function RiskDetail() {
             </CardHeader>
             <CardContent>
               <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-                {risk.description || "No description provided."}
+                {baseDescription || "No description provided."}
               </p>
+              {enrichment && (
+                <div className="mt-4 border-t pt-4">
+                  <Collapsible open={enrichmentOpen} onOpenChange={setEnrichmentOpen}>
+                    <CollapsibleTrigger className="flex items-center gap-2 text-sm font-semibold hover:text-primary transition-colors mb-2">
+                      {enrichmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      AI Enrichment
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{enrichment}</p>
+                        <AiProvenance action="Enriched by" date={risk.updatedAt} />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              )}
               {enrichMutation.isSuccess && (
                 <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
                   <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-2">
