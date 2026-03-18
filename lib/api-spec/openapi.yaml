@@ -2158,6 +2158,148 @@ paths:
                   latencyMs:
                     type: number
 
+  /v1/settings/llm-providers/{id}/discover:
+    post:
+      operationId: discoverLlmModels
+      tags: [settings]
+      summary: Discover available models from a configured LLM provider
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Discovered models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmDiscoverResult"
+        "404":
+          description: Provider not found
+        "422":
+          description: Discovery failed
+
+  /v1/settings/llm-providers/{id}/benchmark:
+    post:
+      operationId: benchmarkLlmProvider
+      tags: [settings]
+      summary: Run a benchmark against a configured LLM provider
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                  description: Optional model override for testing a specific discovered model
+      responses:
+        "200":
+          description: Benchmark results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmBenchmarkResult"
+        "404":
+          description: Provider not found
+
+  /v1/settings/llm-routing:
+    get:
+      operationId: getLlmRouting
+      tags: [settings]
+      summary: Get the current routing table for all task types
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Routing table
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmRoutingTable"
+    put:
+      operationId: updateLlmRouting
+      tags: [settings]
+      summary: Update one or more routing table entries
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/LlmRoutingEntry"
+      responses:
+        "200":
+          description: Updated routing table
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmRoutingTable"
+
+  /v1/settings/llm-routing/{taskType}:
+    delete:
+      operationId: deleteLlmRoutingEntry
+      tags: [settings]
+      summary: Reset a task type routing entry to tenant default
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: taskType
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Entry deleted (reset to default)
+        "404":
+          description: Entry not found
+
+  /v1/settings/embeddings-health:
+    get:
+      operationId: getEmbeddingsHealth
+      tags: [settings]
+      summary: Check whether an embeddings provider is configured
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Embeddings health status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [configured]
+                properties:
+                  configured:
+                    type: boolean
+                  providerId:
+                    type: string
+                    format: uuid
+                  providerName:
+                    type: string
+
   /v1/ai/interview/start:
     post:
       operationId: startInterview
@@ -4756,6 +4898,9 @@ components:
           type: boolean
         hasApiKey:
           type: boolean
+        displayProvider:
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -4801,6 +4946,90 @@ components:
           $ref: "#/components/schemas/LlmUseCase"
         isActive:
           type: boolean
+
+    LlmDiscoveredModel:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        capability:
+          type: array
+          items:
+            type: string
+          description: "Values: chat, embeddings, code"
+        contextWindow:
+          type: integer
+
+    LlmDiscoverResult:
+      type: object
+      required: [models]
+      properties:
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/LlmDiscoveredModel"
+        error:
+          type: string
+
+    LlmBenchmarkResult:
+      type: object
+      required: [ttftMs, totalLatencyMs, qualityScore]
+      properties:
+        ttftMs:
+          type: integer
+          description: Time to first token in milliseconds
+        totalLatencyMs:
+          type: integer
+          description: Total round-trip latency in milliseconds
+        qualityScore:
+          type: integer
+          minimum: 0
+          maximum: 3
+          description: JSON quality heuristic score (0=invalid, 3=perfect)
+        tokensPerSecond:
+          type: number
+        model:
+          type: string
+        configId:
+          type: string
+          format: uuid
+
+    LlmRoutingEntry:
+      type: object
+      required: [taskType]
+      properties:
+        taskType:
+          type: string
+          enum: [enrichment, triage, treatment, embeddings, agent, general]
+        configId:
+          type: string
+          format: uuid
+          nullable: true
+        modelOverride:
+          type: string
+          nullable: true
+        effectiveModel:
+          type: string
+          description: Resolved model name (from configId.model + modelOverride)
+        providerName:
+          type: string
+
+    LlmRoutingTable:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LlmRoutingEntry"
+        suggestions:
+          type: object
+          additionalProperties:
+            type: string
+          description: Task type -> suggested model based on benchmark results
 
     InterviewType:
       type: string

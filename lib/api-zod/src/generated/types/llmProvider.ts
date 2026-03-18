@@ -19,6 +19,7 @@ export interface LlmProvider {
   useCase?: LlmUseCase;
   isActive?: boolean;
   hasApiKey?: boolean;
+  displayProvider?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

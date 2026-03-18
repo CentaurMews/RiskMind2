@@ -1104,6 +1104,7 @@ export interface LlmProvider {
   useCase?: LlmUseCase;
   isActive?: boolean;
   hasApiKey?: boolean;
+  displayProvider?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1127,6 +1128,67 @@ export interface UpdateLlmProvider {
   isDefault?: boolean;
   useCase?: LlmUseCase;
   isActive?: boolean;
+}
+
+export interface LlmDiscoveredModel {
+  id: string;
+  displayName?: string;
+  /** Values: chat, embeddings, code */
+  capability?: string[];
+  contextWindow?: number;
+}
+
+export interface LlmDiscoverResult {
+  models: LlmDiscoveredModel[];
+  error?: string;
+}
+
+export interface LlmBenchmarkResult {
+  /** Time to first token in milliseconds */
+  ttftMs: number;
+  /** Total round-trip latency in milliseconds */
+  totalLatencyMs: number;
+  /**
+   * JSON quality heuristic score (0=invalid, 3=perfect)
+   * @minimum 0
+   * @maximum 3
+   */
+  qualityScore: number;
+  tokensPerSecond?: number;
+  model?: string;
+  configId?: string;
+}
+
+export type LlmRoutingEntryTaskType =
+  (typeof LlmRoutingEntryTaskType)[keyof typeof LlmRoutingEntryTaskType];
+
+export const LlmRoutingEntryTaskType = {
+  enrichment: "enrichment",
+  triage: "triage",
+  treatment: "treatment",
+  embeddings: "embeddings",
+  agent: "agent",
+  general: "general",
+} as const;
+
+export interface LlmRoutingEntry {
+  taskType: LlmRoutingEntryTaskType;
+  configId?: string | null;
+  modelOverride?: string | null;
+  /** Resolved model name (from configId.model + modelOverride) */
+  effectiveModel?: string;
+  providerName?: string;
+}
+
+/**
+ * Task type -> suggested model based on benchmark results
+ */
+export type LlmRoutingTableSuggestions = { [key: string]: string };
+
+export interface LlmRoutingTable {
+  entries: LlmRoutingEntry[];
+  /** Task type -> suggested model based on benchmark results */
+  suggestions?: LlmRoutingTableSuggestions;
 }
 
 export type InterviewType = (typeof InterviewType)[keyof typeof InterviewType];
@@ -1472,6 +1534,21 @@ export type TestLlmProvider200 = {
   success?: boolean;
   message?: string;
   latencyMs?: number;
+};
+
+export type BenchmarkLlmProviderBody = {
+  /** Optional model override for testing a specific discovered model */
+  model?: string;
+};
+
+export type UpdateLlmRoutingBody = {
+  entries: LlmRoutingEntry[];
+};
+
+export type GetEmbeddingsHealth200 = {
+  configured: boolean;
+  providerId?: string;
+  providerName?: string;
 };
 
 export type StartInterviewBodyType =

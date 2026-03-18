@@ -2326,6 +2326,7 @@ export const ListLlmProvidersResponseItem = zod.object({
   useCase: zod.enum(["general", "embeddings"]).optional(),
   isActive: zod.boolean().optional(),
   hasApiKey: zod.boolean().optional(),
+  displayProvider: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -2362,6 +2363,7 @@ export const GetLlmProviderResponse = zod.object({
   useCase: zod.enum(["general", "embeddings"]).optional(),
   isActive: zod.boolean().optional(),
   hasApiKey: zod.boolean().optional(),
+  displayProvider: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -2395,6 +2397,7 @@ export const UpdateLlmProviderResponse = zod.object({
   useCase: zod.enum(["general", "embeddings"]).optional(),
   isActive: zod.boolean().optional(),
   hasApiKey: zod.boolean().optional(),
+  displayProvider: zod.string().nullish(),
   createdAt: zod.date().optional(),
   updatedAt: zod.date().optional(),
 });
@@ -2417,6 +2420,158 @@ export const TestLlmProviderResponse = zod.object({
   success: zod.boolean().optional(),
   message: zod.string().optional(),
   latencyMs: zod.number().optional(),
+});
+
+/**
+ * @summary Discover available models from a configured LLM provider
+ */
+export const DiscoverLlmModelsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const DiscoverLlmModelsResponse = zod.object({
+  models: zod.array(
+    zod.object({
+      id: zod.string(),
+      displayName: zod.string().optional(),
+      capability: zod
+        .array(zod.string())
+        .optional()
+        .describe("Values: chat, embeddings, code"),
+      contextWindow: zod.number().optional(),
+    }),
+  ),
+  error: zod.string().optional(),
+});
+
+/**
+ * @summary Run a benchmark against a configured LLM provider
+ */
+export const BenchmarkLlmProviderParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const BenchmarkLlmProviderBody = zod.object({
+  model: zod
+    .string()
+    .optional()
+    .describe(
+      "Optional model override for testing a specific discovered model",
+    ),
+});
+
+export const benchmarkLlmProviderResponseQualityScoreMin = 0;
+export const benchmarkLlmProviderResponseQualityScoreMax = 3;
+
+export const BenchmarkLlmProviderResponse = zod.object({
+  ttftMs: zod.number().describe("Time to first token in milliseconds"),
+  totalLatencyMs: zod
+    .number()
+    .describe("Total round-trip latency in milliseconds"),
+  qualityScore: zod
+    .number()
+    .min(benchmarkLlmProviderResponseQualityScoreMin)
+    .max(benchmarkLlmProviderResponseQualityScoreMax)
+    .describe("JSON quality heuristic score (0=invalid, 3=perfect)"),
+  tokensPerSecond: zod.number().optional(),
+  model: zod.string().optional(),
+  configId: zod.string().uuid().optional(),
+});
+
+/**
+ * @summary Get the current routing table for all task types
+ */
+export const GetLlmRoutingResponse = zod.object({
+  entries: zod.array(
+    zod.object({
+      taskType: zod.enum([
+        "enrichment",
+        "triage",
+        "treatment",
+        "embeddings",
+        "agent",
+        "general",
+      ]),
+      configId: zod.string().uuid().nullish(),
+      modelOverride: zod.string().nullish(),
+      effectiveModel: zod
+        .string()
+        .optional()
+        .describe("Resolved model name (from configId.model + modelOverride)"),
+      providerName: zod.string().optional(),
+    }),
+  ),
+  suggestions: zod
+    .record(zod.string(), zod.string())
+    .optional()
+    .describe("Task type -> suggested model based on benchmark results"),
+});
+
+/**
+ * @summary Update one or more routing table entries
+ */
+export const UpdateLlmRoutingBody = zod.object({
+  entries: zod.array(
+    zod.object({
+      taskType: zod.enum([
+        "enrichment",
+        "triage",
+        "treatment",
+        "embeddings",
+        "agent",
+        "general",
+      ]),
+      configId: zod.string().uuid().nullish(),
+      modelOverride: zod.string().nullish(),
+      effectiveModel: zod
+        .string()
+        .optional()
+        .describe("Resolved model name (from configId.model + modelOverride)"),
+      providerName: zod.string().optional(),
+    }),
+  ),
+});
+
+export const UpdateLlmRoutingResponse = zod.object({
+  entries: zod.array(
+    zod.object({
+      taskType: zod.enum([
+        "enrichment",
+        "triage",
+        "treatment",
+        "embeddings",
+        "agent",
+        "general",
+      ]),
+      configId: zod.string().uuid().nullish(),
+      modelOverride: zod.string().nullish(),
+      effectiveModel: zod
+        .string()
+        .optional()
+        .describe("Resolved model name (from configId.model + modelOverride)"),
+      providerName: zod.string().optional(),
+    }),
+  ),
+  suggestions: zod
+    .record(zod.string(), zod.string())
+    .optional()
+    .describe("Task type -> suggested model based on benchmark results"),
+});
+
+/**
+ * @summary Reset a task type routing entry to tenant default
+ */
+export const DeleteLlmRoutingEntryParams = zod.object({
+  taskType: zod.coerce.string(),
+});
+
+/**
+ * @summary Check whether an embeddings provider is configured
+ */
+export const GetEmbeddingsHealthResponse = zod.object({
+  configured: zod.boolean(),
+  providerId: zod.string().uuid().optional(),
+  providerName: zod.string().optional(),
 });
 
 /**

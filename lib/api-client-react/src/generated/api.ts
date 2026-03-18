@@ -31,6 +31,7 @@ import type {
   AlertListResponse,
   AlertSummary,
   ApproveAgentFinding200,
+  BenchmarkLlmProviderBody,
   BulkSignalResponse,
   CalculateVendorRiskScore200,
   CommitInterview200,
@@ -72,6 +73,7 @@ import type {
   GenerateMagicLinkBody,
   GetAgentQueue200,
   GetAgentQueueParams,
+  GetEmbeddingsHealth200,
   HealthStatus,
   HeatmapResponse,
   Incident,
@@ -93,7 +95,10 @@ import type {
   ListSignalsParams,
   ListTreatmentStatusEvents200,
   ListVendorsParams,
+  LlmBenchmarkResult,
+  LlmDiscoverResult,
   LlmProvider,
+  LlmRoutingTable,
   LoginRequest,
   LoginResponse,
   MapControlRequirements200,
@@ -132,6 +137,7 @@ import type {
   UpdateFindingRequest,
   UpdateIncidentRequest,
   UpdateLlmProvider,
+  UpdateLlmRoutingBody,
   UpdateQuestionnaireResponsesBody,
   UpdateRiskRequest,
   UpdateSignalStatusRequest,
@@ -8559,6 +8565,498 @@ export const useTestLlmProvider = <
 > => {
   return useMutation(getTestLlmProviderMutationOptions(options));
 };
+
+/**
+ * @summary Discover available models from a configured LLM provider
+ */
+export const getDiscoverLlmModelsUrl = (id: string) => {
+  return `/api/v1/settings/llm-providers/${id}/discover`;
+};
+
+export const discoverLlmModels = async (
+  id: string,
+  options?: RequestInit,
+): Promise<LlmDiscoverResult> => {
+  return customFetch<LlmDiscoverResult>(getDiscoverLlmModelsUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getDiscoverLlmModelsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof discoverLlmModels>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof discoverLlmModels>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["discoverLlmModels"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof discoverLlmModels>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return discoverLlmModels(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DiscoverLlmModelsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof discoverLlmModels>>
+>;
+
+export type DiscoverLlmModelsMutationError = ErrorType<void>;
+
+/**
+ * @summary Discover available models from a configured LLM provider
+ */
+export const useDiscoverLlmModels = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof discoverLlmModels>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof discoverLlmModels>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getDiscoverLlmModelsMutationOptions(options));
+};
+
+/**
+ * @summary Run a benchmark against a configured LLM provider
+ */
+export const getBenchmarkLlmProviderUrl = (id: string) => {
+  return `/api/v1/settings/llm-providers/${id}/benchmark`;
+};
+
+export const benchmarkLlmProvider = async (
+  id: string,
+  benchmarkLlmProviderBody: BenchmarkLlmProviderBody,
+  options?: RequestInit,
+): Promise<LlmBenchmarkResult> => {
+  return customFetch<LlmBenchmarkResult>(getBenchmarkLlmProviderUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(benchmarkLlmProviderBody),
+  });
+};
+
+export const getBenchmarkLlmProviderMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof benchmarkLlmProvider>>,
+    TError,
+    { id: string; data: BodyType<BenchmarkLlmProviderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof benchmarkLlmProvider>>,
+  TError,
+  { id: string; data: BodyType<BenchmarkLlmProviderBody> },
+  TContext
+> => {
+  const mutationKey = ["benchmarkLlmProvider"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof benchmarkLlmProvider>>,
+    { id: string; data: BodyType<BenchmarkLlmProviderBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return benchmarkLlmProvider(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BenchmarkLlmProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof benchmarkLlmProvider>>
+>;
+export type BenchmarkLlmProviderMutationBody =
+  BodyType<BenchmarkLlmProviderBody>;
+export type BenchmarkLlmProviderMutationError = ErrorType<void>;
+
+/**
+ * @summary Run a benchmark against a configured LLM provider
+ */
+export const useBenchmarkLlmProvider = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof benchmarkLlmProvider>>,
+    TError,
+    { id: string; data: BodyType<BenchmarkLlmProviderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof benchmarkLlmProvider>>,
+  TError,
+  { id: string; data: BodyType<BenchmarkLlmProviderBody> },
+  TContext
+> => {
+  return useMutation(getBenchmarkLlmProviderMutationOptions(options));
+};
+
+/**
+ * @summary Get the current routing table for all task types
+ */
+export const getGetLlmRoutingUrl = () => {
+  return `/api/v1/settings/llm-routing`;
+};
+
+export const getLlmRouting = async (
+  options?: RequestInit,
+): Promise<LlmRoutingTable> => {
+  return customFetch<LlmRoutingTable>(getGetLlmRoutingUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLlmRoutingQueryKey = () => {
+  return [`/api/v1/settings/llm-routing`] as const;
+};
+
+export const getGetLlmRoutingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLlmRouting>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getLlmRouting>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLlmRoutingQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLlmRouting>>> = ({
+    signal,
+  }) => getLlmRouting({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLlmRouting>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLlmRoutingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLlmRouting>>
+>;
+export type GetLlmRoutingQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current routing table for all task types
+ */
+
+export function useGetLlmRouting<
+  TData = Awaited<ReturnType<typeof getLlmRouting>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getLlmRouting>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLlmRoutingQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update one or more routing table entries
+ */
+export const getUpdateLlmRoutingUrl = () => {
+  return `/api/v1/settings/llm-routing`;
+};
+
+export const updateLlmRouting = async (
+  updateLlmRoutingBody: UpdateLlmRoutingBody,
+  options?: RequestInit,
+): Promise<LlmRoutingTable> => {
+  return customFetch<LlmRoutingTable>(getUpdateLlmRoutingUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateLlmRoutingBody),
+  });
+};
+
+export const getUpdateLlmRoutingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLlmRouting>>,
+    TError,
+    { data: BodyType<UpdateLlmRoutingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateLlmRouting>>,
+  TError,
+  { data: BodyType<UpdateLlmRoutingBody> },
+  TContext
+> => {
+  const mutationKey = ["updateLlmRouting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateLlmRouting>>,
+    { data: BodyType<UpdateLlmRoutingBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateLlmRouting(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateLlmRoutingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateLlmRouting>>
+>;
+export type UpdateLlmRoutingMutationBody = BodyType<UpdateLlmRoutingBody>;
+export type UpdateLlmRoutingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update one or more routing table entries
+ */
+export const useUpdateLlmRouting = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLlmRouting>>,
+    TError,
+    { data: BodyType<UpdateLlmRoutingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateLlmRouting>>,
+  TError,
+  { data: BodyType<UpdateLlmRoutingBody> },
+  TContext
+> => {
+  return useMutation(getUpdateLlmRoutingMutationOptions(options));
+};
+
+/**
+ * @summary Reset a task type routing entry to tenant default
+ */
+export const getDeleteLlmRoutingEntryUrl = (taskType: string) => {
+  return `/api/v1/settings/llm-routing/${taskType}`;
+};
+
+export const deleteLlmRoutingEntry = async (
+  taskType: string,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteLlmRoutingEntryUrl(taskType), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteLlmRoutingEntryMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLlmRoutingEntry>>,
+    TError,
+    { taskType: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLlmRoutingEntry>>,
+  TError,
+  { taskType: string },
+  TContext
+> => {
+  const mutationKey = ["deleteLlmRoutingEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLlmRoutingEntry>>,
+    { taskType: string }
+  > = (props) => {
+    const { taskType } = props ?? {};
+
+    return deleteLlmRoutingEntry(taskType, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteLlmRoutingEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteLlmRoutingEntry>>
+>;
+
+export type DeleteLlmRoutingEntryMutationError = ErrorType<void>;
+
+/**
+ * @summary Reset a task type routing entry to tenant default
+ */
+export const useDeleteLlmRoutingEntry = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLlmRoutingEntry>>,
+    TError,
+    { taskType: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteLlmRoutingEntry>>,
+  TError,
+  { taskType: string },
+  TContext
+> => {
+  return useMutation(getDeleteLlmRoutingEntryMutationOptions(options));
+};
+
+/**
+ * @summary Check whether an embeddings provider is configured
+ */
+export const getGetEmbeddingsHealthUrl = () => {
+  return `/api/v1/settings/embeddings-health`;
+};
+
+export const getEmbeddingsHealth = async (
+  options?: RequestInit,
+): Promise<GetEmbeddingsHealth200> => {
+  return customFetch<GetEmbeddingsHealth200>(getGetEmbeddingsHealthUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEmbeddingsHealthQueryKey = () => {
+  return [`/api/v1/settings/embeddings-health`] as const;
+};
+
+export const getGetEmbeddingsHealthQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmbeddingsHealth>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmbeddingsHealth>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetEmbeddingsHealthQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmbeddingsHealth>>
+  > = ({ signal }) => getEmbeddingsHealth({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmbeddingsHealth>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmbeddingsHealthQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmbeddingsHealth>>
+>;
+export type GetEmbeddingsHealthQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Check whether an embeddings provider is configured
+ */
+
+export function useGetEmbeddingsHealth<
+  TData = Awaited<ReturnType<typeof getEmbeddingsHealth>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmbeddingsHealth>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmbeddingsHealthQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Start a new AI interview session
