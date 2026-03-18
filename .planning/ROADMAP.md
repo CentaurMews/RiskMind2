@@ -64,7 +64,13 @@ Plans:
   4. Vendor scorecard shows score, tier, assessment date, and open findings; vendor pipeline shows lifecycle stages visually
   5. Compliance posture percentage displays per framework; admin-only controls are hidden from viewer/auditor roles
   6. ⌘K command palette provides semantic search across risks, vendors, frameworks, and signals via pgvector
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Backend API gaps: GET /v1/kris tenant-wide endpoint and POST /v1/search semantic search
+- [ ] 03-02-PLAN.md — Dashboard widgets: KPI skeletons + delta badges, HeatmapGrid, executive summary, KRI widget, alert bell
+- [ ] 03-03-PLAN.md — List page polish: skeleton rows, empty states, pagination, CSV export, RBAC gates, vendor kanban
+- [ ] 03-04-PLAN.md — Command palette (⌘K), risk sparklines, compliance posture display
 
 ### Phase 4: AI Differentiators Surfaced
 **Goal**: RiskMind's AI-native identity is visible — enrichment badges on risk detail, treatment suggestions, Foresight page with agent findings, and signal-to-finding-to-risk traceability chain
@@ -86,5 +92,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Server Foundation | 5/5 | Complete    | 2026-03-18 |
 | 2. Public Access and Security | 3/3 | Complete    | 2026-03-18 |
-| 3. Dashboard Polish and Demo Readiness | 0/TBD | Not started | - |
+| 3. Dashboard Polish and Demo Readiness | 0/4 | Not started | - |
 | 4. AI Differentiators Surfaced | 0/TBD | Not started | - |
