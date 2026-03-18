@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
+import { LlmConfigWizard } from "./llm-config-wizard";
+import { RoutingTableCard } from "./routing-table-card";
 import {
   useGetMe,
   useListLlmProviders,
@@ -129,6 +131,7 @@ export default function Settings() {
   });
   const [embeddingsBannerDismissed, setEmbeddingsBannerDismissed] = useState(false);
 
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [providerSheet, setProviderSheet] = useState<"closed" | "add" | "edit">("closed");
   const [editingProvider, setEditingProvider] = useState<LlmProvider | null>(null);
   const [providerForm, setProviderForm] = useState<LlmProviderForm>(EMPTY_PROVIDER_FORM);
@@ -369,9 +372,14 @@ export default function Settings() {
                     <CardTitle className="flex items-center"><Server className="h-5 w-5 mr-2" /> LLM Providers</CardTitle>
                     <CardDescription className="mt-1">Configure language models used by AI features. The default provider is used for all AI operations.</CardDescription>
                   </div>
-                  <Button onClick={openAddProvider} size="sm">
-                    <Plus className="h-4 w-4 mr-2" /> Add Provider
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setWizardOpen(true)}>
+                      <Zap className="h-4 w-4 mr-2" /> Configure with Wizard
+                    </Button>
+                    <Button onClick={openAddProvider} size="sm">
+                      <Plus className="h-4 w-4 mr-2" /> Add Provider
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {providersLoading ? (
@@ -460,6 +468,8 @@ export default function Settings() {
                   </div>
                 </CardContent>
               </Card>
+
+              <RoutingTableCard tenantId={user.tenantId ?? ""} />
             </TabsContent>
 
             {/* AGENT CONFIG TAB */}
@@ -777,6 +787,18 @@ export default function Settings() {
           </div>
         </Tabs>
       </div>
+
+      {/* LLM CONFIG WIZARD */}
+      <LlmConfigWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        tenantId={user.tenantId ?? ""}
+        onComplete={() => {
+          setWizardOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["/api/v1/settings/llm-providers"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/v1/settings/llm-routing"] });
+        }}
+      />
 
       {/* ADD / EDIT PROVIDER SHEET */}
       <Sheet open={providerSheet !== "closed"} onOpenChange={(o) => { if (!o) { setProviderSheet("closed"); setEditingProvider(null); } }}>
