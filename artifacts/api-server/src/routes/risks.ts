@@ -1136,4 +1136,36 @@ router.post("/v1/risks/:riskId/acceptance-memoranda/:memorandumId/reject", requi
   }
 });
 
+router.get("/v1/kris", async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const limit = req.query.limit ?? "10";
+
+    const kris = await db
+      .select({
+        id: krisTable.id,
+        riskId: krisTable.riskId,
+        riskTitle: risksTable.title,
+        name: krisTable.name,
+        description: krisTable.description,
+        warningThreshold: krisTable.warningThreshold,
+        criticalThreshold: krisTable.criticalThreshold,
+        currentValue: krisTable.currentValue,
+        unit: krisTable.unit,
+        createdAt: krisTable.createdAt,
+        updatedAt: krisTable.updatedAt,
+      })
+      .from(krisTable)
+      .leftJoin(risksTable, eq(krisTable.riskId, risksTable.id))
+      .where(eq(krisTable.tenantId, tenantId))
+      .orderBy(krisTable.updatedAt)
+      .limit(Number(limit));
+
+    res.json({ data: kris });
+  } catch (err) {
+    console.error("GET /v1/kris error:", err);
+    serverError(res);
+  }
+});
+
 export default router;
