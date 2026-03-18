@@ -81,7 +81,11 @@ Plans:
   2. AI-generated treatment suggestions display polished on risk detail with confidence and rationale
   3. Signal detail links to derived finding, finding links to resulting risk — full traceability chain navigable in the UI with AI provenance at each decision point
   4. Risk detail shows "Sources" section listing where the risk originated (signal, finding, agent detection)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — AiProvenance component + risk detail enrichment badge, parsed description, collapsible AI Enrichment panel (AI-01)
+- [ ] 04-02-PLAN.md — Treatment suggestions provenance receipt, Sources traceability section, FindingPanel polish (AI-02, AI-04)
 
 ## Progress
 
@@ -93,4 +97,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Server Foundation | 5/5 | Complete    | 2026-03-18 |
 | 2. Public Access and Security | 3/3 | Complete    | 2026-03-18 |
 | 3. Dashboard Polish and Demo Readiness | 4/4 | Complete    | 2026-03-18 |
-| 4. AI Differentiators Surfaced | 0/TBD | Not started | - |
+| 4. AI Differentiators Surfaced | 0/2 | Not started | - |
