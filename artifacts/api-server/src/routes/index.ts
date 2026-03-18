@@ -13,6 +13,7 @@ import settingsRouter from "./settings";
 import interviewsRouter from "./interviews";
 import foresightRouter from "./foresight";
 import agentRouter from "./agent";
+import searchRouter from "./search";
 import { authMiddleware } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -38,5 +39,6 @@ router.use(settingsRouter);
 router.use(interviewsRouter);
 router.use(foresightRouter);
 router.use(agentRouter);
+router.use(searchRouter);
 
 export default router;
