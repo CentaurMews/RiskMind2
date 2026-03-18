@@ -30,6 +30,7 @@ import { Activity, Search, Bot, ArrowRight, Check, X, Loader2, Sparkles, Eye, Al
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { AiProvenance } from "@/components/ai/ai-provenance";
 
 function statusBadge(status: string) {
   const config: Record<string, { label: string; className: string }> = {
@@ -153,14 +154,18 @@ function FindingPanel({
             </div>
 
             {finding.riskId ? (
-              <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/20 p-4">
+              <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/20 p-4 space-y-3">
                 <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
                   This finding is already linked to a risk.
                 </p>
+                <AiProvenance
+                  action="Triaged by"
+                  className="text-emerald-700/70 dark:text-emerald-400/70"
+                />
                 <Button
                   size="sm"
                   variant="outline"
-                  className="mt-2"
+                  className="mt-1"
                   onClick={() => { onClose(); setLocation(`/risks/${finding.riskId}`); }}
                 >
                   View Risk
@@ -416,10 +421,17 @@ export default function SignalList() {
                       <TableCell className="font-medium text-sm max-w-[400px] truncate" title={signal.content}>{signal.content}</TableCell>
                       <TableCell>{statusBadge(signal.status || "pending")}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary flex w-fit items-center gap-1.5">
-                          <Bot className="h-3 w-3" />
-                          <span className="capitalize">{signal.classification?.replace('_', ' ') || 'Unknown'}</span>
-                        </Badge>
+                        <div className="space-y-1">
+                          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary flex w-fit items-center gap-1.5">
+                            <Bot className="h-3 w-3" />
+                            <span className="capitalize">{signal.classification?.replace('_', ' ') || 'Unknown'}</span>
+                          </Badge>
+                          {signal.confidence != null && !isNaN(parseFloat(signal.confidence)) && (
+                            <div className="text-[10px] text-muted-foreground font-mono pl-0.5">
+                              {Math.round(parseFloat(signal.confidence) * 100)}% confidence
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{format(new Date(signal.createdAt || ''), 'MMM d, HH:mm')}</TableCell>
                       <TableCell className="text-right">
