@@ -35,7 +35,7 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 - [ ] **DASH-01**: Dashboard displays KPI cards with proper visual hierarchy (top risks, open treatments, overdue items)
 - [ ] **DASH-02**: Risk heatmap renders correctly with interactive drill-down on click
 - [ ] **DASH-03**: Executive summary panel showing risk posture at a glance
-- [ ] **DASH-04**: KRI dashboard widget with threshold status indicators (green/amber/red)
+- [x] **DASH-04**: KRI dashboard widget with threshold status indicators (green/amber/red)
 - [ ] **DASH-05**: Alert notification center with unread count badge and prioritized list
 
 ### UI Polish
@@ -48,7 +48,7 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 - [ ] **UI-06**: Role-based UI enforcement — admin controls hidden for viewers, read-only for auditors
 - [ ] **UI-07**: Pagination, search, and filter controls on all list views (risks, vendors, controls, signals)
 - [ ] **UI-08**: Risk trend sparklines on risk cards showing 30-day score trajectory
-- [ ] **UI-09**: Command palette (⌘K) with semantic search — global search across risks, vendors, frameworks, signals via pgvector
+- [x] **UI-09**: Command palette (⌘K) with semantic search — global search across risks, vendors, frameworks, signals via pgvector
 
 ### Vendor Management
 
@@ -124,7 +124,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-01 | Phase 3 | Pending |
 | DASH-02 | Phase 3 | Pending |
 | DASH-03 | Phase 3 | Pending |
-| DASH-04 | Phase 3 | Pending |
+| DASH-04 | Phase 3 | Complete |
 | DASH-05 | Phase 3 | Pending |
 | UI-01 | Phase 3 | Pending |
 | UI-02 | Phase 3 | Pending |
@@ -134,7 +134,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-06 | Phase 3 | Pending |
 | UI-07 | Phase 3 | Pending |
 | UI-08 | Phase 3 | Pending |
-| UI-09 | Phase 3 | Pending |
+| UI-09 | Phase 3 | Complete |
 | VEND-01 | Phase 3 | Pending |
 | VEND-02 | Phase 3 | Pending |
 | COMP-01 | Phase 3 | Pending |

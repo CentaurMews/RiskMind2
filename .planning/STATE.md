@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Phase 3 context gathered
-last_updated: "2026-03-18T10:11:45.005Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-18T10:51:30.669Z"
 last_activity: "2026-03-18 — Phase 2 verified complete; app publicly accessible at https://app.riskmind.net with CORS enforced and SSE streaming working"
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 12
+  completed_plans: 9
   percent: 50
 ---
 
@@ -59,6 +59,7 @@ Progress: [█████░░░░░] 50%
 | Phase 02-public-access-and-security P01 | 8 | 3 tasks | 2 files |
 | Phase 02-public-access-and-security P02 | 10 | 2 tasks | 1 files |
 | Phase 02-public-access-and-security P03 | 5min | 2 tasks | 1 files |
+| Phase 03-dashboard-polish-and-demo-readiness P01 | 15 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Recent decisions affecting current work:
 - [Phase 02-public-access-and-security]: res.flushHeaders() after SSE header block prevents Cloudflare from buffering SSE until stream close
 - [Phase 02-public-access-and-security]: Separate named systemd unit (cloudflared-riskmind.service) per tunnel coexists with existing cloudflared.service without disrupting pdpl.pulsebridge.me
 - [Phase 02-public-access-and-security]: CORS rejection uses callback(null, false) not callback(new Error()) — Error variant triggers Express unhandled error response with stack trace
+- [Phase 03-dashboard-polish-and-demo-readiness]: vendor_status DB column name (not status) used in raw SQL for vendors table due to pgEnum non-standard mapping
+- [Phase 03-dashboard-polish-and-demo-readiness]: POST /v1/search falls back to ILIKE when LLMUnavailableError — confirmed working without embedding provider
 
 ### Pending Todos
 
@@ -100,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T10:11:44.999Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-dashboard-polish-and-demo-readiness/03-CONTEXT.md
+Last session: 2026-03-18T10:51:30.659Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None
