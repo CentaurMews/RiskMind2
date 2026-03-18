@@ -23,6 +23,7 @@ export const llmConfigsTable = pgTable("llm_configs", {
   model: text("model").notNull(),
   isDefault: boolean("is_default").notNull().default(false),
   useCase: llmUseCaseEnum("use_case").notNull().default("general"),
+  displayProvider: text("display_provider"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
