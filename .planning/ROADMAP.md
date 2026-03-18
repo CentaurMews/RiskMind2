@@ -96,7 +96,7 @@ Plans:
   3. Any AI operation that specifies a task type receives the model assigned to that task type in the routing table, falling back to the tenant default when no assignment exists
   4. Agent run completes with local findings persisted even when the LLM call throws an error — run status reflects actual findings count, not "skipped"
   5. Routing table entries can be read and updated via API, and the routing table UI card in Settings shows current assignments
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 - [ ] 05-01-PLAN.md — Schema migrations: llm_task_routing + llm_benchmark_results tables, OpenAPI spec update, Orval codegen re-run
@@ -145,7 +145,7 @@ Plans:
   3. Any AI operation that specifies a task type receives the model assigned to that task type in the routing table, falling back to the tenant default when no assignment exists
   4. Agent run completes with local findings persisted even when the LLM call throws an error — run status reflects actual findings count, not "skipped"
   5. Routing table entries can be read and updated via API, and the routing table UI card in Settings shows current assignments
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 - [ ] 05-01-PLAN.md — Schema migrations: llm_task_routing + llm_benchmark_results tables, OpenAPI spec update, Orval codegen re-run
