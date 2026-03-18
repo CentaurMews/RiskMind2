@@ -9,17 +9,17 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### LLM Wizard
 
-- [ ] **LLM-01**: Admin can add a new LLM provider by selecting from a dropdown (OpenAI, Anthropic, Google Gemini, Mistral, Groq, Together AI, Ollama/Private)
-- [ ] **LLM-02**: Admin enters API key (and base URL for private providers) and system validates the connection
-- [ ] **LLM-03**: System auto-discovers available models from the provider API and displays them for selection
-- [ ] **LLM-04**: Admin can select one or more models from the discovered list and save the configuration
-- [ ] **LLM-05**: Admin can test connection and run a benchmark (TTFT, total latency, quality heuristic) against any configured model
-- [ ] **LLM-06**: System suggests optimal model assignment per task type based on benchmark results
+- [x] **LLM-01**: Admin can add a new LLM provider by selecting from a dropdown (OpenAI, Anthropic, Google Gemini, Mistral, Groq, Together AI, Ollama/Private)
+- [x] **LLM-02**: Admin enters API key (and base URL for private providers) and system validates the connection
+- [x] **LLM-03**: System auto-discovers available models from the provider API and displays them for selection
+- [x] **LLM-04**: Admin can select one or more models from the discovered list and save the configuration
+- [x] **LLM-05**: Admin can test connection and run a benchmark (TTFT, total latency, quality heuristic) against any configured model
+- [x] **LLM-06**: System suggests optimal model assignment per task type based on benchmark results
 
 ### Model Router
 
-- [ ] **ROUTE-01**: Routing table maps 6 task types (enrichment, triage, treatment, embeddings, agent, general) to specific model configurations
-- [ ] **ROUTE-02**: Admin can view and override the routing table in Settings
+- [x] **ROUTE-01**: Routing table maps 6 task types (enrichment, triage, treatment, embeddings, agent, general) to specific model configurations
+- [x] **ROUTE-02**: Admin can view and override the routing table in Settings
 - [ ] **ROUTE-03**: Each AI operation uses its routed model (not just the tenant default)
 - [ ] **ROUTE-04**: Routing falls back to tenant default when no task-specific assignment exists
 
@@ -68,14 +68,14 @@ Deferred to v2. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LLM-01 | Phase 5 | Pending |
-| LLM-02 | Phase 5 | Pending |
-| LLM-03 | Phase 5 | Pending |
-| LLM-04 | Phase 5 | Pending |
-| LLM-05 | Phase 5 | Pending |
-| LLM-06 | Phase 5 | Pending |
-| ROUTE-01 | Phase 5 | Pending |
-| ROUTE-02 | Phase 5 | Pending |
+| LLM-01 | Phase 5 | Complete |
+| LLM-02 | Phase 5 | Complete |
+| LLM-03 | Phase 5 | Complete |
+| LLM-04 | Phase 5 | Complete |
+| LLM-05 | Phase 5 | Complete |
+| LLM-06 | Phase 5 | Complete |
+| ROUTE-01 | Phase 5 | Complete |
+| ROUTE-02 | Phase 5 | Complete |
 | ROUTE-03 | Phase 5 | Pending |
 | ROUTE-04 | Phase 5 | Pending |
 | FIX-01 | Phase 6 | Pending |
