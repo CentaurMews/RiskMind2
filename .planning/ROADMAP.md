@@ -46,7 +46,12 @@ Plans:
   3. AI interview SSE stream arrives token-by-token (not buffered until completion)
   4. CORS rejects cross-origin requests from unauthorized origins
   5. cloudflared runs as a systemd service and survives a reboot
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Lock CORS to explicit origin whitelist and add SSE res.flushHeaders()
+- [ ] 02-02-PLAN.md — Create Cloudflare tunnel in dashboard and install as cloudflared-riskmind systemd service
+- [ ] 02-03-PLAN.md — End-to-end smoke tests and human browser verification at public URL
 
 ### Phase 3: Dashboard Polish and Demo Readiness
 **Goal**: The dashboard and all list views look professional — consistent card design, populated with seed data, RBAC-correct, with empty/loading/error states everywhere
@@ -79,6 +84,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Server Foundation | 5/5 | Complete    | 2026-03-18 |
-| 2. Public Access and Security | 0/TBD | Not started | - |
+| 2. Public Access and Security | 0/3 | Not started | - |
 | 3. Dashboard Polish and Demo Readiness | 0/TBD | Not started | - |
 | 4. AI Differentiators Surfaced | 0/TBD | Not started | - |
