@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Phase 4 context gathered
-last_updated: "2026-03-18T11:45:28.000Z"
+stopped_at: Completed 04-ai-differentiators-surfaced-04-01-PLAN.md
+last_updated: "2026-03-18T13:46:49.161Z"
 last_activity: "2026-03-18 — Phase 2 verified complete; app publicly accessible at https://app.riskmind.net with CORS enforced and SSE streaming working"
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 14
+  completed_plans: 13
   percent: 50
 ---
 
@@ -63,6 +63,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03-dashboard-polish-and-demo-readiness P03 | 10min | 3 tasks | 11 files |
 | Phase 03-dashboard-polish-and-demo-readiness P02 | 25 | 2 tasks | 9 files |
 | Phase 03-dashboard-polish-and-demo-readiness P04 | 3 | 2 tasks | 4 files |
+| Phase 04-ai-differentiators-surfaced P01 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,9 @@ Recent decisions affecting current work:
 - [Phase 03-dashboard-polish-and-demo-readiness]: customFetch exported from api-client-react index to avoid subpath export config
 - [Phase 03-dashboard-polish-and-demo-readiness]: CommandPalette mounted inside WouterRouter to provide wouter useLocation context
 - [Phase 03-dashboard-polish-and-demo-readiness]: generateSparkline uses synthetic data ending at likelihood*impact score for visual trajectory
+- [Phase 04-ai-differentiators-surfaced]: AI_ENRICHMENT_SEPARATOR defined locally in risk-detail.tsx to match ai-workers.ts value without cross-package import
+- [Phase 04-ai-differentiators-surfaced]: AiProvenance placed in components/ai/ subdirectory to group AI-specific shared components
+- [Phase 04-ai-differentiators-surfaced]: enrichmentOpen defaults to false — enrichment panel starts collapsed, user opts in to expand
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T11:45:27.990Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-ai-differentiators-surfaced/04-CONTEXT.md
+Last session: 2026-03-18T13:46:49.151Z
+Stopped at: Completed 04-ai-differentiators-surfaced-04-01-PLAN.md
+Resume file: None

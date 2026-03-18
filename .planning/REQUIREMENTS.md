@@ -61,7 +61,7 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 
 ### AI Features
 
-- [ ] **AI-01**: AI enrichment visible on risk detail — "AI-enriched" badge, enrichment summary, date
+- [x] **AI-01**: AI enrichment visible on risk detail — "AI-enriched" badge, enrichment summary, date
 - [ ] **AI-02**: AI-generated treatment suggestions surfaced on risk detail page
 - [ ] **AI-04**: Signal-to-finding-to-risk traceability — visual chain showing how signals become risks
 
@@ -145,7 +145,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VEND-02 | Phase 3 | Complete |
 | COMP-01 | Phase 3 | Complete |
 | EXP-01 | Phase 3 | Complete |
-| AI-01 | Phase 4 | Pending |
+| AI-01 | Phase 4 | Complete |
 | AI-02 | Phase 4 | Pending |
 | AI-04 | Phase 4 | Pending |
 
