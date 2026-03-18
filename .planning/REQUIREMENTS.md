@@ -1,159 +1,97 @@
-# Requirements: RiskMind
+# Requirements: RiskMind v1.1
 
-**Defined:** 2026-03-17
-**Core Value:** A working, demo-ready enterprise risk management platform accessible via Cloudflare tunnel, with AI features visibly surfaced
+**Defined:** 2026-03-18
+**Core Value:** Intelligent LLM management with per-task routing, audit bug fixes, and demo polish
 
-## v1 Requirements
+## v1.1 Requirements
 
-Requirements for demo-ready release. Each maps to roadmap phases.
+Requirements for this milestone. Each maps to roadmap phases.
 
-### Deployment
+### LLM Wizard
 
-- [x] **DEPL-01**: Strip all Replit-specific dependencies (@replit/connectors-sdk, @replit/vite-plugin-*)
-- [x] **DEPL-02**: Configure environment variables (JWT_SECRET, ENCRYPTION_KEY, DATABASE_URL, PORT) with startup validation
-- [x] **DEPL-03**: Install pnpm dependencies and build all workspace packages successfully
-- [x] **DEPL-04**: Express serves both REST API and built React SPA from single port (4000)
-- [x] **DEPL-05**: PM2 process management with ecosystem.config.cjs, auto-restart, boot persistence
+- [ ] **LLM-01**: Admin can add a new LLM provider by selecting from a dropdown (OpenAI, Anthropic, Google Gemini, Mistral, Groq, Together AI, Ollama/Private)
+- [ ] **LLM-02**: Admin enters API key (and base URL for private providers) and system validates the connection
+- [ ] **LLM-03**: System auto-discovers available models from the provider API and displays them for selection
+- [ ] **LLM-04**: Admin can select one or more models from the discovered list and save the configuration
+- [ ] **LLM-05**: Admin can test connection and run a benchmark (TTFT, total latency, quality heuristic) against any configured model
+- [ ] **LLM-06**: System suggests optimal model assignment per task type based on benchmark results
 
-### Database
+### Model Router
 
-- [x] **DB-01**: Create fresh PostgreSQL database for RiskMind
-- [x] **DB-02**: Install pgvector extension as superuser before migrations
-- [x] **DB-03**: Run Drizzle migrations successfully
-- [x] **DB-04**: Run seed scripts to populate demo data (risks, vendors, frameworks, alerts, signals, users)
+- [ ] **ROUTE-01**: Routing table maps 6 task types (enrichment, triage, treatment, embeddings, agent, general) to specific model configurations
+- [ ] **ROUTE-02**: Admin can view and override the routing table in Settings
+- [ ] **ROUTE-03**: Each AI operation uses its routed model (not just the tenant default)
+- [ ] **ROUTE-04**: Routing falls back to tenant default when no task-specific assignment exists
 
-### Network & Security
+### Bug Fixes
 
-- [x] **NET-01**: Configure named Cloudflare tunnel pointing to localhost:4000
-- [x] **NET-02**: Install cloudflared tunnel as systemd service for persistence
-- [x] **NET-03**: Lock CORS to Cloudflare tunnel origin (remove open cors())
-- [x] **NET-04**: Configure http2Origin in cloudflared for SSE streaming (AI interviews)
-- [x] **NET-05**: App accessible via public Cloudflare tunnel URL with working login
+- [ ] **FIX-01**: Document processing worker extracts real file content (not just filename) or shows clear "coming soon" instead of hallucinated summaries
+- [ ] **FIX-02**: Autonomous agent persists local findings (cascade, cluster, predictive) before LLM reasoning call — findings survive LLM errors
+- [ ] **FIX-03**: Re-enriching a risk replaces existing AI enrichment section instead of appending duplicate blocks
+- [ ] **FIX-04**: Vendor AI question generation returns clear error message on LLM parse failure (not confusing "invalid format" 400)
+- [ ] **FIX-05**: Vendor scorecard displays real data — last assessment date and open findings count computed from related tables
+- [ ] **FIX-06**: Settings page shows warning when no embeddings provider is configured (semantic search, agent clustering silently degrade)
+- [ ] **FIX-07**: Model name validation prevents saving invalid model IDs that don't match provider format
 
-### Dashboard
+### Foresight Teaser
 
-- [x] **DASH-01**: Dashboard displays KPI cards with proper visual hierarchy (top risks, open treatments, overdue items)
-- [x] **DASH-02**: Risk heatmap renders correctly with interactive drill-down on click
-- [x] **DASH-03**: Executive summary panel showing risk posture at a glance
-- [x] **DASH-04**: KRI dashboard widget with threshold status indicators (green/amber/red)
-- [x] **DASH-05**: Alert notification center with unread count badge and prioritized list
+- [ ] **FORE-01**: Foresight page shows polished "Coming Soon" preview with visual mockups of planned features (Monte Carlo, OSINT, scenario modeling, agent inbox)
 
-### UI Polish
+## Future Requirements
 
-- [x] **UI-01**: Consistent card design and spacing across all pages
-- [x] **UI-02**: Empty state messaging with placeholder illustrations and "Get started" CTAs on all list views
-- [x] **UI-03**: Loading states (skeleton screens/spinners) on all data-fetching pages
-- [x] **UI-04**: Error states with toast notifications instead of raw error text
-- [x] **UI-05**: Consistent navigation — sidebar active states, breadcrumbs on detail pages, page titles
-- [x] **UI-06**: Role-based UI enforcement — admin controls hidden for viewers, read-only for auditors
-- [x] **UI-07**: Pagination, search, and filter controls on all list views (risks, vendors, controls, signals)
-- [x] **UI-08**: Risk trend sparklines on risk cards showing 30-day score trajectory
-- [x] **UI-09**: Command palette (⌘K) with semantic search — global search across risks, vendors, frameworks, signals via pgvector
+Deferred to v2. Tracked but not in current roadmap.
 
-### Vendor Management
+### Foresight Full
 
-- [x] **VEND-01**: Vendor scorecard summary — risk score, tier, last assessment date, open findings at a glance
-- [x] **VEND-02**: Vendor lifecycle pipeline/kanban view — vendors visualized by lifecycle stage
-
-### Compliance
-
-- [x] **COMP-01**: Compliance posture percentage per framework ("73% compliant with ISO 27001")
-
-### AI Features
-
-- [x] **AI-01**: AI enrichment visible on risk detail — "AI-enriched" badge, enrichment summary, date
-- [x] **AI-02**: AI-generated treatment suggestions surfaced on risk detail page
-- [x] **AI-04**: Signal-to-finding-to-risk traceability — visual chain showing how signals become risks
-
-### Export
-
-- [x] **EXP-01**: CSV export for risk register data
-
-## v2 Requirements
-
-Deferred to future release. Tracked but not in current roadmap.
-
-### Foresight & Forecasting
-
-- **FORE-01**: Foresight page with autonomous agent findings inbox (approve/dismiss/create-risk workflow)
-- **FORE-02**: Monte Carlo simulation for risk scenario modeling (what-if analysis)
+- **FORE-02**: Monte Carlo simulation for risk scenario modeling
 - **FORE-03**: OSINT/external data enrichment for risk horizon forecasting
-- **FORE-04**: LLM observability dashboard (token usage, cost analytics, model performance)
+- **FORE-04**: Agent findings inbox with approve/dismiss workflow
+- **FORE-05**: LLM observability dashboard (token usage, cost analytics, model performance)
 
-### Advanced Analytics
+### Advanced
 
-- **ADV-01**: Cross-framework control mapping (one control satisfies ISO 27001, SOC 2, NIST simultaneously)
-- **ADV-02**: Risk clustering via pgvector semantic similarity surfaced in UI ("Risks like this one")
+- **ADV-01**: Cross-framework control mapping
+- **ADV-02**: Risk clustering via pgvector similarity
 - **ADV-03**: Board-ready PDF report generation
-
-### Configuration
-
-- **CONF-01**: Risk appetite / tolerance configuration UI with visual threshold display
-- **CONF-02**: Configurable dashboard layouts per role
-
-### Enterprise
-
-- **ENT-01**: SSO/SAML/OIDC authentication
-- **ENT-02**: Audit trail / activity log (who changed what and when)
+- **ADV-04**: Automatic model failover on provider errors
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Mobile native app | Responsive web covers mobile; not worth scope for demo |
-| Real-time collaborative editing | WebSocket complexity, conflict resolution — overkill for ERM |
-| Vendor self-service portal | Significant scope, low demo value |
-| Multi-cloud deployment | Single server deployment only |
-| Custom domain/SSL management | Cloudflare tunnel handles this |
-| nginx reverse proxy | Express serves everything; adds unnecessary operational overhead |
+| Automatic failover routing | Easy to misconfigure, confusing behavior — v2 |
+| LLM-as-judge quality scoring | Meta-call complexity, not needed for wizard benchmark |
+| Provider-specific fine-tuning UI | Out of scope for config wizard |
+| Cost tracking / billing | Deferred to LLM observability dashboard (v2) |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEPL-01 | Phase 1 | Complete |
-| DEPL-02 | Phase 1 | Complete |
-| DEPL-03 | Phase 1 | Complete |
-| DEPL-04 | Phase 1 | Complete |
-| DEPL-05 | Phase 1 | Complete |
-| DB-01 | Phase 1 | Complete |
-| DB-02 | Phase 1 | Complete |
-| DB-03 | Phase 1 | Complete |
-| DB-04 | Phase 1 | Complete |
-| NET-01 | Phase 2 | Complete |
-| NET-02 | Phase 2 | Complete |
-| NET-03 | Phase 2 | Complete |
-| NET-04 | Phase 2 | Complete |
-| NET-05 | Phase 2 | Complete |
-| DASH-01 | Phase 3 | Complete |
-| DASH-02 | Phase 3 | Complete |
-| DASH-03 | Phase 3 | Complete |
-| DASH-04 | Phase 3 | Complete |
-| DASH-05 | Phase 3 | Complete |
-| UI-01 | Phase 3 | Complete |
-| UI-02 | Phase 3 | Complete |
-| UI-03 | Phase 3 | Complete |
-| UI-04 | Phase 3 | Complete |
-| UI-05 | Phase 3 | Complete |
-| UI-06 | Phase 3 | Complete |
-| UI-07 | Phase 3 | Complete |
-| UI-08 | Phase 3 | Complete |
-| UI-09 | Phase 3 | Complete |
-| VEND-01 | Phase 3 | Complete |
-| VEND-02 | Phase 3 | Complete |
-| COMP-01 | Phase 3 | Complete |
-| EXP-01 | Phase 3 | Complete |
-| AI-01 | Phase 4 | Complete |
-| AI-02 | Phase 4 | Complete |
-| AI-04 | Phase 4 | Complete |
+| LLM-01 | — | Pending |
+| LLM-02 | — | Pending |
+| LLM-03 | — | Pending |
+| LLM-04 | — | Pending |
+| LLM-05 | — | Pending |
+| LLM-06 | — | Pending |
+| ROUTE-01 | — | Pending |
+| ROUTE-02 | — | Pending |
+| ROUTE-03 | — | Pending |
+| ROUTE-04 | — | Pending |
+| FIX-01 | — | Pending |
+| FIX-02 | — | Pending |
+| FIX-03 | — | Pending |
+| FIX-04 | — | Pending |
+| FIX-05 | — | Pending |
+| FIX-06 | — | Pending |
+| FIX-07 | — | Pending |
+| FORE-01 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 35 total
-- Mapped to phases: 35
-- Unmapped: 0 ✓
+- v1.1 requirements: 18 total
+- Mapped to phases: 0
+- Unmapped: 18
 
 ---
-*Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after roadmap creation — all requirements mapped*
+*Requirements defined: 2026-03-18*
+*Last updated: 2026-03-18 after milestone v1.1 definition*
