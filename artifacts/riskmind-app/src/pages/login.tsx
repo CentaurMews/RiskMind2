@@ -9,18 +9,11 @@ import logo from "@assets/risk_mind_1773670829732.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const [email, setEmail] = useState("admin@acme.com");
-  const [password, setPassword] = useState("password123");
-  const [tenantSlug, setTenantSlug] = useState("acme");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [tenantSlug, setTenantSlug] = useState("");
   
   const loginMutation = useLogin();
-
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      setLocation("/dashboard", { replace: true });
-    }
-  }, [setLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

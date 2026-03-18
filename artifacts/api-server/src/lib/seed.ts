@@ -369,7 +369,7 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
 
     console.log(`[Seed] Created tenant: ${tenant.name} (${tenant.id})`);
 
-    const password = await hashPassword("password123");
+    const password = await hashPassword("Ballpen-Kiosk-0!");
 
     const userDefs = [
       { email: "admin@acme.com", name: "Admin User", role: "admin" as const },
@@ -521,7 +521,7 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
     const nistCount = await seedRequirements(tenant.id, nistFramework.id, nistCsfRequirements, "NIST CSF 2.0");
     console.log(`[Seed] Created NIST CSF 2.0 framework with ${nistCount} requirements`);
 
-    console.log(`[Seed] Done — Acme Corp demo dataset created. Login: any-user@acme.com / password123`);
+    console.log(`[Seed] Done — Acme Corp demo dataset created. Login: any-user@acme.com / Ballpen-Kiosk-0!`);
   } catch (err) {
     console.error("[Seed] Failed:", err);
   }
