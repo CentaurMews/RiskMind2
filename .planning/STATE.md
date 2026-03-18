@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: "Checkpoint: 01-05 Task 2 awaiting human verification"
-last_updated: "2026-03-17T16:56:21.368Z"
+stopped_at: Completed 01-server-foundation plan 05 — Phase 1 fully complete
+last_updated: "2026-03-18T05:03:17.999Z"
 last_activity: 2026-03-17 — Roadmap created, all 35 v1 requirements mapped to 4 phases
 progress:
   total_phases: 4
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-server-foundation P03 | 3 | 1 tasks | 0 files |
 | Phase 01-server-foundation P04 | 15 | 3 tasks | 1 files |
 | Phase 01-server-foundation P05 | 5 | 1 tasks | 3 files |
+| Phase 01-server-foundation P05 | 731min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,8 @@ Recent decisions affecting current work:
 - [Phase 01-server-foundation]: SPA fallback regex excludes /api and /mcp prefixes so API 404 handler still fires for unmatched API routes
 - [Phase 01-server-foundation]: PM2 6.x env_file broken — use node_args with Node 20 --env-file absolute path instead
 - [Phase 01-server-foundation]: Boot persistence via systemd pm2-root.service (pm2 startup + pm2 save)
+- [Phase 01-server-foundation]: PM2 6.x env_file broken — use node_args with Node 20 --env-file absolute path instead
+- [Phase 01-server-foundation]: Boot persistence via systemd pm2-root.service (pm2 startup + pm2 save)
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T16:56:21.360Z
-Stopped at: Checkpoint: 01-05 Task 2 awaiting human verification
+Last session: 2026-03-18T05:03:17.994Z
+Stopped at: Completed 01-server-foundation plan 05 — Phase 1 fully complete
 Resume file: None
