@@ -75,6 +75,18 @@ router.get("/v1/vendors", async (req, res) => {
         overrideReason: vendorsTable.overrideReason,
         createdAt: vendorsTable.createdAt,
         updatedAt: vendorsTable.updatedAt,
+        openFindingsCount: sql<number>`COALESCE((
+          SELECT count(*)::int FROM findings
+          WHERE findings.vendor_id = ${vendorsTable.id}
+          AND findings.status = 'open'
+          AND findings.tenant_id = ${tenantId}
+        ), 0)`,
+        lastAssessmentDate: sql<string | null>`(
+          SELECT max(q.updated_at)::text FROM questionnaires q
+          WHERE q.vendor_id = ${vendorsTable.id}
+          AND q.status = 'completed'
+          AND q.tenant_id = ${tenantId}
+        )`,
       }).from(vendorsTable).where(and(...conditions)).limit(Number(limit)).offset(offset).orderBy(vendorsTable.createdAt),
       db.select({ count: sql<number>`count(*)::int` }).from(vendorsTable).where(and(...conditions)),
     ]);
@@ -493,8 +505,9 @@ Respond ONLY with a JSON array of objects with keys: text, category, answerType,
       const cleaned = result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       aiQuestions = JSON.parse(cleaned);
       if (!Array.isArray(aiQuestions)) throw new Error("Expected array");
-    } catch {
-      badRequest(res, "AI returned invalid format. Please try again.");
+    } catch (parseErr) {
+      console.error("[Vendor AI Questions] LLM returned unparseable response:", result);
+      res.status(502).json({ error: "AI response could not be processed. This is a temporary issue — please try again." });
       return;
     }
 

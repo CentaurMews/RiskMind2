@@ -141,8 +141,12 @@ export function registerAIWorkers() {
         { role: "user", content: `Title: ${risk.title}\nDescription: ${risk.description || "No description provided"}` },
       ], "enrichment");
 
+      const ENRICHMENT_SENTINEL = "\n\n---AI Enrichment---\n";
+      const baseDescription = (risk.description || "").split(ENRICHMENT_SENTINEL)[0];
+      const newDescription = `${baseDescription}${ENRICHMENT_SENTINEL}${response}`;
+
       await db.update(risksTable).set({
-        description: `${risk.description || ""}\n\n---AI Enrichment---\n${response}`,
+        description: newDescription,
         updatedAt: new Date(),
       }).where(eq(risksTable.id, riskId));
 
@@ -166,42 +170,14 @@ export function registerAIWorkers() {
       updatedAt: new Date(),
     }).where(eq(documentsTable.id, documentId));
 
-    const tenantId = doc.tenantId;
-    const available = await isAvailable(tenantId);
-    if (!available) {
-      await db.update(documentsTable).set({
-        status: "uploaded",
-        updatedAt: new Date(),
-      }).where(eq(documentsTable.id, documentId));
-      return { status: "unavailable", reason: "No LLM provider configured" };
-    }
+    const stubSummary = `Document content extraction coming soon. File received: ${doc.fileName}`;
+    await db.update(documentsTable).set({
+      status: "processed",
+      summary: stubSummary,
+      updatedAt: new Date(),
+    }).where(eq(documentsTable.id, documentId));
 
-    try {
-      const response = await callLLM(tenantId, [
-        {
-          role: "system",
-          content: "You are a document analyst for vendor risk management. Summarize the key points, risks, and compliance-relevant information from this document metadata. Provide a structured summary.",
-        },
-        {
-          role: "user",
-          content: `Document: ${doc.fileName}\nType: ${doc.mimeType || "unknown"}\nVendor ID: ${doc.vendorId || "N/A"}`,
-        },
-      ], "enrichment");
-
-      await db.update(documentsTable).set({
-        status: "processed",
-        summary: response,
-        updatedAt: new Date(),
-      }).where(eq(documentsTable.id, documentId));
-
-      return { status: "processed" };
-    } catch (err) {
-      await db.update(documentsTable).set({
-        status: "failed",
-        updatedAt: new Date(),
-      }).where(eq(documentsTable.id, documentId));
-      return { status: "failed", reason: String(err) };
-    }
+    return { status: "processed" };
   });
 
   console.log("[AI Workers] Registered: ai-triage, ai-enrich, doc-process");
