@@ -186,6 +186,7 @@ router.post("/v1/ai/interview/:sessionId/message", requireRole("admin", "risk_ma
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
 
     let fullResponse = "";
     try {
