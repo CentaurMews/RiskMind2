@@ -1,7 +1,7 @@
 import { db, signalsTable, risksTable, documentsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { registerWorker, enqueueJob } from "./job-queue";
-import { complete, isAvailable, LLMUnavailableError } from "./llm-service";
+import { complete, isAvailable, LLMUnavailableError, type LLMTaskType } from "./llm-service";
 import { RiskSourceAggregator } from "../services/risk-source-aggregator";
 
 async function findSimilarRisks(embedding: number[], tenantId: string, threshold = 0.8) {
@@ -20,8 +20,12 @@ async function findSimilarRisks(embedding: number[], tenantId: string, threshold
   return results;
 }
 
-async function callLLM(tenantId: string, messages: Array<{ role: "system" | "user" | "assistant"; content: string }>): Promise<string> {
-  return complete(tenantId, { messages, temperature: 0.3, maxTokens: 1024 });
+async function callLLM(
+  tenantId: string,
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+  taskType: LLMTaskType = "general"
+): Promise<string> {
+  return complete(tenantId, { messages, temperature: 0.3, maxTokens: 1024 }, taskType);
 }
 
 export function registerAIWorkers() {
@@ -48,7 +52,7 @@ export function registerAIWorkers() {
           content: "You are a risk management signal classifier. Given a signal, classify it into one of: cyber_threat, compliance_violation, vendor_risk, operational_risk, financial_risk, reputational_risk, other. Also provide a confidence score between 0.0 and 1.0. Respond in JSON: {\"classification\": \"...\", \"confidence\": 0.0}",
         },
         { role: "user", content: signal.content },
-      ]);
+      ], "triage");
 
       let classification = "other";
       let confidence = 0.5;
@@ -135,7 +139,7 @@ export function registerAIWorkers() {
           content: "You are a risk management expert. Given a risk title and description, provide an enriched description with: 1) potential impact analysis, 2) suggested mitigation strategies, 3) related industry standards or frameworks. Keep it concise (max 500 words).",
         },
         { role: "user", content: `Title: ${risk.title}\nDescription: ${risk.description || "No description provided"}` },
-      ]);
+      ], "enrichment");
 
       await db.update(risksTable).set({
         description: `${risk.description || ""}\n\n---AI Enrichment---\n${response}`,
@@ -182,7 +186,7 @@ export function registerAIWorkers() {
           role: "user",
           content: `Document: ${doc.fileName}\nType: ${doc.mimeType || "unknown"}\nVendor ID: ${doc.vendorId || "N/A"}`,
         },
-      ]);
+      ], "enrichment");
 
       await db.update(documentsTable).set({
         status: "processed",

@@ -7,7 +7,7 @@ import {
   agentRunsTable,
   agentFindingsTable,
 } from "@workspace/db";
-import { complete, isAvailable } from "./llm-service";
+import { complete, isAvailable, type LLMTaskType } from "./llm-service";
 import { recordAuditDirect } from "./audit";
 import { invokeTool } from "./tool-registry";
 import { RiskSourceAggregator } from "../services/risk-source-aggregator";
@@ -645,7 +645,7 @@ If no additional findings, respond: {"findings":[]}`;
     ],
     temperature: 0.3,
     maxTokens: 4000,
-  });
+  }, "agent" as LLMTaskType);
 
   try {
     const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -799,53 +799,43 @@ export async function runAgentCycle(
     let llmFindings: Finding[] = [];
     let model: string | null = null;
     let tokenEstimate = 0;
+    let llmSucceeded = false;
+
+    // FIX-02: Always persist local findings BEFORE attempting LLM reasoning.
+    // Local findings (cascade, cluster, predictive) are valuable and must survive LLM errors.
+    const localSavedCount = await act(tenantId, run.id, localFindings, policyTier);
 
     if (available) {
       try {
         llmFindings = await reason(tenantId, data, localFindings);
         model = "configured";
         tokenEstimate = JSON.stringify(data).length / 4;
+        llmSucceeded = true;
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        console.error("[Agent] LLM reasoning failed, skipping run:", errMsg);
-
-        const durationMs = Date.now() - startTime;
-        await db.update(agentRunsTable).set({
-          status: "skipped",
-          durationMs,
-          findingCount: 0,
-          completedAt: new Date(),
-          context: {
-            reason: `LLM provider unreachable: ${errMsg}`,
-            llmAvailable: false,
-            localFindingsDetected: localFindings.length,
-            schedule: scheduleInfo?.schedule || null,
-            triggeredBy: scheduleInfo?.triggeredBy || "manual",
-            observationSummary: {
-              risks: data.risks.length,
-              kris: data.kris.length,
-              vendors: data.vendors.length,
-              signals: data.signals.length,
-              alerts: data.alerts.length,
-              controls: data.controls.length,
-              unmappedRequirements: data.unmappedRequirements.length,
-            },
-          },
-        }).where(eq(agentRunsTable.id, run.id));
-
-        await agentAudit(tenantId, run.id, "agent_run_skipped", "agent_run", run.id, {
-          policyTier,
-          reason: `LLM provider unreachable: ${errMsg}`,
-          localFindingsDetected: localFindings.length,
-          triggeredBy: scheduleInfo?.triggeredBy || "manual",
-        });
-
-        return run.id;
+        console.error("[Agent] LLM reasoning failed, local findings already persisted:", errMsg);
+        // Do NOT return early — run completes with local findings count
       }
     } else {
-      const durationMs = Date.now() - startTime;
-      const skipReason = "LLM provider unavailable or not configured";
-      console.log(`[Agent] LLM not available for tenant ${tenantId}, skipping run`);
+      console.log(`[Agent] LLM not available for tenant ${tenantId}, completing with local findings only`);
+    }
+
+    // Persist LLM-generated findings additively (only if LLM succeeded)
+    let llmSavedCount = 0;
+    if (llmSucceeded && llmFindings.length > 0) {
+      llmSavedCount = await act(tenantId, run.id, llmFindings, policyTier);
+    }
+
+    const totalSavedCount = localSavedCount + llmSavedCount;
+    const durationMs = Date.now() - startTime;
+
+    // Mark as completed if any findings were saved; skipped only if nothing at all happened
+    const finalStatus = totalSavedCount > 0 || llmSucceeded ? "completed" : "skipped";
+
+    if (finalStatus === "skipped") {
+      const skipReason = available
+        ? "No findings detected and LLM reasoning produced no new findings"
+        : "LLM provider unavailable or not configured and no local findings detected";
 
       await db.update(agentRunsTable).set({
         status: "skipped",
@@ -854,7 +844,7 @@ export async function runAgentCycle(
         completedAt: new Date(),
         context: {
           reason: skipReason,
-          llmAvailable: false,
+          llmAvailable: available,
           localFindingsDetected: localFindings.length,
           schedule: scheduleInfo?.schedule || null,
           triggeredBy: scheduleInfo?.triggeredBy || "manual",
@@ -877,15 +867,9 @@ export async function runAgentCycle(
         triggeredBy: scheduleInfo?.triggeredBy || "manual",
       });
 
-      console.log(`[Agent] Run ${run.id} skipped for tenant ${tenantId}: ${skipReason}`);
       return run.id;
     }
 
-    const allFindings = [...localFindings, ...llmFindings];
-
-    const savedCount = await act(tenantId, run.id, allFindings, policyTier);
-
-    const durationMs = Date.now() - startTime;
     const promptTokens = Math.floor(tokenEstimate * 0.8);
     const completionTokens = Math.floor(tokenEstimate * 0.2);
     const costPerInputToken = 0.000003;
@@ -900,7 +884,7 @@ export async function runAgentCycle(
       completionTokens,
       estimatedCost,
       durationMs,
-      findingCount: savedCount,
+      findingCount: totalSavedCount,
       completedAt: new Date(),
       context: {
         observationSummary: {
@@ -922,13 +906,13 @@ export async function runAgentCycle(
 
     await agentAudit(tenantId, run.id, "agent_run_completed", "agent_run", run.id, {
       policyTier,
-      findingCount: savedCount,
+      findingCount: totalSavedCount,
       durationMs,
       llmAvailable: available,
       triggeredBy: scheduleInfo?.triggeredBy || "manual",
     });
 
-    console.log(`[Agent] Run ${run.id} completed for tenant ${tenantId}: ${savedCount} findings in ${durationMs}ms`);
+    console.log(`[Agent] Run ${run.id} completed for tenant ${tenantId}: ${totalSavedCount} findings in ${durationMs}ms`);
     return run.id;
 
   } catch (err) {

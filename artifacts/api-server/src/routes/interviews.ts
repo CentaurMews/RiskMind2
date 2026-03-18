@@ -101,7 +101,7 @@ router.post("/v1/ai/interview/start", requireRole("admin", "risk_manager", "audi
           { role: "system", content: systemPrompt },
           { role: "user", content: "Start the interview." },
         ],
-      });
+      }, "general");
     } catch (err) {
       console.error("Interview start LLM error:", err);
       greeting = type === "risk_creation"
@@ -190,7 +190,7 @@ router.post("/v1/ai/interview/:sessionId/message", requireRole("admin", "risk_ma
 
     let fullResponse = "";
     try {
-      for await (const chunk of streamComplete(tenantId, { messages })) {
+      for await (const chunk of streamComplete(tenantId, { messages }, "general")) {
         if (chunk.type === "text") {
           fullResponse += chunk.content;
           res.write(`data: ${JSON.stringify({ type: "text", content: chunk.content })}\n\n`);
@@ -407,7 +407,7 @@ router.post("/v1/risks/:id/ai/suggest-treatments", requireRole("admin", "risk_ma
           content: `Risk: ${risk.title}\nDescription: ${risk.description || "N/A"}\nCategory: ${risk.category}\nLikelihood: ${risk.likelihood}/5\nImpact: ${risk.impact}/5`,
         },
       ],
-    });
+    }, "treatment");
 
     let treatments: TreatmentSuggestion[] = [];
     try {
@@ -487,7 +487,7 @@ Respond in JSON only: {"inherent":{"likelihood":N,"impact":N},"residual":{"likel
           content: `Risk: ${risk.title}\nDescription: ${risk.description || "N/A"}\nCategory: ${risk.category}\nStatus: ${risk.status}\nCurrent Inherent: L=${risk.likelihood}/5, I=${risk.impact}/5\nCurrent Residual: L=${risk.residualLikelihood || "unset"}, I=${risk.residualImpact || "unset"}\nCurrent Target: L=${risk.targetLikelihood || "unset"}, I=${risk.targetImpact || "unset"}${historicalContext ? `\n\nHistorical scoring context from similar risks:\n${historicalContext}` : ""}`,
         },
       ],
-    });
+    }, "enrichment");
 
     let result: {
       inherent: { likelihood: number; impact: number };
@@ -572,7 +572,7 @@ router.post("/v1/compliance/:frameworkId/gap-analysis/ai-remediate", requireRole
           content: `Framework: ${frameworkId}\nGaps:\n${gaps.map((g, i) => `${i + 1}. ${g}`).join("\n")}`,
         },
       ],
-    });
+    }, "enrichment");
 
     let remediations: RemediationStep[] = [];
     try {
