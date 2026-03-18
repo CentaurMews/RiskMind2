@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-18T05:43:05.838Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-18T06:08:32.804Z"
 last_activity: 2026-03-17 — Roadmap created, all 35 v1 requirements mapped to 4 phases
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 8
+  completed_plans: 6
   percent: 0
 ---
 
@@ -56,6 +56,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-server-foundation P04 | 15 | 3 tasks | 1 files |
 | Phase 01-server-foundation P05 | 5 | 1 tasks | 3 files |
 | Phase 01-server-foundation P05 | 731min | 2 tasks | 3 files |
+| Phase 02-public-access-and-security P01 | 8 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 01-server-foundation]: Boot persistence via systemd pm2-root.service (pm2 startup + pm2 save)
 - [Phase 01-server-foundation]: PM2 6.x env_file broken — use node_args with Node 20 --env-file absolute path instead
 - [Phase 01-server-foundation]: Boot persistence via systemd pm2-root.service (pm2 startup + pm2 save)
+- [Phase 02-public-access-and-security]: Function-based CORS origin whitelist with credentials: true for JWT Authorization header support
+- [Phase 02-public-access-and-security]: res.flushHeaders() after SSE header block prevents Cloudflare from buffering SSE until stream close
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T05:43:05.829Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-public-access-and-security/02-CONTEXT.md
+Last session: 2026-03-18T06:08:32.798Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
