@@ -32,11 +32,11 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 
 ### Dashboard
 
-- [ ] **DASH-01**: Dashboard displays KPI cards with proper visual hierarchy (top risks, open treatments, overdue items)
-- [ ] **DASH-02**: Risk heatmap renders correctly with interactive drill-down on click
-- [ ] **DASH-03**: Executive summary panel showing risk posture at a glance
+- [x] **DASH-01**: Dashboard displays KPI cards with proper visual hierarchy (top risks, open treatments, overdue items)
+- [x] **DASH-02**: Risk heatmap renders correctly with interactive drill-down on click
+- [x] **DASH-03**: Executive summary panel showing risk posture at a glance
 - [x] **DASH-04**: KRI dashboard widget with threshold status indicators (green/amber/red)
-- [ ] **DASH-05**: Alert notification center with unread count badge and prioritized list
+- [x] **DASH-05**: Alert notification center with unread count badge and prioritized list
 
 ### UI Polish
 
@@ -121,11 +121,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NET-03 | Phase 2 | Complete |
 | NET-04 | Phase 2 | Complete |
 | NET-05 | Phase 2 | Complete |
-| DASH-01 | Phase 3 | Pending |
-| DASH-02 | Phase 3 | Pending |
-| DASH-03 | Phase 3 | Pending |
+| DASH-01 | Phase 3 | Complete |
+| DASH-02 | Phase 3 | Complete |
+| DASH-03 | Phase 3 | Complete |
 | DASH-04 | Phase 3 | Complete |
-| DASH-05 | Phase 3 | Pending |
+| DASH-05 | Phase 3 | Complete |
 | UI-01 | Phase 3 | Complete |
 | UI-02 | Phase 3 | Complete |
 | UI-03 | Phase 3 | Complete |
