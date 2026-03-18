@@ -23,6 +23,9 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Activity, Search, Bot, ArrowRight, Check, X, Loader2, Sparkles, Eye, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -243,9 +246,12 @@ function FindingPanel({
   );
 }
 
+const PAGE_SIZE = 20;
+
 export default function SignalList() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"pending" | "triaged" | "finding">("pending");
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const [retriggering, setRetriggering] = useState<Record<string, boolean>>({});
   const [findingPanelSignalId, setFindingPanelSignalId] = useState<string | null>(null);
@@ -267,16 +273,16 @@ export default function SignalList() {
   };
 
   const { data: pendingData, isLoading: pendingLoading } = useListSignals(
-    { status: "pending", search: search || undefined },
-    { query: { queryKey: ["/api/v1/signals", "pending", search] } }
+    { status: "pending", search: search || undefined, page: String(page), limit: String(PAGE_SIZE) },
+    { query: { queryKey: ["/api/v1/signals", "pending", search, page] } }
   );
   const { data: triagedData, isLoading: triagedLoading } = useListSignals(
-    { status: "triaged", search: search || undefined },
-    { query: { queryKey: ["/api/v1/signals", "triaged", search] } }
+    { status: "triaged", search: search || undefined, page: String(page), limit: String(PAGE_SIZE) },
+    { query: { queryKey: ["/api/v1/signals", "triaged", search, page] } }
   );
   const { data: findingData, isLoading: findingLoading } = useListSignals(
-    { status: "finding", search: search || undefined },
-    { query: { queryKey: ["/api/v1/signals", "finding", search] } }
+    { status: "finding", search: search || undefined, page: String(page), limit: String(PAGE_SIZE) },
+    { query: { queryKey: ["/api/v1/signals", "finding", search, page] } }
   );
 
   const invalidate = () => {
@@ -327,6 +333,8 @@ export default function SignalList() {
         ? triagedLoading
         : findingLoading;
 
+  const totalPages = Math.ceil((data?.total ?? 0) / PAGE_SIZE);
+
   return (
     <AppLayout>
       <div className="p-8 max-w-7xl mx-auto space-y-6 h-full flex flex-col">
@@ -337,7 +345,7 @@ export default function SignalList() {
 
         <Card className="flex-1 flex flex-col min-h-0 shadow-sm border-t-4 border-t-primary">
           <div className="p-4 border-b bg-card flex items-center gap-4">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as "pending" | "triaged" | "finding")} className="w-auto">
+            <Tabs value={tab} onValueChange={(v) => { setTab(v as "pending" | "triaged" | "finding"); setPage(1); }} className="w-auto">
               <TabsList className="h-8">
                 <TabsTrigger value="pending" className="text-xs px-3 h-7">
                   Pending ({pendingData?.data?.length || 0})
@@ -356,7 +364,7 @@ export default function SignalList() {
                 placeholder="Search signal content..."
                 className="pl-9 bg-muted/50"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
             <div className="text-sm text-muted-foreground font-mono ml-auto flex items-center">
@@ -379,13 +387,26 @@ export default function SignalList() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12"><Loader2 className="animate-spin mx-auto text-muted-foreground" /></TableCell>
-                  </TableRow>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[300px]" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-[70px] rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-[100px] rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[70px]" /></TableCell>
+                      <TableCell><Skeleton className="h-7 w-[160px]" /></TableCell>
+                    </TableRow>
+                  ))
                 ) : data?.data?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-                      No {tab === "finding" ? "finding" : tab} signals.
+                    <TableCell colSpan={6}>
+                      <Empty className="border-0">
+                        <EmptyMedia variant="icon"><Activity /></EmptyMedia>
+                        <EmptyHeader>
+                          <EmptyTitle>No signals found</EmptyTitle>
+                          <EmptyDescription>External signals will appear here as they are ingested.</EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -497,6 +518,22 @@ export default function SignalList() {
             </Table>
           </div>
         </Card>
+
+        {totalPages > 1 && (
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious onClick={() => setPage(p => Math.max(1, p - 1))} className={page === 1 ? "pointer-events-none opacity-50" : ""} />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="px-3 py-2 text-sm">{page} / {totalPages}</span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext onClick={() => setPage(p => Math.min(totalPages, p + 1))} className={page >= totalPages ? "pointer-events-none opacity-50" : ""} />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
       </div>
 
       <FindingPanel

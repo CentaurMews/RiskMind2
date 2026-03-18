@@ -10,6 +10,7 @@ import { Plus, Search, Loader2, Shield, Link2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 export default function ControlList() {
   const [search, setSearch] = useState("");
@@ -26,7 +27,14 @@ export default function ControlList() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/v1/controls"] });
         setIsOpen(false);
-      }
+      },
+      onError: (error) => {
+        toast({
+          variant: "destructive",
+          title: "Action failed",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        });
+      },
     }
   });
 
@@ -35,7 +43,14 @@ export default function ControlList() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["/api/v1/controls"] });
         setMappingControlId(null);
-      }
+      },
+      onError: (error) => {
+        toast({
+          variant: "destructive",
+          title: "Action failed",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        });
+      },
     }
   });
 

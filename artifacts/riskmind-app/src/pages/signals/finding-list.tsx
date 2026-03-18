@@ -1,13 +1,22 @@
+import { useState } from "react";
 import { useListFindings } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/severity-badge";
-import { GitMerge, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { GitMerge } from "lucide-react";
 import { format } from "date-fns";
 
+const PAGE_SIZE = 20;
+
 export default function FindingList() {
-  const { data, isLoading } = useListFindings();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useListFindings({ page: String(page), limit: String(PAGE_SIZE) });
+
+  const totalPages = Math.ceil((data?.total ?? 0) / PAGE_SIZE);
 
   return (
     <AppLayout>
@@ -31,9 +40,27 @@ export default function FindingList() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-12"><Loader2 className="animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[250px]" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-[70px] rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                    </TableRow>
+                  ))
                 ) : data?.data?.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No active findings.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <Empty className="border-0">
+                        <EmptyMedia variant="icon"><GitMerge /></EmptyMedia>
+                        <EmptyHeader>
+                          <EmptyTitle>No findings yet</EmptyTitle>
+                          <EmptyDescription>Findings are created when signals are triaged and correlated.</EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   data?.data?.map((finding) => (
                     <TableRow key={finding.id} className="hover:bg-muted/30">
@@ -56,6 +83,22 @@ export default function FindingList() {
             </Table>
           </div>
         </Card>
+
+        {totalPages > 1 && (
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious onClick={() => setPage(p => Math.max(1, p - 1))} className={page === 1 ? "pointer-events-none opacity-50" : ""} />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="px-3 py-2 text-sm">{page} / {totalPages}</span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext onClick={() => setPage(p => Math.min(totalPages, p + 1))} className={page >= totalPages ? "pointer-events-none opacity-50" : ""} />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
       </div>
     </AppLayout>
   );

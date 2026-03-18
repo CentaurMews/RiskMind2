@@ -66,6 +66,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 const STRATEGY_LABELS: Record<string, string> = {
   treat: "Treat",
@@ -149,6 +150,13 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
         setFormBenefit("");
         setFormStrategy("treat");
       },
+      onError: (error) => {
+        toast({
+          variant: "destructive",
+          title: "Action failed",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        });
+      },
     },
   });
 
@@ -156,6 +164,13 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${riskId}/treatments`] });
+      },
+      onError: (error) => {
+        toast({
+          variant: "destructive",
+          title: "Action failed",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        });
       },
     },
   });
@@ -166,6 +181,13 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
         queryClient.invalidateQueries({ queryKey: [`/api/v1/risks/${riskId}/acceptance-memoranda`] });
         setPendingMemorandum(data as AcceptanceMemorandum);
         setMemorandumPreviewOpen(true);
+      },
+      onError: (error) => {
+        toast({
+          variant: "destructive",
+          title: "Action failed",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        });
       },
     },
   });
@@ -178,6 +200,13 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
         queryClient.invalidateQueries({ queryKey: ["/api/v1/risks"] });
         setMemorandumPreviewOpen(false);
         setViewMemorandum(null);
+      },
+      onError: (error) => {
+        toast({
+          variant: "destructive",
+          title: "Action failed",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        });
       },
     },
   });
@@ -193,6 +222,13 @@ export function TreatmentsTab({ riskId, inherentScore, residualLikelihood, resid
         setRejectMemorandumId(null);
         setMemorandumPreviewOpen(false);
         setViewMemorandum(null);
+      },
+      onError: (error) => {
+        toast({
+          variant: "destructive",
+          title: "Action failed",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        });
       },
     },
   });
