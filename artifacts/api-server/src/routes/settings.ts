@@ -7,6 +7,14 @@ import { badRequest, notFound, serverError, conflict } from "../lib/errors";
 import { encrypt } from "../lib/encryption";
 import { testConnection, discoverModels, runBenchmark, suggestRouting } from "../lib/llm-service";
 
+function validateModelFormat(providerType: string, model: string): string | null {
+  if (providerType === "anthropic" && !model.startsWith("claude-")) {
+    return "Invalid model ID for Anthropic provider. Model IDs must start with 'claude-' (e.g. claude-3-5-sonnet-20241022).";
+  }
+  // openai_compat allows any format (covers OpenAI, Together, Groq, Ollama, etc.)
+  return null;
+}
+
 const router = Router();
 
 const BLOCKED_HOSTS = ["metadata.google.internal", "169.254.169.254"];
@@ -80,6 +88,9 @@ router.post("/v1/settings/llm-providers", requireRole("admin"), async (req: Requ
       return;
     }
 
+    const modelErr = validateModelFormat(providerType, model);
+    if (modelErr) { res.status(422).json({ error: modelErr }); return; }
+
     if (baseUrl) {
       const urlError = validateBaseUrl(baseUrl);
       if (urlError) { badRequest(res, urlError); return; }
@@ -138,6 +149,12 @@ router.put("/v1/settings/llm-providers/:id", requireRole("admin"), async (req: R
           eq(llmConfigsTable.useCase, uc),
           eq(llmConfigsTable.isDefault, true),
         ));
+    }
+
+    if (model !== undefined) {
+      const effectiveProviderType = providerType || existing.providerType;
+      const modelErr = validateModelFormat(effectiveProviderType, model);
+      if (modelErr) { res.status(422).json({ error: modelErr }); return; }
     }
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };

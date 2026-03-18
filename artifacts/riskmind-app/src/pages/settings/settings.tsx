@@ -17,6 +17,8 @@ import {
   useCreateRiskFromFinding,
   useApproveAgentFinding,
   useDismissAgentFinding,
+  useGetEmbeddingsHealth,
+  useDiscoverLlmModels,
 } from "@workspace/api-client-react";
 import type { UpdateUserRoleBodyRole, LlmProvider, CreateLlmProvider, UpdateLlmProvider, AgentFinding } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -30,7 +32,7 @@ import {
   ShieldAlert, Bot, Server, Loader2, Users, Shield,
   Plus, Pencil, Trash2, CheckCircle2, XCircle,
   Play, RefreshCw, Clock, AlertTriangle, Eye,
-  Link2, Zap, TrendingUp, Search, Lightbulb, Ban
+  Link2, Zap, TrendingUp, Search, Lightbulb, Ban, X
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -122,10 +124,16 @@ export default function Settings() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
+  const { data: embeddingsHealth } = useGetEmbeddingsHealth({
+    query: { queryKey: ["/api/v1/settings/embeddings-health"] }
+  });
+  const [embeddingsBannerDismissed, setEmbeddingsBannerDismissed] = useState(false);
+
   const [providerSheet, setProviderSheet] = useState<"closed" | "add" | "edit">("closed");
   const [editingProvider, setEditingProvider] = useState<LlmProvider | null>(null);
   const [providerForm, setProviderForm] = useState<LlmProviderForm>(EMPTY_PROVIDER_FORM);
   const [testResult, setTestResult] = useState<Record<string, "ok" | "fail" | "testing">>({});
+  const [discoveredModelsForForm, setDiscoveredModelsForForm] = useState<{ id: string; displayName?: string }[]>([]);
 
   const [agentForm, setAgentForm] = useState<{
     enabled?: boolean;
@@ -178,6 +186,17 @@ export default function Settings() {
       onError: (_, vars) => {
         setTestResult((prev) => ({ ...prev, [vars.id]: "fail" }));
         setTimeout(() => setTestResult((prev) => { const n = { ...prev }; delete n[vars.id]; return n; }), 4000);
+      },
+    },
+  });
+
+  const discoverModelsMutation = useDiscoverLlmModels({
+    mutation: {
+      onSuccess: (data) => {
+        const models = Array.isArray((data as { models?: { id: string; displayName?: string }[] })?.models)
+          ? (data as { models: { id: string; displayName?: string }[] }).models
+          : [];
+        setDiscoveredModelsForForm(models);
       },
     },
   });
@@ -256,6 +275,7 @@ export default function Settings() {
   const openAddProvider = () => {
     setProviderForm(EMPTY_PROVIDER_FORM);
     setEditingProvider(null);
+    setDiscoveredModelsForForm([]);
     setProviderSheet("add");
   };
 
@@ -270,6 +290,7 @@ export default function Settings() {
       isDefault: p.isDefault || false,
     });
     setEditingProvider(p);
+    setDiscoveredModelsForForm([]);
     setProviderSheet("edit");
   };
 
@@ -310,6 +331,20 @@ export default function Settings() {
           <h1 className="text-3xl font-bold tracking-tight">Tenant Settings</h1>
           <p className="text-muted-foreground mt-1">Manage AI, agents, users, and providers for your organization.</p>
         </div>
+
+        {embeddingsHealth && !(embeddingsHealth as { configured?: boolean }).configured && !embeddingsBannerDismissed && (
+          <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 mb-6">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-amber-600" />
+            <div className="flex-1 text-sm">
+              <span className="font-medium">No embeddings provider configured.</span>{" "}
+              Semantic search, agent clustering, and signal correlation are degraded.
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6 -mt-0.5 -mr-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
+              onClick={() => setEmbeddingsBannerDismissed(true)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         <Tabs defaultValue="llm" className="w-full">
           <TabsList className="bg-muted/50 p-1 w-full justify-start h-12 rounded-lg">
@@ -783,13 +818,44 @@ export default function Settings() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Model</Label>
-              <Input
-                required
-                placeholder={providerForm.providerType === "anthropic" ? "claude-3-5-sonnet-20241022" : "gpt-4o"}
-                value={providerForm.model}
-                onChange={(e) => setProviderForm((prev) => ({ ...prev, model: e.target.value }))}
-              />
+              <div className="flex items-center justify-between">
+                <Label>Model</Label>
+                {providerSheet === "edit" && editingProvider?.id && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    disabled={discoverModelsMutation.isPending}
+                    onClick={() => discoverModelsMutation.mutate({ id: editingProvider.id! })}
+                  >
+                    {discoverModelsMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                    Load models
+                  </Button>
+                )}
+              </div>
+              {discoveredModelsForForm.length > 0 ? (
+                <Select
+                  value={providerForm.model}
+                  onValueChange={(v) => setProviderForm((prev) => ({ ...prev, model: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {discoveredModelsForForm.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.displayName || m.id}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  required
+                  placeholder={providerForm.providerType === "anthropic" ? "claude-3-5-sonnet-20241022" : "gpt-4o"}
+                  value={providerForm.model}
+                  onChange={(e) => setProviderForm((prev) => ({ ...prev, model: e.target.value }))}
+                />
+              )}
               <p className="text-xs text-muted-foreground">
                 {providerForm.providerType === "anthropic"
                   ? "claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307"

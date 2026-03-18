@@ -278,10 +278,18 @@ export default function VendorList() {
                               <TierBadge tier={vendor.tier} />
                             </TableCell>
                             <TableCell>
-                              <span className="text-muted-foreground text-xs">Never</span>
+                              {(vendor as { lastAssessmentDate?: string | null }).lastAssessmentDate ? (
+                                <span className="text-xs">{format(new Date((vendor as { lastAssessmentDate: string }).lastAssessmentDate), "MMM d, yyyy")}</span>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">Never</span>
+                              )}
                             </TableCell>
                             <TableCell>
-                              <span className="text-muted-foreground text-xs">—</span>
+                              {((vendor as { openFindingsCount?: number }).openFindingsCount ?? 0) > 0 ? (
+                                <span className="text-xs font-mono text-amber-600">{(vendor as { openFindingsCount: number }).openFindingsCount}</span>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">0</span>
+                              )}
                             </TableCell>
                             <TableCell><LifecycleBadge status={vendor.status} /></TableCell>
                             <TableCell className="text-right">
