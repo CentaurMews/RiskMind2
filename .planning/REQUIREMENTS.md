@@ -28,7 +28,7 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 - [x] **NET-02**: Install cloudflared tunnel as systemd service for persistence
 - [x] **NET-03**: Lock CORS to Cloudflare tunnel origin (remove open cors())
 - [x] **NET-04**: Configure http2Origin in cloudflared for SSE streaming (AI interviews)
-- [ ] **NET-05**: App accessible via public Cloudflare tunnel URL with working login
+- [x] **NET-05**: App accessible via public Cloudflare tunnel URL with working login
 
 ### Dashboard
 
@@ -119,7 +119,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NET-02 | Phase 2 | Complete |
 | NET-03 | Phase 2 | Complete |
 | NET-04 | Phase 2 | Complete |
-| NET-05 | Phase 2 | Pending |
+| NET-05 | Phase 2 | Complete |
 | DASH-01 | Phase 3 | Pending |
 | DASH-02 | Phase 3 | Pending |
 | DASH-03 | Phase 3 | Pending |
