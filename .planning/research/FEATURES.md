@@ -1,27 +1,31 @@
 # Feature Research
 
-**Domain:** Enterprise Risk Management (ERM) Platform — MVP to Demo-Ready
-**Researched:** 2026-03-17
-**Confidence:** MEDIUM-HIGH (web research + domain analysis of existing codebase)
+**Domain:** LLM Configuration Wizard + Model Routing (RiskMind v1.1)
+**Researched:** 2026-03-18
+**Confidence:** HIGH (Anthropic API docs confirmed, RouteLLM research verified, industry patterns confirmed via multiple sources)
 
 ---
 
-## Context: What Already Exists
+## Context: What This Covers
 
-RiskMind already has a functioning MVP with:
-- Risk register (CRUD, treatments, KRIs, incidents, review cycles)
-- TPRM vendor management (7-state lifecycle, risk-tiered routing)
-- Compliance frameworks (controls, gap analysis, control testing)
-- Signal + findings pipeline
-- Alert system
-- AI enrichment job queue (OpenAI + Anthropic)
-- AI interview sessions
-- Autonomous risk intelligence agent
-- MCP endpoint
-- React frontend (dashboard, heatmap, vendor detail, compliance, alerts, foresight, settings)
-- Multi-tenant RBAC (admin, risk_manager, risk_owner, auditor, viewer, vendor)
+This document augments the v1.0 ERM feature research with v1.1-specific feature analysis. Focus areas:
 
-This research focuses on what elevates the existing MVP to a **polished, demo-ready state** that would impress enterprise evaluators.
+1. **LLM Config Wizard** — guided provider onboarding with auto-discovery
+2. **Intelligent Model Router** — per-task model assignment
+3. **Bug Fixes (7 items)** — correctness and UX repair from v1.0 audit
+4. **Foresight Teaser** — polished preview page replacing bare stub
+
+The v1.0 FEATURES.md remains valid for core ERM features. This document covers the LLM intelligence layer added in v1.1.
+
+---
+
+## Key Research Finding: Anthropic Now Has a List Endpoint
+
+The v1.1 scope document states "Anthropic: hardcoded model list (no list endpoint)" — this is **outdated**.
+
+Anthropic now provides `GET /v1/models` returning `id`, `display_name`, `created_at`, `type`. This means the wizard can auto-fetch Anthropic models the same way it fetches OpenAI models.
+
+**Source:** [Anthropic API Reference — List Models](https://platform.claude.com/docs/en/api/models/list) — HIGH confidence
 
 ---
 
@@ -29,151 +33,161 @@ This research focuses on what elevates the existing MVP to a **polished, demo-re
 
 ### Table Stakes (Users Expect These)
 
-Features that enterprise stakeholders assume exist. Missing these makes the product feel unfinished or amateur.
+Features that any operator adding an LLM provider to a SaaS tool expects. Missing these makes the integration feel unfinished or untrustworthy.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Responsive, polished dashboard UI** | Executives judge software by visual quality in first 30 seconds | MEDIUM | shadcn/ui + Tailwind already in stack — needs visual hierarchy, card layout consistency, color system |
-| **Risk heatmap (5x5 likelihood/impact)** | Universal ERM standard — no serious platform lacks one | LOW | Backend exists; ensure smooth interactivity, color bands, drill-down on click |
-| **Executive summary / risk overview panel** | C-suite needs a single glance view of risk posture | MEDIUM | Top risks by score, trend lines, open treatments count, overdue items |
-| **KRI (Key Risk Indicator) tracking** | Standard ERM concept — auditors/CROs look for this | MEDIUM | Data model exists; needs visible dashboard widget and threshold alerts |
-| **Risk appetite / tolerance display** | Organizations must demonstrate they set and monitor limits | MEDIUM | Should show current exposure vs defined thresholds visually |
-| **Audit trail / activity log** | Compliance and auditors require evidence of changes | MEDIUM | Who changed what and when — per risk, per vendor, per control |
-| **Role-based UI enforcement** | Viewers should not see admin controls; auditors read-only | LOW | RBAC exists in backend — verify UI hides/disables appropriately |
-| **Empty state messaging** | Demo with no data must still look intentional and guided | LOW | Placeholder illustrations + "Get started" CTAs instead of blank tables |
-| **Loading states and error states** | Skeleton screens, spinners, toast notifications for errors | LOW | Critical for perceived quality during demo — janky loading breaks trust |
-| **Vendor risk scorecard summary** | TPRM standard — vendors need a risk score at a glance | MEDIUM | Score, tier (critical/high/medium/low), last assessment date, open findings |
-| **Compliance posture percentage** | "You are 73% compliant with ISO 27001" is a table-stakes display | LOW | Aggregate control pass/fail % per framework |
-| **Alert / notification center** | Users need to know what requires attention | LOW | Backend exists; ensure UI surfaces unread count and prioritized list |
-| **Pagination + search + filter on all lists** | Enterprise data volumes require navigation tools | MEDIUM | Every list view (risks, vendors, controls, signals) needs filter + search |
-| **Export / download (PDF or CSV)** | Compliance teams and auditors always need exports | MEDIUM | Risk register CSV export is minimum; board report PDF is the stretch goal |
-| **Consistent navigation structure** | Users must orient themselves within 10 seconds | LOW | Fixed sidebar, active state, breadcrumbs on detail pages |
-| **Login / tenant-aware access** | Must work from a public Cloudflare URL without friction | LOW | Login page already exists — ensure demo credentials are seeded |
-| **Seed data for demo** | A demo with empty database is not demoable | LOW | Seed realistic risk scenarios, 3-5 vendors, 2 compliance frameworks, sample alerts |
+| **Provider dropdown with known providers** | Users expect a list of well-known providers, not a blank text field | LOW | OpenAI, Anthropic, Google, Mistral, Groq, Together AI, Ollama — 7 providers covers >95% of real usage |
+| **API key input with masking** | Standard credential UX — show asterisks, never expose raw key | LOW | Input type="password" + show/hide toggle; key encrypted at rest (AES-256-GCM already in stack) |
+| **Base URL input for self-hosted/Ollama** | Private deployments need custom endpoints | LOW | Only shown when provider is Ollama or custom; pre-filled with sensible default (http://localhost:11434) |
+| **Test connection button** | Users must verify credentials before saving — otherwise silent misconfiguration | LOW | Single API call to a cheap endpoint (e.g., list models); show success/failure inline |
+| **Auto-fetch available models** | Users should not manually type model IDs — typos cause silent failures | MEDIUM | All 7 providers now support this: OpenAI `GET /v1/models`, Anthropic `GET /v1/models`, Ollama `GET /api/tags`, others provider-specific |
+| **Model name display (not raw ID)** | `claude-sonnet-4-6` means nothing to users; `Claude Sonnet 4.6` is readable | LOW | Map raw IDs to display names; fall back to raw ID if unknown |
+| **Save configuration** | Obvious — user must be able to persist their settings | LOW | Existing `llm_configs` table and API; encrypted key storage already works |
+| **Edit / delete existing configs** | Users rotate API keys and change providers | LOW | CRUD operations on existing configs already exists in the API |
+| **Connection status indicator** | Users must know at a glance whether a config is working | LOW | Green/red/grey badge on each saved config; trigger a periodic health ping or on-demand retest |
+| **Error message clarity on failure** | "Invalid API key" is helpful; "Error 401" is not | LOW | This is one of the 7 audit bugs — vendor AI returns confusing 400; must surface 502/clear message |
 
 ### Differentiators (Competitive Advantage)
 
-Features that distinguish RiskMind from generic ERM tools and create "wow" moments in demos.
+Features that go beyond baseline expectations and create genuine value for an AI-native platform.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **AI-powered risk enrichment (visible)** | Shows AI isn't decoration — enriched risks have more context, better treatment suggestions | MEDIUM | Surface the AI enrichment result visibly on risk detail: "AI-enriched on [date]" with summary |
-| **Autonomous risk intelligence agent** | No other ERM tool has an agent that proactively monitors and creates risks | HIGH | The foresight page needs to make the agent's work visible — what it found, why, confidence level |
-| **AI interview for risk creation** | Guided conversational risk intake is a UX leap over forms | MEDIUM | The interview session flow needs polish — clear progress, good default prompts, result preview |
-| **Risk-to-signal linkage** | Show how external signals (news, threat feeds) flow into risk creation | HIGH | The signal → finding → risk pipeline needs visual traceability — not just separate lists |
-| **MCP endpoint (AI agent integration)** | Unique positioning: "Claude/GPT can query your risk register" | LOW | Surface this in settings or docs; show a sample query result; this is a differentiator for tech-savvy demos |
-| **Real-time risk score trend** | Show how risk scores change over time, not just current snapshot | MEDIUM | Sparkline or mini chart on risk cards showing 30-day trend |
-| **Vendor lifecycle visualization** | The 7-state vendor lifecycle is a differentiator vs basic vendor lists | MEDIUM | Kanban-style board or pipeline view of vendors moving through states |
-| **Multi-framework compliance overlap** | Show how one control satisfies ISO 27001, SOC 2, and NIST simultaneously | HIGH | Cross-framework control mapping is rare and impressive to compliance teams |
-| **AI-generated risk treatment suggestions** | "Based on similar risks, we recommend..." | MEDIUM | Requires AI enrichment output to include suggested treatments — surface these in the UI |
-| **Risk clustering / semantic grouping** | pgvector is already in stack — use it to surface "similar risks" | HIGH | "Risks like this one" panel on risk detail is both useful and demonstrably AI-native |
-| **Configurable risk intelligence policy tiers** | Shows enterprise-grade configurability vs one-size-fits-all | MEDIUM | Policy tier settings page must be clear and demo-friendly |
-| **Tenant-scoped LLM configuration** | Each tenant uses their own AI keys and model preferences | MEDIUM | Settings page showing per-tenant LLM configuration shows mature multi-tenant design |
+| **Model benchmarking (latency + quality)** | Users can see which model is fastest/best before committing to it for a task | MEDIUM | Run standard prompt against each selected model; measure TTFT + total latency; simple 1-3 quality signal (e.g., response coherence check); display results in Step 5 of wizard |
+| **Per-task model routing table** | Right-size model to task: cheap fast model for triage, reasoning model for enrichment | MEDIUM | 6 task types in scope: Risk Enrichment, Signal Triage, Treatment Suggestions, Embeddings, Agent Reasoning, General; visual table in Settings with dropdown per task |
+| **Smart routing defaults from benchmarks** | Suggest "use model X for triage (cheapest fast)" based on benchmark results | MEDIUM | After benchmarking, pre-fill routing table with sensible suggestions; user can override; reduces cognitive load |
+| **Embeddings health warning** | Warn when no embeddings provider is configured — semantic search and agent clustering silently degrade | LOW | This is one of the 7 audit bugs; banner in Settings page: "Warning: No embeddings provider configured. Semantic search and signal correlation are disabled." |
+| **Model name validation** | Prevent saving incorrect model IDs (the "Haiku" bug — must be `claude-haiku-4-5` not `haiku`) | LOW | Validate model ID against fetched list; if user types manually, warn when ID doesn't match known pattern |
+| **Wizard step-by-step progress** | Multi-step onboarding is less intimidating than a large form; progress indicator shows where you are | LOW | 6 steps matching the scope doc; progress bar or numbered steps; back/next navigation |
+| **Multiple configs per tenant** | Different tasks might use different providers (e.g., Anthropic for reasoning, Ollama for embeddings) | LOW | Existing architecture already supports multiple `llm_configs` per tenant; expose this in UI clearly |
+| **Foresight teaser page** | Builds anticipation for v2 features; turns a missing feature into a marketing moment | MEDIUM | Monte Carlo simulation, OSINT forecasting, agent feed, what-if scenarios previewed visually; Apple keynote aesthetic |
 
-### Anti-Features (Explicitly Avoid at This Stage)
+### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but add scope, complexity, or maintenance burden without enough demo value.
+Features that seem useful but add disproportionate complexity or risk for the v1.1 milestone.
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **Real-time collaborative editing** | "Like Google Docs for risk registers" | WebSocket complexity, conflict resolution, significantly increases testing surface | Single-user editing with optimistic updates and refresh is fine for ERM use cases |
-| **Mobile native app** | Risk managers work on phones | Already out of scope; responsive web covers mobile needs adequately at this stage | Ensure responsive Tailwind layout works on mobile browser |
-| **Custom report builder (drag/drop)** | "Let users build their own dashboards" | High complexity, low demo value vs pre-built executive dashboards | Build 2-3 well-designed fixed report views instead |
-| **Integrations with external SIEM/ERP** | "We need to pull data from Splunk / SAP" | Integration surface is enormous; each connector is its own project | Focus on manual signal ingestion + API; mention integrations as roadmap |
-| **Advanced Monte Carlo simulation** | "We need quantitative risk analysis" | High complexity, requires actuarial-style models, niche audience | Show qualitative risk scoring with trend visualization instead |
-| **Blockchain audit trail** | "Immutable evidence for regulators" | Unnecessary for demo; adds infrastructure complexity | Standard database audit log with timestamp + user is sufficient for all realistic compliance needs |
-| **SSO / SAML / OIDC federation** | "Our IT requires SSO" | Complex to implement and test; blocks demo if misconfigured | Seed demo accounts with JWT login; mention SSO as post-launch integration |
-| **Vendor self-service portal** | "Vendors fill out their own questionnaires" | Requires separate auth, different UX flow, complex workflow orchestration | Show vendor risk management from the risk manager's perspective; vendor portal is a v2 feature |
-| **Multi-cloud / high-availability deployment** | "What's the uptime SLA?" | Out of scope per PROJECT.md; single-server deployment is the goal | Cloudflare tunnel provides reliable public access; HA is post-demo infrastructure work |
+| **Automatic key rotation** | "We should rotate API keys on a schedule" | Key rotation requires re-encrypting all stored configs; the PROJECT.md constraint explicitly calls this out as a risk; it's also a key management problem better solved at the provider level | Let users rotate manually; document the constraint; v2 can add a re-encryption migration tool |
+| **LLM cost tracking / token analytics** | "I want to see what AI is costing me" | Per-token cost tracking requires logging every LLM call with token counts; this is a meaningful infrastructure addition; explicitly deferred to v2 in PROJECT.md | Show it as a Foresight/v2 teaser; don't half-implement it in v1.1 |
+| **Automatic failover between models** | "If OpenAI is down, fall back to Anthropic automatically" | Failover logic adds state (which models are healthy?), retry semantics, and potential cost surprises; 2026 research confirms this is easy to get wrong (silent fallback to expensive model) | Manual fallback config in routing table is sufficient; automatic failover is v2 |
+| **AI-scored model quality benchmarks** | "Use another LLM to judge the response quality of tested models" | LLM-judge benchmarking adds a meta-LLM call, cost, latency, and requires a reference answer; significant complexity for a setup wizard | Use simpler quality heuristics: response length, format compliance, time-to-first-token |
+| **Streaming benchmark results** | "Show tokens arriving in real-time during benchmark" | Streaming adds WebSocket or SSE complexity to what is fundamentally a one-time setup step | Show a loading spinner and summary results after completion |
+| **Provider marketplace / discovery** | "Browse available providers I haven't configured yet" | Requires maintaining a provider catalog with current pricing, model specs, availability — a full-time maintenance burden | Hardcode the 7 known providers with sensible defaults; Ollama/custom covers the long tail |
+| **Global (cross-tenant) routing defaults** | "Set a default routing table that all new tenants inherit" | Breaks tenant isolation guarantees; each tenant's keys are scoped to their account | Per-tenant routing is the correct architecture; global defaults are an admin-only v2 feature if needed |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Seed Data]
-    └──required by──> [Executive Dashboard]
-    └──required by──> [Risk Heatmap Drill-Down]
-    └──required by──> [Demo Credibility]
+[LLM Config — Provider + API Key]
+    └──required by──> [Auto-Fetch Models]
+    └──required by──> [Test Connection]
+    └──required by──> [Benchmarking]
+    └──required by──> [Save Config]
 
-[AI Enrichment (backend)]
-    └──enables──> [AI-Enriched Risk Detail Display]
-    └──enables──> [AI Treatment Suggestions]
-    └──enables──> [Risk Clustering / Similar Risks]
+[Auto-Fetch Models]
+    └──required by──> [Model Picker (Step 4)]
+    └──required by──> [Model Name Validation]
 
-[Signal Pipeline (backend)]
-    └──enables──> [Signal → Finding → Risk Traceability UI]
-    └──enables──> [Autonomous Agent Visible Work Trail]
+[Benchmarking (Step 5)]
+    └──enhances──> [Smart Routing Defaults]
 
-[Risk Score Calculation]
-    └──required by──> [Risk Heatmap]
-    └──required by──> [Risk Trend Sparklines]
-    └──required by──> [Executive Summary Panel]
+[Smart Routing Defaults]
+    └──enhances──> [Per-Task Routing Table]
 
-[Risk Appetite Definition]
-    └──required by──> [Risk Appetite vs Exposure Display]
-    └──required by──> [KRI Threshold Alerts]
+[Per-Task Routing Table (Settings)]
+    └──required by──> [Intelligent Model Router (backend resolveConfig)]
 
-[RBAC Roles (backend)]
-    └──required by──> [Role-Based UI Enforcement]
-    └──required by──> [Demo User Seeding (multiple roles)]
+[Intelligent Model Router]
+    └──required by──> [Risk Enrichment uses correct model]
+    └──required by──> [Signal Triage uses correct model]
+    └──required by──> [Treatment Suggestions uses correct model]
+    └──required by──> [Agent Reasoning uses correct model]
+    └──required by──> [Embeddings uses correct model]
 
-[Compliance Controls (backend)]
-    └──required by──> [Compliance Posture Percentage]
-    └──required by──> [Cross-Framework Control Mapping]
+[Embeddings Provider Configured]
+    └──required by──> [Semantic Search (⌘K)]
+    └──required by──> [Agent Signal Clustering]
+    └──required by──> [Signal Correlation]
 
-[Vendor Lifecycle (7-state, backend)]
-    └──enables──> [Vendor Pipeline/Kanban View]
-    └──required by──> [Vendor Risk Scorecard]
+[Embeddings Health Check Warning]
+    └──surfaces──> [Missing Embeddings Provider]
+
+[Bug Fix: Persist Agent Findings Before LLM Call]
+    └──fixes──> [Agent Local Findings Lost on LLM Error]
+
+[Bug Fix: Replace Instead of Append Enrichment Block]
+    └──fixes──> [Duplicate AI Enrichment Stacking]
+
+[Bug Fix: 502 on LLM Parse Failure]
+    └──fixes──> [Confusing 400 on Vendor AI Questions]
+
+[Bug Fix: Vendor Scorecard Real Data]
+    └──removes──> [Placeholder lastAssessmentDate + openFindingsCount]
 ```
 
 ### Dependency Notes
 
-- **Seed data required by all demo features:** Without realistic seed data, no UI feature can be demonstrated. This must be the first thing established post-deployment.
-- **AI enrichment must have run before AI UI features show value:** The enrichment jobs must be triggered and completed for risk detail pages to show AI output.
-- **Signal pipeline must produce findings for traceability to be visible:** The autonomous agent + signal pipeline must have processed at least a few signals to demonstrate the flow.
-- **Risk appetite must be configured before KRI thresholds make sense:** The settings for risk appetite thresholds drive the alert/KRI display; without them, the feature looks empty.
+- **Auto-fetch models requires provider + key first:** The wizard cannot list models until the API key is validated. Step 3 (Connect) must succeed before Step 4 (Model picker) is available.
+- **Benchmarking requires model selection:** You can only benchmark models that have been fetched and selected. Benchmarking is Step 5, after model picking in Step 4.
+- **Smart defaults require benchmarking:** Pre-filling the routing table is only meaningful if benchmark data (latency, quality) exists. If user skips benchmarking, routing table shows empty/manual mode.
+- **Routing table drives backend resolveConfig:** The UI routing table is only valuable if the backend actually uses it. These must ship together.
+- **Embeddings health check is standalone:** It does not depend on the wizard — it's a read of existing config state. It can ship independently of the wizard.
+- **Bug fixes are independent of each other:** Each of the 7 bugs can be fixed in isolation. No sequencing dependency between them.
 
 ---
 
-## Demo-Ready Definition
+## v1.1 Feature Definition
 
-### Must Have Before Demo (P1)
+### Wizard: Must-Have Steps (Launch With)
 
-These are the blockers. The demo fails or looks amateurish without them.
+The wizard has no value if any of these are missing.
 
-- [ ] **Deployment working** — app running at Cloudflare tunnel URL, accessible from browser
-- [ ] **Seed data populated** — realistic risks, vendors, frameworks, alerts, signals loaded
-- [ ] **Dashboard visually polished** — clean layout, proper spacing, consistent card design
-- [ ] **Risk heatmap functional** — renders correctly, clickable cells drill down to risk list
-- [ ] **Empty states handled** — no blank white boxes on any page
-- [ ] **Loading and error states** — no broken spinners or raw error messages in UI
-- [ ] **Role-based UI working** — demo accounts for admin, risk_manager, auditor roles behave differently
-- [ ] **Navigation consistent** — sidebar active states, breadcrumbs, page titles all correct
-- [ ] **Vendor list + detail functional** — vendor scorecard summary visible, lifecycle state shown
-- [ ] **Compliance posture visible** — framework list shows % completion, framework detail shows control status
+- [ ] **Step 1: Nickname + provider dropdown** — name the config, pick provider from list of 7
+- [ ] **Step 2: API key + optional base URL** — masked input, help text per provider
+- [ ] **Step 3: Test connection + fetch models** — single button, inline result, model list returned
+- [ ] **Step 4: Model selection** — multi-select from fetched list; display names not raw IDs
+- [ ] **Step 5: Benchmark selected models** — measure latency, show results; can skip
+- [ ] **Step 6: Save + assign to task types** — confirm config, initial routing suggestions
 
-### Should Have for Strong Demo (P2)
+### Router: Must-Have (Launch With)
 
-These elevate from "functional" to "impressive."
+- [ ] **Visual routing table in Settings** — 6 task types, dropdown per task pointing to available configs/models
+- [ ] **Backend resolveConfig accepts task type** — actually routes to assigned model
+- [ ] **Model name validation** — error if saved model ID doesn't match a known model from the provider
 
-- [ ] **AI enrichment visible on risk detail** — "AI-enriched" badge, summary, suggested treatments displayed
-- [ ] **Foresight page shows agent work** — autonomous agent findings visible with confidence + rationale
-- [ ] **Signal → finding traceability** — signal detail links to derived findings and risks
-- [ ] **Risk trend sparklines** — mini charts showing score trajectory on risk cards or list
-- [ ] **Export/download working** — at minimum CSV export for risk register
-- [ ] **Alert notification center** — unread count badge, prioritized list, acknowledge flow works
-- [ ] **KRI dashboard widget** — top KRIs shown with threshold status (green/amber/red)
-- [ ] **Vendor pipeline view** — vendors visualized by lifecycle stage
+### Bug Fixes: All 7 Required
 
-### Nice to Have (P3 — Post Demo)
+These are correctness issues, not features. All 7 must ship.
 
-- [ ] **Cross-framework control mapping** — one control → multiple frameworks
-- [ ] **Risk clustering / similar risks panel** — pgvector semantic similarity surfaced in UI
-- [ ] **MCP endpoint documentation / demo** — settings page explaining integration capability
-- [ ] **Board-ready PDF report** — generated summary document
-- [ ] **Risk appetite configuration UI** — settings page for defining thresholds
-- [ ] **Tenant LLM configuration UI** — per-tenant AI provider settings visible and editable
+- [ ] **Doc processor** — real parsing or explicit "coming soon" (no hallucinated summaries)
+- [ ] **Agent findings persistence** — persist local findings before `reason()` call
+- [ ] **Duplicate enrichment** — detect and replace existing enrichment block
+- [ ] **Vendor AI 400 → 502** — return appropriate HTTP status + clear message on LLM parse failure
+- [ ] **Vendor scorecard real data** — compute `lastAssessmentDate` and `openFindingsCount` from DB
+- [ ] **Embeddings health warning** — Settings banner when no embeddings provider configured
+- [ ] **Model name validation** — prevent saving mismatched model IDs
+
+### Foresight Teaser: Must-Have (Launch With)
+
+- [ ] **Polished "Coming Soon" page** — replaces bare stub; Apple keynote aesthetic
+- [ ] **Feature previews for 4 planned capabilities** — Monte Carlo, OSINT, agent feed, what-if builder
+- [ ] **Visual design that builds anticipation** — screenshots/mockups or illustrated concepts, not just text bullets
+
+### Add After Validation (v1.x — Post v1.1)
+
+- [ ] **Token cost analytics** — per-call cost tracking and dashboard; requires logging infrastructure
+- [ ] **Automatic model failover** — retry with secondary model on primary failure
+- [ ] **LLM observability** — request/response logging for debugging enrichment quality
+
+### Future Consideration (v2+)
+
+- [ ] **Key rotation with re-encryption** — rotate ENCRYPTION_KEY and re-encrypt all stored keys
+- [ ] **AI-judged model quality scoring** — LLM-as-judge for benchmark quality assessment
+- [ ] **Cross-tenant routing defaults** — admin-set baseline routing that tenants can override
 
 ---
 
@@ -181,60 +195,63 @@ These elevate from "functional" to "impressive."
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Seed data for demo | HIGH | LOW | P1 |
-| Dashboard visual polish | HIGH | MEDIUM | P1 |
-| Risk heatmap drill-down | HIGH | LOW | P1 |
-| Empty / loading / error states | HIGH | LOW | P1 |
-| Role-based UI enforcement | HIGH | LOW | P1 |
-| Vendor scorecard summary | HIGH | LOW | P1 |
-| Compliance posture % | HIGH | LOW | P1 |
-| AI enrichment visible on risk | HIGH | MEDIUM | P2 |
-| Foresight / agent work visible | HIGH | MEDIUM | P2 |
-| Signal → finding traceability | MEDIUM | MEDIUM | P2 |
-| Risk trend sparklines | MEDIUM | MEDIUM | P2 |
-| Export CSV | MEDIUM | LOW | P2 |
-| KRI dashboard widget | MEDIUM | MEDIUM | P2 |
-| Vendor pipeline/kanban view | MEDIUM | MEDIUM | P2 |
-| Cross-framework control mapping | HIGH | HIGH | P3 |
-| Risk clustering (pgvector) | MEDIUM | HIGH | P3 |
-| MCP endpoint surfaced in UI | LOW | LOW | P3 |
-| Board PDF report | MEDIUM | HIGH | P3 |
-| Risk appetite config UI | MEDIUM | MEDIUM | P3 |
+| Wizard Step 1-3 (provider, key, test) | HIGH | LOW | P1 |
+| Wizard Step 4 (model picker) | HIGH | LOW | P1 |
+| Wizard Step 6 (save + routing) | HIGH | LOW | P1 |
+| Backend resolveConfig with task type | HIGH | MEDIUM | P1 |
+| Bug fix: agent findings persistence | HIGH | LOW | P1 |
+| Bug fix: duplicate enrichment | HIGH | LOW | P1 |
+| Bug fix: vendor 400 → 502 | MEDIUM | LOW | P1 |
+| Bug fix: vendor scorecard real data | HIGH | MEDIUM | P1 |
+| Bug fix: model name validation | MEDIUM | LOW | P1 |
+| Embeddings health warning | MEDIUM | LOW | P1 |
+| Visual routing table in Settings | HIGH | MEDIUM | P1 |
+| Wizard Step 5 (benchmarking) | MEDIUM | MEDIUM | P2 |
+| Smart routing defaults from benchmark | MEDIUM | MEDIUM | P2 |
+| Bug fix: doc processor | MEDIUM | MEDIUM | P2 |
+| Foresight teaser page | MEDIUM | MEDIUM | P2 |
+| Model display names (not raw IDs) | LOW | LOW | P2 |
+| Token cost analytics | LOW | HIGH | P3 |
+| Auto-failover between models | MEDIUM | HIGH | P3 |
+| Key rotation tooling | LOW | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for demo — deployment blocker if missing
-- P2: Should have — makes demo impressive, not just functional
-- P3: Nice to have — differentiating, but can defer without harming demo
+- P1: Must ship in v1.1 — milestone fails without it
+- P2: Should ship in v1.1 — quality and differentiation
+- P3: Defer to v2+ — valuable but disproportionate cost
 
 ---
 
 ## Competitor Feature Analysis
 
-| Feature | Riskonnect | LogicManager | MetricStream | RiskMind Approach |
-|---------|------------|--------------|--------------|-------------------|
-| Risk register | Yes | Yes | Yes | Existing — needs polish |
-| TPRM / vendor mgmt | Yes | Yes (via ripple) | Yes | Existing 7-state lifecycle — strong differentiator |
-| Compliance frameworks | Yes | Yes | Yes | Existing — needs posture % display |
-| AI/ML features | Basic analytics | LMX AI assistant | Limited | Autonomous agent is a genuine differentiator |
-| Real-time monitoring | Yes | Continuous | Yes | Signal pipeline exists — needs traceability UI |
-| Executive dashboards | Yes | Yes (RMM) | Yes | Needs polish and summary panel |
-| Multi-tenant RBAC | Yes | Yes | Yes | Existing — needs UI enforcement verification |
-| API / integrations | REST API | Connectors | REST API | MCP endpoint is a unique positioning story |
+| Feature | LiteLLM Proxy | OpenRouter | Open WebUI | RiskMind v1.1 Approach |
+|---------|---------------|------------|------------|------------------------|
+| Provider onboarding | Config file / API | Web UI | Web UI wizard | 6-step in-app wizard per tenant |
+| Auto-fetch models | Yes (via proxy) | Yes (catalog) | Yes (Ollama + OpenAI) | Yes — all 7 providers including Anthropic (now has list endpoint) |
+| Per-task routing | Yes (strategy config) | Yes (model shortcuts) | No — chat-focused | Yes — 6 task types with Settings UI + backend routing |
+| Model benchmarking | No | Yes (usage stats) | No | Yes — TTFT + latency in wizard Step 5 |
+| Embeddings health | No UI | N/A | Partial | Yes — Settings warning banner |
+| Multi-tenant configs | Yes | Account-level | No | Yes — per-tenant, encrypted keys |
+| Cost tracking | Yes | Yes | No | Deferred to v2 |
 
 ---
 
 ## Sources
 
-- [Riskonnect: 10 Best ERM Software Platforms](https://riskonnect.com/the-10-best-enterprise-risk-management-erm-software-platforms/) — MEDIUM confidence (current article)
-- [MetricStream: Top 5 ERM Tools](https://www.metricstream.com/blog/top-5-erm-tools.html) — MEDIUM confidence
-- [Tracker Networks: ERM Buyers Guide 2026](https://www.trackernetworks.com/blog/best-enterprise-risk-management-tools-2026-buyers-guide) — MEDIUM confidence
-- [LogicManager Platform](https://www.logicmanager.com/platform/) — HIGH confidence (vendor documentation)
-- [Continuity2: ERM Software Guide](https://continuity2.com/blog/erm-software) — MEDIUM confidence
-- [CyberSierra: AI-Powered GRC Platforms 2025](https://cybersierra.co/blog/ai-grc-platforms-2025/) — MEDIUM confidence
-- [DigitalXForce: Modern TPRM 2025](https://digitalxforce.com/blogs/modern-tprm-2025-ai-powered-vendor-risk-management/) — MEDIUM confidence
-- [Pathlock: Top GRC Tools 2025](https://pathlock.com/blog/grc/list-of-top-grc-tools-and-softwares/) — MEDIUM confidence
-- RiskMind codebase analysis (existing pages, routes, components) — HIGH confidence
+- [Anthropic API — List Models endpoint](https://platform.claude.com/docs/en/api/models/list) — HIGH confidence (official docs, verified)
+- [RouteLLM: Learning to Route LLMs with Preference Data](https://arxiv.org/abs/2406.18665) — HIGH confidence (published at ICLR 2025)
+- [Multi-Model Routing: Choosing the Best LLM per Task](https://dasroot.net/posts/2026/03/multi-model-routing-llm-selection/) — MEDIUM confidence (current 2026 article)
+- [Intelligent LLM Routing: How Multi-Model AI Cuts Costs by 85%](https://www.swfte.com/blog/intelligent-llm-routing-multi-model-ai) — MEDIUM confidence
+- [Top 5 LLM Failover Routing Gateways in 2026](https://www.getmaxim.ai/articles/top-5-llm-failover-routing-gateways-in-2026/) — MEDIUM confidence
+- [LiteLLM vs OpenRouter Comparison](https://www.truefoundry.com/blog/litellm-vs-openrouter) — MEDIUM confidence
+- [Open WebUI Features](https://docs.openwebui.com/features/) — HIGH confidence (official docs)
+- [Ollama Integration — Open WebUI Pipelines](https://deepwiki.com/open-webui/pipelines/4.7-ollama-integration) — MEDIUM confidence
+- [Multi-LLM Routing Strategies on AWS](https://aws.amazon.com/blogs/machine-learning/multi-llm-routing-strategies-for-generative-ai-applications-on-aws/) — HIGH confidence (official AWS documentation)
+- [LLM Latency Benchmark 2026](https://research.aimultiple.com/llm-latency-benchmark/) — MEDIUM confidence
+- [Beyond Tokens-per-Second: Balancing Speed, Cost, Quality](https://www.bentoml.com/blog/beyond-tokens-per-second-how-to-balance-speed-cost-and-quality-in-llm-inference) — HIGH confidence (technical depth)
+- [OpenClaw: Onboarding configure Primary + Backup LLM](https://github.com/openclaw/openclaw/issues/22357) — MEDIUM confidence (real-world implementation reference)
+- RiskMind v1.1 scope document (`.planning/v1.1-scope.md`) — HIGH confidence (authoritative project spec)
 
 ---
-*Feature research for: Enterprise Risk Management Platform (RiskMind)*
-*Researched: 2026-03-17*
+*Feature research for: LLM Configuration Wizard + Model Routing (RiskMind v1.1)*
+*Researched: 2026-03-18*

@@ -1,193 +1,217 @@
 # Pitfalls Research
 
-**Domain:** Replit-to-server migration + Cloudflare tunnel deployment + ERM platform improvement
-**Researched:** 2026-03-17
-**Confidence:** HIGH (codebase inspected directly; pitfalls derived from actual code analysis)
+**Domain:** LLM integration, model routing, async job queue bugs — RiskMind v1.1 (existing ERM platform)
+**Researched:** 2026-03-18
+**Confidence:** HIGH (5 pitfalls code-verified by direct inspection; 5 from provider docs + community evidence)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Replit SDK Left in Production Build
+### Pitfall 1: Agent Local Findings Discarded When LLM Throws
 
 **What goes wrong:**
-`package.json` at the workspace root lists `@replit/connectors-sdk` as a dependency. `vite.config.ts` conditionally loads `@replit/vite-plugin-cartographer` and `@replit/vite-plugin-dev-banner`. The `button.tsx` and `badge.tsx` components also import from Replit packages. On a bare Linux server these packages either fail to install correctly (native bindings), throw at import time, or silently no-op — but the dependency remains in the bundle and `pnpm install` may fail or produce warnings that mask real errors.
+In `runAgentCycle()`, local findings (cascade chains, pgvector clusters, predictive KRI trends) are computed and stored in `localFindings` before `reason()` is called. If `reason()` throws — network error, rate limit, model error, bad JSON — the catch block sets run status to `skipped` and returns early **without ever calling `act()`**. All local findings are silently discarded and never written to `agent_findings`.
+
+This is Bug #2 from the v1.0 audit. The local detection logic runs correctly. The results are lost.
+
+Specific code location: `agent-service.ts` lines 798–844. The structure is:
+```
+localFindings = [...cascade, ...cluster, ...predictive]  // computed
+llmFindings = await reason(...)                           // if this throws:
+  → catch: status = "skipped", return run.id             // act() is never called
+```
 
 **Why it happens:**
-The code was developed on Replit, which injects its own plugin infrastructure. The conditional guard (`process.env.REPL_ID !== undefined`) prevents runtime activation, but the packages are still installed and bundled.
+The original design assumed LLM reasoning was required to produce meaningful findings. Local analysis was added later without restructuring the persistence flow. The catch block was written for the "LLM unavailable" case, not for partial success.
 
 **How to avoid:**
-Remove `@replit/connectors-sdk` from `package.json` at the workspace root. Remove `@replit/vite-plugin-runtime-error-modal`, `@replit/vite-plugin-cartographer`, and `@replit/vite-plugin-dev-banner` from `artifacts/riskmind-app/package.json`. Remove all import/require of these packages from `vite.config.ts` and any UI components. Verify with `pnpm install --frozen-lockfile` and `pnpm run build` after removal.
+Persist local findings **before** calling `reason()`. Refactor the flow:
+1. `await act(tenantId, run.id, localFindings, policyTier)` — always runs.
+2. Attempt `reason()` in a separate try/catch.
+3. On `reason()` success: `await act(tenantId, run.id, llmFindings, policyTier)`.
+4. On `reason()` failure: update run status to `completed` (not `skipped`), with `findingCount = localFindings.length`.
 
 **Warning signs:**
-- `pnpm install` emits peer-dependency warnings for `@replit/*`
-- Build output includes `@replit` chunk in bundle analysis
-- Any reference to `REPL_ID` env var in production config files
+- Agent runs consistently show `status: "skipped"` when LLM is occasionally unavailable.
+- `agent_findings` table is empty despite observable cascade conditions (breached KRIs, vendor concentration).
+- Run context shows `localFindingsDetected: N` but no corresponding rows in `agent_findings`.
 
-**Phase to address:** Phase 1 (Server Setup & Migration)
+**Phase to address:** Phase 2 (Bug Fixes) — fix before routing changes that affect LLM availability.
 
 ---
 
-### Pitfall 2: Missing Environment Variables Cause Silent or Explosive Failures
+### Pitfall 2: Duplicate Enrichment Stacking on Re-Enrich
 
 **What goes wrong:**
-The server fails loudly for `DATABASE_URL`, `PORT`, and `JWT_SECRET` (all throw `Error` at startup). But `ENCRYPTION_KEY` only throws when a tenant's LLM API key is first accessed — the server starts fine, then crashes mid-request when the first AI feature is used. This looks like an intermittent bug rather than a configuration problem.
+The `ai-enrich` worker appends a new `---AI Enrichment---` block to `risk.description` on every call. If a user triggers enrichment twice, or if the job retries after a partial DB write, the description accumulates multiple stacked blocks.
+
+Specific code in `ai-workers.ts` line 141:
+```typescript
+description: `${risk.description || ""}\n\n---AI Enrichment---\n${response}`,
+```
+
+There is no check for whether enrichment already exists. The job queue retries up to `maxAttempts` (default: 3) with exponential backoff, so a single user click can produce up to 3 stacked blocks if the job fails after the DB write.
 
 **Why it happens:**
-`getEncryptionKey()` in `encryption.ts` is called lazily per-request rather than at startup. Similarly, `JWT_SECRET` in `jwt.ts` is checked at module load, but `ENCRYPTION_KEY` is not. On Replit, secrets are always present; on a fresh server they are missing.
+The append pattern is the simplest write. Idempotency was not considered because the original job design assumed one enrichment per risk lifecycle. The retry mechanism creates a window for duplication even without user action.
 
 **How to avoid:**
-Create a single `.env` file (never committed) before first run with all required variables:
-- `PORT` — pick a port not in use (3000, 5173, 9323, 5037 occupied)
-- `DATABASE_URL` — `postgresql://user:pass@localhost:5432/riskmind`
-- `JWT_SECRET` — 64+ random hex characters (`openssl rand -hex 32`)
-- `ENCRYPTION_KEY` — exactly 32 bytes base64-encoded (`openssl rand -base64 32`)
-
-Add a startup validation function in `src/index.ts` that checks all four before calling `start()`.
+Before writing, check if the description already contains the enrichment separator. Replace instead of append:
+```typescript
+const baseDescription = (risk.description || "").split("\n\n---AI Enrichment---")[0];
+description: `${baseDescription}\n\n---AI Enrichment---\n${response}`
+```
+This is idempotent: any number of retries produces one enrichment block. Optionally add an `enrichedAt` timestamp to the `risks` table to gate job execution (skip if already enriched within N hours).
 
 **Warning signs:**
-- Server starts but AI enrichment/settings throws 500 with "ENCRYPTION_KEY required"
-- LLM config save succeeds but decrypt fails later
-- `JWT_SECRET` throws at import — server won't start at all (this is the good case)
+- Risk descriptions containing two or more `---AI Enrichment---` separators.
+- Risk detail view shows duplicated content sections.
+- Database `risks.description` length growing on each job execution for the same `riskId`.
 
-**Phase to address:** Phase 1 (Server Setup & Migration)
+**Phase to address:** Phase 2 (Bug Fixes) — data quality and demo readiness blocker.
 
 ---
 
-### Pitfall 3: Port Conflicts Break the Entire Stack Silently
+### Pitfall 3: Anthropic Has No Model List Endpoint — Wizard Step 3 Will Fail Silently
 
 **What goes wrong:**
-The server environment already has ports 3000, 5173, 5037, 9323, and 5432 occupied. The API server and Vite dev server default to ports in these ranges. If `PORT` is not set, the API server throws immediately. If Vite's port is occupied, it auto-increments silently — meaning the frontend starts on an unexpected port, API calls to `/api/` hit the wrong process, and every request returns 404 with no obvious cause.
+The LLM Config Wizard Step 3 auto-fetches available models from the provider API. OpenAI (`GET /v1/models`), Ollama (`GET /api/tags`), Groq, Mistral, and Together AI all expose model listing endpoints. **Anthropic does not.** Any attempt to dynamically fetch Anthropic models will result in a 404 or `TypeError` because the Anthropic SDK has no `client.models.list()` method (verified against Anthropic API docs and SDK).
 
 **Why it happens:**
-Vite's `server.port` config uses the value of `process.env.PORT` with a fallback of `5173` — which is occupied. The API server requires `PORT` to be set explicitly. The two services need to be on separate ports, and neither knows about the other.
+Anthropic's API design treats model enumeration as documentation, not a runtime capability. Developers building a "fetch models" flow test with OpenAI first, assume parity, then get a runtime error when trying Anthropic.
 
 **How to avoid:**
-Choose two clean ports not in the occupied list (e.g., 4000 for API, 4001 for frontend). Set them explicitly in environment variables and/or config before running either service. Do not rely on auto-increment — always bind explicitly. Document the port assignments.
+The backend route for `GET /llm/providers/:providerId/models` (or equivalent wizard fetch endpoint) must branch on provider type:
+- `openai_compat`: call provider's `/v1/models` endpoint, filter to chat-capable models.
+- `anthropic`: return a hardcoded constant maintained in the backend:
+```typescript
+const ANTHROPIC_MODELS = [
+  { id: "claude-opus-4-20251001", name: "Claude Opus 4" },
+  { id: "claude-sonnet-4-20251001", name: "Claude Sonnet 4" },
+  { id: "claude-haiku-4-20251001", name: "Claude Haiku 4" },
+  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet" },
+  { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku" },
+];
+```
+- `ollama`: call `GET /api/tags` on the configured `baseUrl`, parse the `models` array.
 
 **Warning signs:**
-- `curl localhost:PORT/api/v1/health` returns HTML (hit Vite) or connection refused
-- Frontend loads but all API calls return 404 or HTML error pages
-- `ss -tlnp` shows unexpected port ownership
+- Wizard Step 3 shows a fetch error only for Anthropic providers.
+- Backend logs show Anthropic SDK throwing `TypeError: client.models is not a function`.
+- Integration tests pass for OpenAI but fail for Anthropic in the model discovery path.
 
-**Phase to address:** Phase 1 (Server Setup & Migration)
+**Phase to address:** Phase 1 (LLM Config Wizard) — design the model-fetch route with provider branching from day one.
 
 ---
 
-### Pitfall 4: Cloudflare Tunnel Buffers SSE Streams, Breaking AI Interviews
+### Pitfall 4: Model Name Validation Gap — The "Haiku" Bug
 
 **What goes wrong:**
-The AI interview feature uses Server-Sent Events (`Content-Type: text/event-stream`). Cloudflare's HTTP/2 proxy layer buffers responses by default. This causes the client to receive all SSE chunks at once at the end of the LLM call instead of streaming — the UI hangs for the full duration then shows a wall of text, or times out entirely for long responses.
+Bug #7 from the audit: users can save a model name like `"Haiku"` instead of `"claude-haiku-4-20251001"`. The current `llm_configs` table schema has `model: text("model").notNull()` with no format constraint. This bad value propagates silently: `resolveConfig()` returns it, the LLM client uses it, and the provider returns a 404 or 400 error deep inside a background job — not at config save time. The user sees no feedback.
+
+Compound risk: the job queue retries on failure. A bad model name causes every job for that tenant to fail, consume all retries, and enter `dead` status. The `ai-triage` and `ai-enrich` queues will dead-letter all jobs until the model name is corrected.
 
 **Why it happens:**
-The codebase correctly sets `X-Accel-Buffering: no` (visible in `interviews.ts`), which disables nginx buffering. But Cloudflare has its own buffering layer that ignores this header unless the tunnel is configured with `no_tls_verify` or the appropriate HTTP/2 settings. Cloudflare also has a 100-second default response timeout for tunnel connections.
+The Drizzle/Zod schema inherits only the `notNull()` constraint, which allows any non-empty string. Free-text model entry in the wizard (if implemented without a selection list) removes the last guard.
 
 **How to avoid:**
-In the cloudflared configuration YAML, set `http2Origin: true` under the ingress rule for the API service. This enables HTTP/2 between cloudflared and the origin, which streams correctly. Alternatively, ensure the tunnel routes the SSE path (`/api/v1/interviews/*/message`) through a dedicated ingress rule with `disableChunkedEncoding: false`. Also add `res.flushHeaders()` immediately after setting SSE headers in the Express route to force the response to start before buffering decisions are made.
+At the wizard UI layer: after Step 3 fetches the model list, Step 4 must use a **selection component**, not a free-text input. Never allow arbitrary model name entry.
+
+At the backend layer: the `testConnection()` function in `llm-service.ts` already makes a real API call against the configured model — **wire this as a required pre-save validation step** in the wizard save route. If `testConnection` returns `success: false`, reject the save with the provider's error message.
+
+For Anthropic: validate the model ID against the hardcoded list before saving.
 
 **Warning signs:**
-- AI interview shows spinner for 10-30 seconds then displays all text at once
-- `curl -N` against the direct server port streams correctly but through the tunnel does not
-- Browser DevTools shows SSE response arriving as a single event after long delay
+- Jobs entering `dead` status with `lastError` containing "model not found" or similar provider error.
+- AI features broken for a tenant after wizard configuration but `testConnection` was never called.
+- User reports that re-entering settings "fixes" AI — indicating they corrected the model name on retry.
 
-**Phase to address:** Phase 2 (Cloudflare Tunnel Configuration)
+**Phase to address:** Phase 1 (Wizard Step 4 and save flow) + Phase 2 (Bug #7 validation fix).
 
 ---
 
-### Pitfall 5: Cloudflare Tunnel Authentication Not Configured, App Exposed Publicly
+### Pitfall 5: Extending the `llm_use_case` Enum Risks Migration Failure
 
 **What goes wrong:**
-A `cloudflared tunnel` with no Cloudflare Access policy exposes the entire application — including the MCP endpoint, all API routes, and admin functionality — to the public internet. The app has its own JWT auth, but the MCP endpoint and health checks are unauthenticated by design. Brute-force attempts against `/api/v1/auth/login` are trivially easy from the public internet.
+The v1.1 routing feature requires routing to specific models per task type (Risk Enrichment, Signal Triage, Agent Reasoning, etc.). The current schema uses a PostgreSQL enum `llm_use_case` with values `general` and `embeddings`. If task types are implemented by extending this enum, Drizzle's migration generator will produce `ALTER TYPE llm_use_case ADD VALUE '...'`.
+
+PostgreSQL rejects `ALTER TYPE ADD VALUE` inside a transaction block (versions < 16, and with edge cases in 16+). Drizzle wraps all migrations in a transaction by default. The migration fails with `ERROR: cannot add a usable enum value in a transaction`.
 
 **Why it happens:**
-The default tunnel setup creates a public hostname with no additional authentication layer. Developers testing demos assume Cloudflare's obscurity (random subdomain) is sufficient protection.
+Drizzle ORM's migration generator does not automatically handle the enum transaction restriction. Developers extending enums discover this at migration time in production.
 
 **How to avoid:**
-Configure Cloudflare Access on the tunnel subdomain as a second authentication layer. For internal demo use, restrict access to specific email addresses or an identity provider. Alternatively, use a Cloudflare Zero Trust application policy. At minimum, rate-limit the login endpoint via Cloudflare's WAF rules before the tunnel receives traffic.
+Do **not** extend the `llm_use_case` enum. Add a separate nullable `taskType` text column to `llm_configs`:
+```sql
+ALTER TABLE llm_configs ADD COLUMN task_type text DEFAULT NULL;
+```
+Adding a nullable column with a constant default is instant in PostgreSQL 11+ (no table rewrite, no lock). The `resolveConfig()` function then accepts an optional `taskType` parameter and queries for task-specific configs first, falling back to `useCase = 'general'` if none found. Existing configs are fully backward-compatible.
 
 **Warning signs:**
-- The tunnel URL appears in public DNS immediately after creation
-- No `CF-Access-*` headers present in requests reaching the Express server
-- Login endpoint receives requests from IP ranges not belonging to intended users
+- Drizzle-generated migration file contains `ALTER TYPE llm_use_case ADD VALUE`.
+- Migration fails in staging with enum transaction error.
+- Need to manually edit migration SQL or split into multiple files.
 
-**Phase to address:** Phase 2 (Cloudflare Tunnel Configuration)
+**Phase to address:** Phase 1 (Model Router schema design) — decide this before writing any routing code or running any migrations.
 
 ---
 
-### Pitfall 6: MCP Endpoint State Lost on Process Restart
+### Pitfall 6: Document Processor Hallucinating Summaries From Filename Only (Bug #1)
 
 **What goes wrong:**
-The MCP handler stores sessions in an in-process `Map<string, McpSession>` (visible in `mcp/handler.ts`). If the server process restarts (crash, deployment, systemd restart), all active MCP sessions are lost. Clients with a stored `mcp-session-id` header will receive errors on reconnect with no clear recovery path.
+The `doc-process` worker calls the LLM with only the document filename and MIME type — it never reads actual file content:
+```typescript
+content: `Document: ${doc.fileName}\nType: ${doc.mimeType}\nVendor ID: ${doc.vendorId}`
+```
+The LLM generates a plausible-sounding vendor risk summary from the filename alone. This summary is saved to `documents.summary` and displayed to users as if it were extracted from the document's content. This is a fabrication, not an analysis.
 
 **Why it happens:**
-This is the correct architecture for a single-process server, but on a new Linux deployment without process supervision the server will occasionally restart. Without graceful session expiry or reconnect logic, AI agent integrations silently break.
+File parsing was deferred. The LLM call was stubbed in with filename-as-content as a placeholder. The placeholder produces output that looks correct (no errors), so it was never flagged as broken during development.
 
 **How to avoid:**
-Add session expiry logic: periodically purge sessions older than N minutes from the Map. Document that MCP clients should handle `404` or `400` on session-id reuse as a "reconnect" signal and create a new session. Add a process supervisor (systemd or pm2) with restart policies so the server restarts quickly when it crashes.
+Two options — pick one, do not ship the current behavior:
+
+Option A (implement real parsing): Add `pdf-parse` for PDFs and `mammoth` for DOCX. Call the appropriate parser based on `mimeType`, extract text, then send the text to the LLM. Store parsed text in a new `content` column or pass it directly.
+
+Option B (honest stub): Replace the LLM call with a status update to `"uploaded"` and return `{ status: "not_implemented" }`. Show "Document processing not yet available" in the UI instead of a hallucinated summary. This is Option B from the scope.
+
+Option B is lower risk for Phase 2. Option A is the correct long-term fix.
 
 **Warning signs:**
-- MCP integration returns errors after server restart without explicit session re-establishment
-- Map grows unbounded in long-running process (memory leak if sessions are never purged)
+- Documents showing detailed summaries for files with generic names like `contract.pdf` or `soc2-report.docx` that are suspiciously generic.
+- LLM summaries that don't match actual document content when verified.
+- No file reading code anywhere near the `doc-process` worker.
 
-**Phase to address:** Phase 1 (Server Setup), Phase 3 (AI Feature Improvement)
+**Phase to address:** Phase 2 (Bug Fixes, Bug #1) — must resolve before any demo involving document upload.
 
 ---
 
-### Pitfall 7: pgvector Extension Missing, Silently Degrading AI Features
+### Pitfall 7: Vendor AI Question Returns 400 Instead of 502 on Parse Failure (Bug #4)
 
 **What goes wrong:**
-`ensureExtensions()` runs `CREATE EXTENSION IF NOT EXISTS vector` at startup. If the PostgreSQL user lacks `SUPERUSER` or `CREATE EXTENSION` privilege, this silently fails (the error is caught by the try/finally but not re-thrown). The server starts fine. The first AI enrichment job that attempts to store or query an embedding fails with a cryptic PostgreSQL error about the `vector` type not existing.
+When the LLM returns an unparseable response for vendor AI interview questions, the backend returns `400 Bad Request` with message `"AI returned invalid format. Please try again."`. A 400 status code means "client error" — the user did something wrong. But this is a server-side LLM failure, a 502 or 503 is semantically correct. Users seeing 400 try to change their input, which doesn't help.
 
 **Why it happens:**
-PostgreSQL extension creation requires superuser or the `pg_extension_owner_transfer` privilege. A freshly provisioned database user created with `CREATEDB` but not `SUPERUSER` cannot install extensions.
+The error handling conflates "bad request from client" (400) with "upstream AI service failure" (502). The original error handler used a catch-all 400 for all validation failures including LLM parse errors.
 
 **How to avoid:**
-During database setup, install the extension as the PostgreSQL superuser before the app user runs migrations: `psql -U postgres -d riskmind -c "CREATE EXTENSION IF NOT EXISTS vector;"`. Then confirm with `\dx` in psql. Do not rely on the runtime `ensureExtensions()` call to install — it should only verify.
+In the vendor AI question route, catch LLM parse/format errors specifically and return 502:
+```typescript
+if (err instanceof LLMParseError || err.message.includes("invalid format")) {
+  return res.status(502).json({
+    error: "AI returned an unexpected response. This is a temporary issue — please try again."
+  });
+}
+```
+Never return 400 for errors that the user cannot fix by changing their input.
 
 **Warning signs:**
-- `ensureExtensions()` completes without error but `SELECT * FROM pg_extension WHERE extname = 'vector'` returns empty
-- AI enrichment jobs enter dead-letter state with PostgreSQL error mentioning unknown type `vector`
-- `drizzle-kit push` fails with type errors on embedding columns
+- User testing produces feedback like "the form is broken" or "it keeps saying my request is invalid."
+- Browser DevTools shows 400 responses on vendor AI question submissions that were structurally correct.
+- No change in behavior between correct and incorrect user inputs — always 400.
 
-**Phase to address:** Phase 1 (Database Provisioning)
-
----
-
-### Pitfall 8: Demo Seed Data Not Idempotent Across Migrations
-
-**What goes wrong:**
-`seedDemoDataIfEmpty()` checks for any user in `usersTable` before seeding. If the database is reset (tables dropped and recreated via `drizzle-kit push --force`) but the seed check is skipped, the demo tenant and users are not recreated. The app starts, migrations run, but the login page rejects all credentials because no users exist. There is no seed command separate from the server start.
-
-**Why it happens:**
-The seed is embedded in the server startup path with no standalone CLI invocation. Developers who run `drizzle-kit push --force` after a schema change lose all data and must restart the server once to re-trigger seeding — which is non-obvious.
-
-**How to avoid:**
-Create a standalone `seed` script (the `lib/db` package has a `bootstrap.ts` — extend it with seeding). Add `pnpm --filter @workspace/db run seed` to the deployment checklist. Document that after any `push --force` (schema reset), the seed must run before the server starts or the server must be restarted to trigger auto-seed.
-
-**Warning signs:**
-- Login with `admin@acme.com` / `password123` fails immediately after schema migration
-- Server logs show "No users found — seeding demo data..." but tables were dropped mid-run
-
-**Phase to address:** Phase 1 (Database Provisioning)
-
----
-
-### Pitfall 9: CORS Configuration Allows All Origins in Production
-
-**What goes wrong:**
-`app.ts` calls `app.use(cors())` with no options — this sets `Access-Control-Allow-Origin: *` for all routes. In a Cloudflare tunnel deployment where the frontend is served from a known subdomain, this is unnecessary and exposes the API to cross-origin requests from any domain, including malicious ones that may have stolen a JWT.
-
-**Why it happens:**
-Open CORS is fine on Replit where the origin is always Replit's domain. On a real server with a public URL, it's a security weakness, especially combined with JWT tokens stored in localStorage (which are readable by any injected script).
-
-**How to avoid:**
-Configure CORS to allow only the specific Cloudflare tunnel frontend origin: `cors({ origin: 'https://your-tunnel.trycloudflare.com', credentials: true })`. Update this when the tunnel URL is known. For demo deployments where the URL changes, document this as a required configuration step.
-
-**Warning signs:**
-- `curl -H "Origin: https://evil.com" http://localhost:PORT/api/v1/health` returns `Access-Control-Allow-Origin: *`
-- No `CORS_ORIGIN` or equivalent environment variable in the env configuration
-
-**Phase to address:** Phase 2 (Cloudflare Tunnel Configuration)
+**Phase to address:** Phase 2 (Bug Fixes, Bug #4).
 
 ---
 
@@ -195,12 +219,12 @@ Configure CORS to allow only the specific Cloudflare tunnel frontend origin: `co
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| JWT stored in localStorage | Simple auth flow, easy to implement | XSS can steal tokens; no httpOnly cookie protection | MVP/demo only — acceptable for internal demo, not production |
-| Open CORS (`cors()` with no config) | Zero configuration required | Any origin can make credentialed API calls | Never in production; fix in Phase 2 |
-| In-memory MCP session Map | No Redis/DB dependency for sessions | Sessions lost on restart; unbounded memory growth | Acceptable for single-process demo deployment |
-| Polling-based job queue (PostgreSQL) | No external message broker needed | Database load increases with job volume; polling interval creates latency | Fine up to ~100 concurrent jobs/minute; acceptable for demo |
-| `drizzle-kit push` for schema management | Fast iteration, no migration files | No rollback capability; `push --force` is destructive | MVP only — consider migration files for production data |
-| Seed in server startup path | Zero-config seeding | Seed runs on every cold start check; no standalone seed command | Acceptable but add standalone seed script before first demo |
+| Hardcode Anthropic model list in backend | Fast wizard implementation, no API call needed | Stale when Anthropic releases models (typically quarterly) | MVP only — add an admin-updatable config in v2 |
+| Use `useCase: "general"` for all 6 task types at launch | No migration needed | Routing table UI is cosmetic — all tasks use same model | Acceptable for Phase 1 scaffold if routing table clearly shows "No override" state |
+| Benchmark with `max_tokens: 5` call (current `testConnection`) | Fast, cheap, catches bad API keys | Measures connection latency only, not inference quality or speed at real token counts | Connection test only — add separate benchmark route with a 50-token quality prompt |
+| Keep enrichment as text append (current code) | No schema change needed | Creates stacking bug (already exists); hard to update without parsing the separator | Never — fix in Phase 2 |
+| Skip real document parsing in Phase 2, use honest stub | Eliminates hallucination risk immediately | Document feature remains incomplete | Acceptable for v1.1 if stub message is honest and not misleading |
+| Rate-limit model discovery calls with no retry | Avoids accidental provider spam | Users see failures if provider is under temporary load during wizard | Add a single retry with 1s delay for model fetch — minimal effort, significant UX improvement |
 
 ---
 
@@ -208,12 +232,12 @@ Configure CORS to allow only the specific Cloudflare tunnel frontend origin: `co
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Cloudflare Tunnel + SSE | Tunnel buffers SSE chunks; client gets all data at end or times out | Set `http2Origin: true` in cloudflared config; call `res.flushHeaders()` before streaming; the code already sets `X-Accel-Buffering: no` which helps with nginx but not Cloudflare |
-| Cloudflare Tunnel + MCP StreamableHTTP | StreamableHTTP uses long-lived connections that hit Cloudflare's 100s timeout | Configure tunnel with `keepAliveConnections: true`; ensure MCP client sends heartbeats |
-| PostgreSQL + pgvector | Extension not installed as superuser, `ensureExtensions()` silently fails | Install extension manually as postgres superuser before migrations |
-| OpenAI SDK + tenant LLM configs | Tenant API keys encrypted with `ENCRYPTION_KEY`; if key changes, all stored LLM configs become undecryptable | Never rotate `ENCRYPTION_KEY` after first tenant LLM config is saved; it's not a password, it's a data encryption key |
-| Drizzle ORM + pgvector | Vector columns need `drizzle-orm/pg-core`'s `vector` import; Drizzle-kit push does not install the extension | Always install extension before push; keep `ensureExtensions` as a runtime guard only |
-| Vite dev server + API proxy | Vite runs on a separate port from Express; `fetch('/api/')` in browser hits same-origin Vite, not Express | The frontend uses relative `/api/` paths; in dev, configure Vite proxy; in production, serve frontend from Express or tunnel routes must resolve both |
+| OpenAI `GET /v1/models` | Treating all returned models as chat models | Filter the list: only models with IDs starting with `gpt-` or `o1`/`o3` are chat models; embedding models (`text-embedding-*`) will also appear |
+| Anthropic SDK | Calling `client.models.list()` — method does not exist | Return hardcoded list from backend constant; do not make any API call for model listing |
+| Ollama `GET /api/tags` | Assuming all tags are LLM chat models | Some tags are embedding models (e.g., `nomic-embed-text`); distinguish by `details.families` field — embedding models typically show `bert` family |
+| OpenAI-compat providers (Groq, Mistral, Together AI) | Using OpenAI model IDs directly | These providers have their own model name formats; always fetch from their `/v1/models` endpoint and display the returned IDs, never substitute OpenAI IDs |
+| AES-256-GCM key rotation | Assuming `ENCRYPTION_KEY` can be changed freely | All stored `encryptedApiKey` values are bound to the current key; rotating requires a migration script to decrypt and re-encrypt all rows with the new key |
+| pgvector queries in job queue context | Running `<=>` similarity queries inside the `FOR UPDATE SKIP LOCKED` transaction | pgvector queries are read-heavy; execute them outside the claim transaction to avoid lock contention — the current `ai-workers.ts` `findSimilarRisks` call happens after `COMMIT`, which is correct; preserve this pattern |
 
 ---
 
@@ -221,11 +245,11 @@ Configure CORS to allow only the specific Cloudflare tunnel frontend origin: `co
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| pgvector similarity search without index | Embedding queries do full table scan; risk clustering becomes slow | Add `HNSW` or `IVFFlat` index on embedding columns after initial data load | ~1,000+ risk records |
-| PostgreSQL polling every 1s per queue | Idle CPU usage from SELECT queries; DB connection pool saturation under load | Use `LISTEN/NOTIFY` instead of polling, or set poll interval to 5-10s for demo scale | ~10 concurrent users with AI jobs queued |
-| React Query with default stale times | Dashboard re-fetches all KPIs on every focus; multiplied by all open tabs | Set `staleTime: 30_000` on dashboard queries; risks and compliance data don't need real-time refresh | Noticeable immediately in demo with multiple browser tabs |
-| Bcrypt 12 rounds on login | Login takes ~300ms per attempt; multiplied under concurrent load | 12 rounds is appropriate for production; acceptable for demo; do not lower for performance | Fine at demo scale, becomes issue at 50+ concurrent logins |
-| Unindexed tenant_id WHERE clauses | Multi-tenant queries scan full table; grows with data volume | Confirm `tenant_id` columns have indexes in Drizzle schema; check with EXPLAIN ANALYZE | ~10,000+ rows per tenant |
+| Benchmark cold-start inflating latency | First call to a provider appears 3–5x slower than subsequent calls; benchmarks consistently look bad for freshly configured providers | Run a warm-up call (or discard the first result) before reporting benchmark latency; report median of 3 calls, not first call | Every single benchmark run if not addressed |
+| Model discovery rate limits during rapid wizard use | `429 Too Many Requests` from provider during Step 3; appears as "Failed to fetch models" | Cache model list per provider per session; add 500ms delay between discovery calls if user is configuring multiple providers | When user attempts wizard for 3+ providers in rapid succession |
+| Agent `observe()` loading all tenant data with no limit | `Promise.all` of 7 parallel queries; KRIs and vendors have no LIMIT clauses; grows with tenant data volume | Add LIMIT clauses to all agent observation queries; current code passes to `invokeTool` which may or may not have limits — verify | At ~500+ risks or ~1,000+ KRIs per tenant |
+| Job processor `while(processed)` tight loop | CPU spikes during high-volume job periods; can consume entire poll interval processing jobs without yielding | The loop in `startJobProcessor` drains all available jobs per tick — add a maximum iteration count per tick (e.g., 10 jobs) to avoid starvation of other operations | At 50+ concurrent jobs from multiple tenants |
+| Hardcoded `text-embedding-3-small` fallback in `generateEmbedding` | Embeddings silently use a model the user did not configure; cost attributed to wrong provider | Make the fallback model configurable or remove the hardcoded fallback and throw `LLMUnavailableError` instead — currently falls back to `text-embedding-3-small` if no embeddings config exists | If OpenAI deprecates `text-embedding-3-small` or if tenant uses Ollama-only setup |
 
 ---
 
@@ -233,11 +257,10 @@ Configure CORS to allow only the specific Cloudflare tunnel frontend origin: `co
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Demo credentials in seed (`password123`) | If demo app accidentally becomes accessible, trivially brute-forced or guessed | Change seed passwords before any public-facing deployment; document this in pre-demo checklist |
-| JWT secret weak or default | Tokens can be forged; all tenants compromised | Use `openssl rand -hex 32` minimum; never use a string like "secret" or "development" |
-| ENCRYPTION_KEY in `.env` not backed up | All stored LLM API keys permanently undecryptable if key is lost | Treat `ENCRYPTION_KEY` like a database backup password — document it securely separately from the server |
-| MCP endpoint unauthenticated for non-JWT access | The MCP handler checks JWT but health check route is open | Health check exposure is acceptable; ensure `/mcp` always requires JWT — it currently does, but verify after any route refactoring |
-| cloudflared credentials file world-readable | Tunnel credentials JSON grants full control of the tunnel | Set file permissions to 600 on `~/.cloudflared/` credentials; run cloudflared as a non-root service user |
+| Returning provider API keys in LLM config API responses | API key exposed in browser network tab, frontend logs, React Query cache | `resolveConfig()` already decrypts internally — audit every `GET /llm-configs` response shape to ensure neither `encryptedApiKey` nor any decrypted key is serialized to the client |
+| Storing provider `baseUrl` without SSRF validation | Attacker configures `baseUrl: "http://169.254.169.254/"` to probe internal metadata services | Validate `baseUrl` at save time: only allow `https://` schemes or `http://localhost` (for Ollama); reject RFC1918 addresses and link-local addresses in production |
+| Benchmark and test-connection routes without tenant isolation | If route accepts `configId` without verifying caller's `tenantId`, Tenant A can test Tenant B's API keys | `resolveConfigById()` already scopes by `tenantId` parameter — ensure wizard routes pass the authenticated user's `tenantId`, not a client-supplied one |
+| Model name injection through wizard | Malicious model name with special characters passed to provider | OpenAI and Anthropic pass model as a JSON field (no filesystem risk), but Ollama resolves local model names — validate Ollama model IDs against alphanumeric, colon, and slash characters only; reject path traversal sequences |
 
 ---
 
@@ -245,26 +268,26 @@ Configure CORS to allow only the specific Cloudflare tunnel frontend origin: `co
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| AI interview shows no progress during LLM streaming | User thinks the app is frozen for the duration of the LLM call (10-30s) | Ensure SSE streaming works through Cloudflare tunnel (see Pitfall 4); add a "thinking" animation that starts immediately when request is sent |
-| Risk heatmap renders blank if no risks exist | Demo looks broken before data is seeded | Add empty-state illustration and "Add your first risk" CTA to heatmap page |
-| Vendor 7-state lifecycle not visible at a glance | Demo audiences don't understand the TPRM flow | Add visual lifecycle stepper on vendor detail page showing current state and available transitions |
-| Mobile sidebar navigation collapses but content is cramped | Enterprise risk managers use laptops; mobile is secondary but must not look broken | Test AppLayout at 375px and 768px before demo; hamburger menu exists but content overflow may still occur |
-| JWT expiry during long demo session | Access token expires in 1 hour; user gets 401 mid-demo with no friendly message | Confirm auto-refresh interceptor works; add a visible session timeout warning at 55min if refresh fails |
+| Vendor AI question error shows 400 to user (Bug #4) | Users think they submitted invalid input; they retry with different text, which never helps | Return 502 for LLM failures; message should say "AI returned an unexpected response — this is temporary, please try again" not "invalid format" |
+| No embeddings provider warning (Bug #6) | Semantic search, agent clustering, and signal correlation silently degrade; users think features are broken | Show a persistent yellow banner in Settings when `resolveConfig(tenantId, "embeddings")` returns null |
+| Benchmark latency shown as raw milliseconds only | `180ms` means nothing to a non-technical operator choosing between models | Label as qualitative tiers: "Very Fast (< 300ms)", "Fast (300ms–800ms)", "Moderate (800ms–2s)", "Slow (> 2s)" alongside raw ms |
+| Wizard closes on navigation before save (6-step wizard) | User fills 5 steps, navigates away accidentally, loses all configuration | Add React Router `useBlocker` or `beforeunload` guard in the wizard when `isDirty` is true |
+| Routing table shows task types but all resolve to same model | Sophisticated-looking UI but AI behavior is identical — feels fake in a demo | If per-task model assignment is not yet implemented in the backend, each routing table row must clearly show "Using default model" rather than implying unique routing |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Server running:** Verify `curl http://localhost:PORT/api/v1/health` returns `{"status":"ok","database":"connected"}` — `database` key being absent means pgvector or DB connection is broken
-- [ ] **pgvector installed:** Verify `SELECT extname FROM pg_extension WHERE extname = 'vector'` returns a row before running migrations
-- [ ] **Demo data seeded:** Log in as `admin@acme.com` / `password123` successfully — if this fails after migration, seed did not run
-- [ ] **AI features functional:** LLM settings page must have a valid provider configured, or all AI enrichment jobs will dead-letter silently
-- [ ] **SSE streaming works through tunnel:** Open an AI interview via the Cloudflare URL and confirm text streams progressively, not all at once
-- [ ] **Replit dependencies removed:** `pnpm install --frozen-lockfile` must complete with no `@replit/*` peer warnings
-- [ ] **CORS locked down:** Verify `Access-Control-Allow-Origin` response header is not `*` in production
-- [ ] **ENCRYPTION_KEY backed up:** Confirm the key value is documented somewhere secure before configuring any LLM provider
-- [ ] **Cloudflare Access policy set:** The tunnel URL should require authentication before reaching the app if it will be shared externally
-- [ ] **Process supervisor configured:** Server must restart automatically on crash — verify with `systemctl status` or `pm2 list`
+- [ ] **LLM Wizard Step 3 (Anthropic):** Wizard shows a model list for Anthropic — verify it comes from the hardcoded constant, not an API call. Wizard must not show a "Failed to fetch" error for Anthropic.
+- [ ] **LLM Wizard Step 3 (Ollama):** Model list populates from the Ollama instance at the user-provided `baseUrl`. Embedding models are distinguishable from chat models.
+- [ ] **Model Router backend:** Visual routing table renders — verify `resolveConfig()` actually queries by task type (not just the first `isDefault: true` record).
+- [ ] **Benchmark quality:** Shows a latency number — verify it represents inference time (time from request to first token), not just TCP handshake time.
+- [ ] **Agent findings fix (Bug #2):** Agent run shows `status: "completed"` — verify `agent_findings` table has cascade/cluster/predictive rows even when LLM throws during `reason()`.
+- [ ] **Enrichment idempotency fix (Bug #3):** Trigger enrichment twice on same risk — verify description has exactly one `---AI Enrichment---` block afterward.
+- [ ] **Document processor fix (Bug #1):** Upload a document — verify either real content is parsed or a clear "not available" stub is shown; no hallucinated summaries.
+- [ ] **Vendor scorecard real data (Bug #5):** `lastAssessmentDate` and `openFindingsCount` show live values — verify they are queried from `questionnaires` or `review_cycles`, not fixture data.
+- [ ] **Embeddings health check (Bug #6):** Remove embeddings config from Settings — verify a warning banner appears without page reload.
+- [ ] **Model name validation (Bug #7):** Attempt to save `"Haiku"` as model name — verify the save route rejects it with a clear error.
 
 ---
 
@@ -272,14 +295,12 @@ Configure CORS to allow only the specific Cloudflare tunnel frontend origin: `co
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Replit SDK breaks build | LOW | Remove packages from package.json, run `pnpm install`, rebuild |
-| Missing ENCRYPTION_KEY after LLM configs saved | HIGH | Key is non-recoverable; must delete all LLM configs from DB and re-enter API keys after setting correct key |
-| Port conflict discovered after deployment | LOW | Update `.env`, restart services; no data impact |
-| SSE not streaming through tunnel | MEDIUM | Update cloudflared config YAML, restart tunnel daemon; no data impact but requires testing |
-| pgvector not installed before push | MEDIUM | Install extension as superuser, re-run push; if tables already created, only affected columns need fixing |
-| Demo data lost after `drizzle-kit push --force` | LOW | Restart server to trigger auto-seed (seed runs on empty DB); or run standalone seed script |
-| JWT secret changed | HIGH | All existing tokens immediately invalid; all users must re-login; no other data impact |
-| cloudflared credentials lost | LOW | Delete tunnel in Cloudflare dashboard, re-authenticate with `cloudflared tunnel login`, recreate tunnel |
+| Agent findings discarded on LLM error | LOW | Fix `runAgentCycle()` ordering (no data migration needed); future runs will persist correctly |
+| Enrichment stacking already in production data | MEDIUM | Write a one-time SQL script: for each risk with multiple `---AI Enrichment---` occurrences, keep only the last block; run as an idempotent migration |
+| Bad model name saved to `llm_configs` | LOW | Fix the wizard save validation; existing bad configs correctable via the wizard edit flow without data migration |
+| PostgreSQL enum migration failure (`ADD VALUE` in transaction) | MEDIUM | Roll back the migration; rewrite the routing schema using the nullable `task_type` text column approach instead |
+| Provider API key exposed in a response | HIGH | Rotate all affected tenant API keys immediately via provider dashboard; audit server access logs for the exposure window; add contract tests asserting no key fields appear in response schemas |
+| Document processor showing hallucinated summaries | MEDIUM | Deploy Option B (honest stub) immediately to stop hallucinations; clear any existing `documents.summary` values generated from filename-only; plan Option A (real parsing) for v1.2 |
 
 ---
 
@@ -287,31 +308,34 @@ Configure CORS to allow only the specific Cloudflare tunnel frontend origin: `co
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Replit SDK in production build | Phase 1: Migration | `pnpm build` succeeds with no @replit warnings; bundle contains no @replit chunks |
-| Missing environment variables | Phase 1: Migration | Startup validation logs confirm all env vars present; server starts cleanly |
-| Port conflicts | Phase 1: Migration | `ss -tlnp` confirms chosen ports are free; health check responds correctly |
-| pgvector missing | Phase 1: DB Provisioning | `SELECT extname FROM pg_extension WHERE extname = 'vector'` returns row |
-| Demo seed not running | Phase 1: DB Provisioning | Login with demo credentials succeeds on fresh DB |
-| SSE buffering through Cloudflare | Phase 2: Cloudflare Tunnel | AI interview streams progressively through tunnel URL |
-| Tunnel public with no access control | Phase 2: Cloudflare Tunnel | Cloudflare Access application policy applied and tested |
-| Open CORS | Phase 2: Cloudflare Tunnel | CORS origin locked to tunnel hostname |
-| MCP session memory leak | Phase 3: AI Improvements | Session map has TTL/expiry logic; long-running server memory stable |
-| Weak demo credentials | Pre-demo | Demo login credentials rotated from `password123` |
-| ENCRYPTION_KEY not backed up | Phase 1: Migration | Key documented in secure location before any LLM config saved |
-| No process supervisor | Phase 1: Migration | `systemctl status riskmind-api` shows active/running |
+| Agent local findings lost on LLM error (Bug #2) | Phase 2 — Bug Fixes | `agent_findings` rows exist after agent run with simulated LLM error |
+| Duplicate enrichment stacking (Bug #3) | Phase 2 — Bug Fixes | Trigger enrichment twice; exactly one `---AI Enrichment---` block in description |
+| Document processor hallucination (Bug #1) | Phase 2 — Bug Fixes | Upload a document; no AI-generated summary unless real content was parsed |
+| Vendor AI 400 on LLM parse failure (Bug #4) | Phase 2 — Bug Fixes | Simulate LLM parse failure; response is 502, not 400 |
+| Vendor scorecard placeholder data (Bug #5) | Phase 2 — Bug Fixes | `lastAssessmentDate` and `openFindingsCount` populated from real DB tables |
+| Embeddings health check missing (Bug #6) | Phase 2 — Bug Fixes (or Phase 1 Settings) | Remove embeddings config; Settings shows a warning banner |
+| Model name validation (Bug #7) | Phase 1 — Wizard save + Phase 2 | Attempt to save `"Haiku"` as model name; route rejects it |
+| Anthropic has no model list endpoint | Phase 1 — LLM Config Wizard | Wizard completes Step 3 for Anthropic and shows hardcoded model list |
+| Router schema: avoid enum extension | Phase 1 — Model Router schema | Drizzle migration uses `ADD COLUMN task_type text` not `ALTER TYPE ADD VALUE` |
+| Benchmark cold-start inflating latency | Phase 1 — Benchmark implementation | Reported benchmark is median of calls 2–3, not call 1 |
+| SSRF via baseUrl | Phase 1 — Wizard save validation | Attempt to save RFC1918 baseUrl; route rejects it |
 
 ---
 
 ## Sources
 
-- Direct codebase inspection: `/home/dante/RiskMind2/artifacts/api-server/src/` (HIGH confidence — source of truth)
-- Direct codebase inspection: `/home/dante/RiskMind2/artifacts/riskmind-app/vite.config.ts` (HIGH confidence)
-- Direct codebase inspection: `/home/dante/RiskMind2/lib/api-client-react/src/custom-fetch.ts` (HIGH confidence)
-- Direct codebase inspection: `/home/dante/RiskMind2/artifacts/api-server/src/mcp/handler.ts` (HIGH confidence)
-- cloudflared version check on target server: `2026.3.0` — tunnel not yet configured (HIGH confidence)
-- Cloudflare documentation on HTTP/2 and tunnel buffering (MEDIUM confidence — based on known Cloudflare proxy behavior for SSE/streaming)
-- PostgreSQL pgvector extension privilege requirements (HIGH confidence — standard PostgreSQL extension installation behavior)
+- Code-verified (HIGH): `/artifacts/api-server/src/lib/agent-service.ts` lines 798–844 — `runAgentCycle()` discards local findings on LLM error
+- Code-verified (HIGH): `/artifacts/api-server/src/lib/ai-workers.ts` line 141 — enrichment append without idempotency guard
+- Code-verified (HIGH): `/artifacts/api-server/src/lib/llm-service.ts` — `resolveConfig()` takes `useCase` only, no task type parameter
+- Code-verified (HIGH): `/lib/db/src/schema/llm-configs.ts` — `llm_use_case` enum has only `general` and `embeddings`
+- Anthropic API (no model list endpoint): https://platform.claude.com/docs/en/about-claude/models/overview — HIGH confidence, official docs
+- LLM benchmark cold start and measurement accuracy: https://acecloud.ai/blog/cold-start-latency-llm-inference/ and https://www.newline.co/@zaoyang/best-practices-for-llm-latency-benchmarking--257f132d — MEDIUM confidence
+- PostgreSQL zero-downtime column addition (PG11+ instant ADD COLUMN): https://www.bytebase.com/blog/postgres-schema-migration-without-downtime/ — HIGH confidence
+- PostgreSQL enum in transaction restriction: https://gocardless.com/blog/zero-downtime-postgres-migrations-the-hard-parts/ — HIGH confidence
+- LLM model routing implementation mistakes: https://portkey.ai/blog/task-based-llm-routing/ and https://dev.to/richardbaxter/making-a-local-llm-mcp-server-deterministic-model-routing-think-block-stripping-and-the-problems-5bmj — MEDIUM confidence
+- LLM rate limits and provider discovery: https://www.truefoundry.com/blog/rate-limiting-in-llm-gateway — MEDIUM confidence
+- Drizzle nullable column safe migration pattern: https://github.com/drizzle-team/drizzle-orm/issues/2694 — MEDIUM confidence
 
 ---
-*Pitfalls research for: RiskMind — Replit migration + Cloudflare tunnel + ERM platform improvement*
-*Researched: 2026-03-17*
+*Pitfalls research for: RiskMind v1.1 — LLM integration, model routing, async job queue bug fixes*
+*Researched: 2026-03-18*
