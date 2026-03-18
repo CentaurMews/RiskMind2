@@ -128,7 +128,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Foresight page loads at its route and shows visual previews for all four planned features: Monte Carlo simulation, OSINT forecasting, agent findings inbox, and what-if scenario builder
   2. The page uses the established minimalist design language (Linear/Vercel aesthetic) with no broken layouts or placeholder text visible
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 07-01-PLAN.md — Foresight teaser page: polished coming-soon layout with visual mockups for Monte Carlo, OSINT, agent feed, what-if builder
@@ -177,7 +177,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Foresight page loads at its route and shows visual previews for all four planned features: Monte Carlo simulation, OSINT forecasting, agent findings inbox, and what-if scenario builder
   2. The page uses the established minimalist design language (Linear/Vercel aesthetic) with no broken layouts or placeholder text visible
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 07-01-PLAN.md — Foresight teaser page: polished coming-soon layout with visual mockups for Monte Carlo, OSINT, agent feed, what-if builder
