@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LLM Intelligence + Fixes + Polish
-status: completed
-stopped_at: Phase 6 context gathered
-last_updated: "2026-03-18T17:21:06.968Z"
-last_activity: 2026-03-18 — Phase 5 Plan 03 completed (LLM wiring, FIX-02)
+status: executing
+stopped_at: "Phase 6 Plan 02 — checkpoint:human-verify (wizard end-to-end flow verification)"
+last_updated: "2026-03-18T18:05:02.234Z"
+last_activity: "2026-03-18 — Phase 6 Plan 01 completed (bug fixes: FIX-01, FIX-03, FIX-04, FIX-05, FIX-06, FIX-07)"
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 5
+  percent: 80
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 ## Current Position
 
 Phase: 6 of 7 (Bug Fixes and Wizard UI)
-Plan: 01 of 03 (completed)
-Status: In progress
-Last activity: 2026-03-18 — Phase 6 Plan 01 completed (bug fixes: FIX-01, FIX-03, FIX-04, FIX-05, FIX-06, FIX-07)
+Plan: 02 of 03 (awaiting human-verify checkpoint)
+Status: In progress — checkpoint:human-verify
+Last activity: 2026-03-18 — Phase 6 Plan 02 automated tasks complete (LlmConfigWizard + RoutingTableCard); awaiting wizard end-to-end verification
 
 Progress: [████████░░] 80%
 
@@ -49,6 +49,7 @@ Progress: [████████░░] 80%
 | Phase 05-llm-intelligence-backend P01 | 3 minutes | 2 tasks | 20 files |
 | Phase 05-llm-intelligence-backend P02 | 5 minutes | 2 tasks | 1 files |
 | Phase 05-llm-intelligence-backend P03 | 4 minutes | 2 tasks | 4 files |
+| Phase 06-bug-fixes-and-wizard-ui P02 | 6 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 06-bug-fixes-and-wizard-ui]: ENRICHMENT_SENTINEL split pattern ensures enrichment is idempotent — re-enriching replaces block
 - [Phase 06-bug-fixes-and-wizard-ui]: Vendor AI question parse failure returns 502 (upstream error), not 400 (bad request)
 - [Phase 06-bug-fixes-and-wizard-ui]: useDiscoverLlmModels requires saved provider ID — Load models button shown only in edit mode
+- [Phase 06-bug-fixes-and-wizard-ui]: LlmConfigWizard mounted as sibling to existing provider Sheet to avoid nested Radix Dialog portals
+- [Phase 06-bug-fixes-and-wizard-ui]: Wizard createProvider success triggers useEffect discover automatically via configId change
 
 ### Pending Todos
 
@@ -85,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T19:14:00Z
-Stopped at: Phase 6 Plan 01 completed (bug fixes)
-Resume file: .planning/phases/06-bug-fixes-and-wizard-ui/06-01-SUMMARY.md
+Last session: 2026-03-18T18:05:02.228Z
+Stopped at: Phase 6 Plan 02 — checkpoint:human-verify (wizard end-to-end flow verification)
+Resume file: .planning/phases/06-bug-fixes-and-wizard-ui/06-02-SUMMARY.md
