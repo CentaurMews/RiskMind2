@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: completed
-stopped_at: Completed 04-ai-differentiators-surfaced-04-02-PLAN.md
+milestone: v1.1
+milestone_name: LLM Intelligence + Fixes + Polish
+status: planning
+stopped_at: Milestone v1.1 started — defining requirements
 last_updated: "2026-03-18T13:58:08.349Z"
 last_activity: "2026-03-18 — Phase 2 verified complete; app publicly accessible at https://app.riskmind.net with CORS enforced and SSE streaming working"
 progress:
@@ -20,17 +20,17 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-03-17)
 
-**Core value:** A working, demo-ready enterprise risk management platform accessible via Cloudflare tunnel, with AI features visibly surfaced
-**Current focus:** Phase 3 — AI Features
+**Core value:** A working, demo-ready enterprise risk management platform powered by intelligent AI routing at https://app.riskmind.net
+**Current focus:** Milestone v1.1 — LLM Intelligence + Fixes + Polish
 
 ## Current Position
 
-Phase: 2 of 4 (Public Access and Security) — COMPLETE
-Plan: 3 of 3 in Phase 2 (all complete)
-Status: Phase 2 complete; ready to begin Phase 3
-Last activity: 2026-03-18 — Phase 2 verified complete; app publicly accessible at https://app.riskmind.net with CORS enforced and SSE streaming working
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-18 — Milestone v1.1 started
 
-Progress: [█████░░░░░] 50%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
