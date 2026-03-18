@@ -63,7 +63,6 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 
 - [ ] **AI-01**: AI enrichment visible on risk detail — "AI-enriched" badge, enrichment summary, date
 - [ ] **AI-02**: AI-generated treatment suggestions surfaced on risk detail page
-- [ ] **AI-03**: Foresight page displays autonomous agent findings with confidence level and rationale
 - [ ] **AI-04**: Signal-to-finding-to-risk traceability — visual chain showing how signals become risks
 
 ### Export
@@ -73,6 +72,13 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
+
+### Foresight & Forecasting
+
+- **FORE-01**: Foresight page with autonomous agent findings inbox (approve/dismiss/create-risk workflow)
+- **FORE-02**: Monte Carlo simulation for risk scenario modeling (what-if analysis)
+- **FORE-03**: OSINT/external data enrichment for risk horizon forecasting
+- **FORE-04**: LLM observability dashboard (token usage, cost analytics, model performance)
 
 ### Advanced Analytics
 
@@ -141,12 +147,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXP-01 | Phase 3 | Complete |
 | AI-01 | Phase 4 | Pending |
 | AI-02 | Phase 4 | Pending |
-| AI-03 | Phase 4 | Pending |
 | AI-04 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 36 total
-- Mapped to phases: 36
+- v1 requirements: 35 total
+- Mapped to phases: 35
 - Unmapped: 0 ✓
 
 ---

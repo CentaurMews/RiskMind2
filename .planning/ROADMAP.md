@@ -73,14 +73,14 @@ Plans:
 - [ ] 03-04-PLAN.md — Command palette (⌘K), risk sparklines, compliance posture display
 
 ### Phase 4: AI Differentiators Surfaced
-**Goal**: RiskMind's AI-native identity is visible — enrichment badges on risk detail, treatment suggestions, Foresight page with agent findings, and signal-to-finding-to-risk traceability chain
+**Goal**: RiskMind's AI-native identity is visible — enrichment badges with provenance on risk detail, polished treatment suggestions, and signal-to-finding-to-risk traceability chain with AI decision transparency
 **Depends on**: Phase 3
-**Requirements**: AI-01, AI-02, AI-03, AI-04
+**Requirements**: AI-01, AI-02, AI-04
 **Success Criteria** (what must be TRUE):
-  1. Risk detail page shows "AI-enriched" badge, enrichment summary, and the date enrichment ran
-  2. AI-generated treatment suggestions appear on the risk detail page
-  3. Foresight page displays autonomous agent findings with confidence level and rationale for each finding
-  4. Signal detail links to the derived finding, and finding links to the resulting risk — full traceability chain navigable in the UI
+  1. Risk detail page shows "AI Enhanced" badge, parsed enrichment section with provenance (model, date, tokens), separate from raw description
+  2. AI-generated treatment suggestions display polished on risk detail with confidence and rationale
+  3. Signal detail links to derived finding, finding links to resulting risk — full traceability chain navigable in the UI with AI provenance at each decision point
+  4. Risk detail shows "Sources" section listing where the risk originated (signal, finding, agent detection)
 **Plans**: TBD
 
 ## Progress
