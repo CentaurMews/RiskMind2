@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useGetRiskHeatmap } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { SeverityBadge } from "@/components/ui/severity-badge";
 import { Link } from "wouter";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { HeatmapGrid } from "@/components/dashboard/heatmap-grid";
 
 export default function RiskHeatmap() {
   const { data, isLoading } = useGetRiskHeatmap();
   const [selectedCell, setSelectedCell] = useState<{ likelihood: number; impact: number } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const l = params.get("l");
+    const i = params.get("i");
+    if (l && i) setSelectedCell({ likelihood: Number(l), impact: Number(i) });
+  }, []);
 
   const getCellColor = (count: number, likelihood: number, impact: number) => {
     if (count === 0) return "bg-card hover:bg-muted/50 border-border/50";
@@ -65,27 +73,12 @@ export default function RiskHeatmap() {
                   <span>1 (Rare)</span>
                 </div>
 
-                <div className="aspect-square grid grid-cols-5 grid-rows-5 gap-1.5 md:gap-2">
-                  {[5, 4, 3, 2, 1].map(l => (
-                    [1, 2, 3, 4, 5].map(i => {
-                      const cell = getCellData(l, i);
-                      const count = cell?.risks?.length || 0;
-                      return (
-                        <button 
-                          key={`${l}-${i}`}
-                          className={cn(
-                            "rounded-lg border transition-all duration-300 flex items-center justify-center text-2xl cursor-pointer hover:scale-[1.02]",
-                            getCellColor(count, l, i),
-                            selectedCell?.likelihood === l && selectedCell?.impact === i ? "ring-2 ring-primary ring-offset-2" : ""
-                          )}
-                          title={`Likelihood: ${l}, Impact: ${i} - ${count} risks`}
-                          onClick={() => count > 0 ? setSelectedCell({ likelihood: l, impact: i }) : undefined}
-                        >
-                          {count > 0 ? count : ""}
-                        </button>
-                      )
-                    })
-                  ))}
+                <div className="aspect-square">
+                  <HeatmapGrid
+                    cells={(data?.cells || []) as Array<{ likelihood: number; impact: number; risks: Array<{ id: string; title: string; status: string; category: string }> }>}
+                    compact={false}
+                    onCellClick={(l, i) => setSelectedCell({ likelihood: l, impact: i })}
+                  />
                 </div>
 
                 <div />

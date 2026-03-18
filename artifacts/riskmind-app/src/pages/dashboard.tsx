@@ -4,10 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldAlert, Bell, Users, ShieldCheck, ArrowUpRight } from "lucide-react";
 import { SeverityBadge, StatusBadge } from "@/components/ui/severity-badge";
 import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { HeatmapGrid } from "@/components/dashboard/heatmap-grid";
 
 export default function Dashboard() {
+  const [, navigate] = useLocation();
   const { data: risks } = useListRisks({ status: "open" });
   const { data: alerts } = useListAlerts({ status: "active" });
   const { data: vendors } = useListVendors();
@@ -129,29 +132,12 @@ export default function Dashboard() {
                <div className="aspect-square w-full bg-secondary/50 rounded-lg border flex flex-col relative overflow-hidden">
                   <div className="absolute bottom-4 left-4 text-xs font-mono text-muted-foreground rotate-[-90deg] origin-bottom-left">LIKELIHOOD</div>
                   <div className="absolute bottom-0 left-10 text-xs font-mono text-muted-foreground w-full text-center pb-2">IMPACT</div>
-                  
-                  <div className="flex-1 grid grid-cols-5 grid-rows-5 gap-1 p-8 pb-10 pl-10">
-                    {[5, 4, 3, 2, 1].flatMap(l =>
-                      [1, 2, 3, 4, 5].map(i => {
-                        const cell = heatmap?.cells?.find(c => c.likelihood === l && c.impact === i);
-                        const count = cell?.risks?.length || 0;
-                        const score = l * i;
-                        return (
-                          <div 
-                            key={`${l}-${i}`} 
-                            className={cn(
-                              "rounded-sm border border-border/50 flex items-center justify-center text-xs font-mono",
-                              count === 0 ? "bg-muted/30" :
-                              score >= 15 ? "bg-severity-critical/20 border-severity-critical/30 text-severity-critical font-bold" :
-                              score >= 10 ? "bg-severity-high/20 border-severity-high/30 text-severity-high font-bold" :
-                              score >= 5 ? "bg-severity-medium/20 border-severity-medium/30 font-bold" : "bg-severity-low/20 border-severity-low/30"
-                            )} 
-                          >
-                            {count > 0 ? count : ""}
-                          </div>
-                        )
-                      })
-                    )}
+                  <div className="flex-1 p-8 pb-10 pl-10">
+                    <HeatmapGrid
+                      cells={(heatmap?.cells || []) as Array<{ likelihood: number; impact: number; risks: Array<{ id: string; title: string; status: string; category: string }> }>}
+                      compact={true}
+                      onCellClick={(l, i) => navigate('/risks/heatmap?l=' + l + '&i=' + i)}
+                    />
                   </div>
                </div>
             </CardContent>
