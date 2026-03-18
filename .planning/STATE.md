@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Completed 04-ai-differentiators-surfaced-04-01-PLAN.md
-last_updated: "2026-03-18T13:46:49.161Z"
+stopped_at: Completed 04-ai-differentiators-surfaced-04-02-PLAN.md
+last_updated: "2026-03-18T13:53:24.924Z"
 last_activity: "2026-03-18 — Phase 2 verified complete; app publicly accessible at https://app.riskmind.net with CORS enforced and SSE streaming working"
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 14
-  completed_plans: 13
+  completed_plans: 14
   percent: 50
 ---
 
@@ -64,6 +64,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03-dashboard-polish-and-demo-readiness P02 | 25 | 2 tasks | 9 files |
 | Phase 03-dashboard-polish-and-demo-readiness P04 | 3 | 2 tasks | 4 files |
 | Phase 04-ai-differentiators-surfaced P01 | 8 | 2 tasks | 2 files |
+| Phase 04-ai-differentiators-surfaced P02 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase 04-ai-differentiators-surfaced]: AI_ENRICHMENT_SEPARATOR defined locally in risk-detail.tsx to match ai-workers.ts value without cross-package import
 - [Phase 04-ai-differentiators-surfaced]: AiProvenance placed in components/ai/ subdirectory to group AI-specific shared components
 - [Phase 04-ai-differentiators-surfaced]: enrichmentOpen defaults to false — enrichment panel starts collapsed, user opts in to expand
+- [Phase 04-ai-differentiators-surfaced]: Omit finding.confidence from AiProvenance in FindingPanel — Finding type has no confidence field
+- [Phase 04-ai-differentiators-surfaced]: Parse signal.confidence as string (Signal.confidence is string | null) using parseFloat for safe display
 
 ### Pending Todos
 
@@ -116,6 +119,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T13:46:49.151Z
-Stopped at: Completed 04-ai-differentiators-surfaced-04-01-PLAN.md
+Last session: 2026-03-18T13:53:24.911Z
+Stopped at: Completed 04-ai-differentiators-surfaced-04-02-PLAN.md
 Resume file: None
