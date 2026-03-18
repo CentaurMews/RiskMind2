@@ -1,21 +1,14 @@
 # Roadmap: RiskMind
 
-## Overview
+## Milestones
 
-RiskMind is a functioning ERM platform being migrated from Replit to a dedicated Linux server and polished for demo-ready use. The journey is: deploy cleanly → expose publicly → make the UI credible → make the AI differentiators visible. Four phases follow the hard dependency chain. Nothing in Phase 3 is demoable without Phase 1 and 2 complete, and AI visibility in Phase 4 requires the full stack running.
+- ✅ **v1.0 Demo-Ready Deployment** - Phases 1-4 (shipped 2026-03-18)
+- 🚧 **v1.1 LLM Intelligence + Fixes + Polish** - Phases 5-7 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-- [x] **Phase 1: Server Foundation** - Strip Replit dependencies, provision database, build and run the app locally on port 4000 with PM2 (completed 2026-03-17)
-- [x] **Phase 2: Public Access and Security** - Configure named Cloudflare tunnel, lock CORS, enable SSE streaming, expose app via public URL (completed 2026-03-18)
-- [x] **Phase 3: Dashboard Polish and Demo Readiness** - Visual polish, empty/loading/error states, RBAC UI enforcement, vendor and compliance views (completed 2026-03-18)
-- [x] **Phase 4: AI Differentiators Surfaced** - AI enrichment badges, treatment suggestions, Foresight page, signal traceability visible in UI (completed 2026-03-18)
-
-## Phase Details
+<details>
+<summary>✅ v1.0 Demo-Ready Deployment (Phases 1-4) - SHIPPED 2026-03-18</summary>
 
 ### Phase 1: Server Foundation
 **Goal**: The app runs cleanly on the dedicated server — dependencies stripped, database provisioned with seed data, Express serving both API and SPA on port 4000, PM2 managing the process
@@ -30,11 +23,11 @@ RiskMind is a functioning ERM platform being migrated from Replit to a dedicated
 **Plans**: 5 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Strip Replit dependencies from all manifests and vite.config.ts
-- [ ] 01-02-PLAN.md — Env validation, rich seed integration, .env setup
-- [ ] 01-03-PLAN.md — Database provisioning (pgvector, drizzle push, manual migration)
-- [ ] 01-04-PLAN.md — Build workspace packages and wire Express static serving + SPA fallback
-- [ ] 01-05-PLAN.md — PM2 config, log rotation, boot persistence, end-to-end verification
+- [x] 01-01-PLAN.md — Strip Replit dependencies from all manifests and vite.config.ts
+- [x] 01-02-PLAN.md — Env validation, rich seed integration, .env setup
+- [x] 01-03-PLAN.md — Database provisioning (pgvector, drizzle push, manual migration)
+- [x] 01-04-PLAN.md — Build workspace packages and wire Express static serving + SPA fallback
+- [x] 01-05-PLAN.md — PM2 config, log rotation, boot persistence, end-to-end verification
 
 ### Phase 2: Public Access and Security
 **Goal**: The app is accessible via a stable, named Cloudflare tunnel URL with CORS locked to that origin and SSE streaming working end-to-end
@@ -67,10 +60,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Backend API gaps: GET /v1/kris tenant-wide endpoint and POST /v1/search semantic search
-- [ ] 03-02-PLAN.md — Dashboard widgets: KPI skeletons + delta badges, HeatmapGrid, executive summary, KRI widget, alert bell
-- [ ] 03-03-PLAN.md — List page polish: skeleton rows, empty states, pagination, CSV export, RBAC gates, vendor kanban
-- [ ] 03-04-PLAN.md — Command palette (⌘K), risk sparklines, compliance posture display
+- [x] 03-01-PLAN.md — Backend API gaps: GET /v1/kris tenant-wide endpoint and POST /v1/search semantic search
+- [x] 03-02-PLAN.md — Dashboard widgets: KPI skeletons + delta badges, HeatmapGrid, executive summary, KRI widget, alert bell
+- [x] 03-03-PLAN.md — List page polish: skeleton rows, empty states, pagination, CSV export, RBAC gates, vendor kanban
+- [x] 03-04-PLAN.md — Command palette (⌘K), risk sparklines, compliance posture display
 
 ### Phase 4: AI Differentiators Surfaced
 **Goal**: RiskMind's AI-native identity is visible — enrichment badges with provenance on risk detail, polished treatment suggestions, and signal-to-finding-to-risk traceability chain with AI decision transparency
@@ -84,17 +77,122 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — AiProvenance component + risk detail enrichment badge, parsed description, collapsible AI Enrichment panel (AI-01)
-- [ ] 04-02-PLAN.md — Treatment suggestions provenance receipt, Sources traceability section, FindingPanel polish (AI-02, AI-04)
+- [x] 04-01-PLAN.md — AiProvenance component + risk detail enrichment badge, parsed description, collapsible AI Enrichment panel (AI-01)
+- [x] 04-02-PLAN.md — Treatment suggestions provenance receipt, Sources traceability section, FindingPanel polish (AI-02, AI-04)
+
+</details>
+
+### 🚧 v1.1 LLM Intelligence + Fixes + Polish (In Progress)
+
+**Milestone Goal:** Intelligent LLM configuration with wizard-based onboarding, model auto-discovery, benchmarking, per-task routing, audit bug fixes, and demo polish
+
+#### Phase 5: LLM Intelligence Backend
+**Goal**: The LLM routing system is fully operational server-side — new schema tables in place, service layer can discover models and run benchmarks, per-task routing resolves correctly, and the critical agent findings bug is fixed before caller wiring lands
+**Depends on**: Phase 4
+**Requirements**: LLM-01, LLM-02, LLM-03, LLM-04, LLM-05, LLM-06, ROUTE-01, ROUTE-02, ROUTE-03, ROUTE-04, FIX-02
+**Success Criteria** (what must be TRUE):
+  1. Admin can add a provider via the API (or directly) and the system validates the connection, fetches available models, and saves the configuration
+  2. Calling the benchmark endpoint against a configured model returns TTFT, total latency, and a quality score
+  3. Any AI operation that specifies a task type receives the model assigned to that task type in the routing table, falling back to the tenant default when no assignment exists
+  4. Agent run completes with local findings persisted even when the LLM call throws an error — run status reflects actual findings count, not "skipped"
+  5. Routing table entries can be read and updated via API, and the routing table UI card in Settings shows current assignments
+**Plans**: TBD
+
+Plans:
+- [ ] 05-01-PLAN.md — Schema migrations: llm_task_routing + llm_benchmark_results tables, OpenAPI spec update, Orval codegen re-run
+- [ ] 05-02-PLAN.md — llm-service.ts extensions: discoverModels(), runBenchmark(), resolveConfig(taskType), ANTHROPIC_MODELS constant
+- [ ] 05-03-PLAN.md — API endpoints + caller wiring: /discover, /benchmark, routing CRUD, /embeddings-health, taskType threading through all callers; FIX-02 agent findings persistence
+
+#### Phase 6: Bug Fixes and Wizard UI
+**Goal**: All remaining audit bugs are corrected and the 6-step LLM Config Wizard is live in Settings — admins can onboard providers, discover models, benchmark, and assign per-task routing without leaving the UI
+**Depends on**: Phase 5
+**Requirements**: FIX-01, FIX-03, FIX-04, FIX-05, FIX-06, FIX-07, LLM-01, LLM-02, LLM-03, LLM-04, LLM-05, LLM-06
+**Success Criteria** (what must be TRUE):
+  1. Document processing returns honest "content extraction not yet supported" stub instead of a hallucinated filename summary — no misleading AI output surfaces from the doc processor
+  2. Re-enriching a risk replaces the existing AI enrichment block exactly once — opening risk detail after two enrichment runs shows one block, not two stacked
+  3. Vendor AI question generation returns a clear, user-readable error message on LLM parse failure instead of a confusing 400 "invalid format" response
+  4. Vendor scorecard displays real last-assessment date and open findings count pulled from the database — no more placeholder dashes
+  5. Settings shows a visible warning banner when no embeddings provider is configured, explaining that semantic search and agent clustering will degrade
+  6. Model name input in provider configuration uses a selection component from the discovered list — free-text entry is blocked, and the backend rejects configs with model IDs that fail provider validation
+  7. Admin can complete the full 6-step LLM Config Wizard (provider select → API key → model discovery → model select → benchmark → routing assignment) and have the resulting config and routing assignments active without leaving Settings
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01-PLAN.md — Bug fixes: FIX-01 doc processor stub, FIX-03 enrichment idempotency, FIX-04 vendor 400 error, FIX-05 scorecard real data, FIX-06 embeddings warning, FIX-07 model name validation
+- [ ] 06-02-PLAN.md — LLM Config Wizard frontend: 6-step wizard in settings.tsx, routing table card, smart defaults from benchmark results, embeddings health banner
+
+#### Phase 7: Foresight Teaser
+**Goal**: The Foresight page is a polished, compelling preview that communicates the v2 vision — replacing the bare stub with an Apple-keynote-quality "coming soon" that makes the roadmap tangible
+**Depends on**: Phase 6
+**Requirements**: FORE-01
+**Success Criteria** (what must be TRUE):
+  1. Foresight page loads at its route and shows visual previews for all four planned features: Monte Carlo simulation, OSINT forecasting, agent findings inbox, and what-if scenario builder
+  2. The page uses the established minimalist design language (Linear/Vercel aesthetic) with no broken layouts or placeholder text visible
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01-PLAN.md — Foresight teaser page: polished coming-soon layout with visual mockups for Monte Carlo, OSINT, agent feed, what-if builder
+
+## Phase Details
+
+### Phase 5: LLM Intelligence Backend
+**Goal**: The LLM routing system is fully operational server-side — new schema tables in place, service layer can discover models and run benchmarks, per-task routing resolves correctly, and the critical agent findings bug is fixed before caller wiring lands
+**Depends on**: Phase 4
+**Requirements**: LLM-01, LLM-02, LLM-03, LLM-04, LLM-05, LLM-06, ROUTE-01, ROUTE-02, ROUTE-03, ROUTE-04, FIX-02
+**Success Criteria** (what must be TRUE):
+  1. Admin can add a provider via the API (or directly) and the system validates the connection, fetches available models, and saves the configuration
+  2. Calling the benchmark endpoint against a configured model returns TTFT, total latency, and a quality score
+  3. Any AI operation that specifies a task type receives the model assigned to that task type in the routing table, falling back to the tenant default when no assignment exists
+  4. Agent run completes with local findings persisted even when the LLM call throws an error — run status reflects actual findings count, not "skipped"
+  5. Routing table entries can be read and updated via API, and the routing table UI card in Settings shows current assignments
+**Plans**: TBD
+
+Plans:
+- [ ] 05-01-PLAN.md — Schema migrations: llm_task_routing + llm_benchmark_results tables, OpenAPI spec update, Orval codegen re-run
+- [ ] 05-02-PLAN.md — llm-service.ts extensions: discoverModels(), runBenchmark(), resolveConfig(taskType), ANTHROPIC_MODELS constant
+- [ ] 05-03-PLAN.md — API endpoints + caller wiring: /discover, /benchmark, routing CRUD, /embeddings-health, taskType threading through all callers; FIX-02 agent findings persistence
+
+### Phase 6: Bug Fixes and Wizard UI
+**Goal**: All remaining audit bugs are corrected and the 6-step LLM Config Wizard is live in Settings — admins can onboard providers, discover models, benchmark, and assign per-task routing without leaving the UI
+**Depends on**: Phase 5
+**Requirements**: FIX-01, FIX-03, FIX-04, FIX-05, FIX-06, FIX-07, LLM-01, LLM-02, LLM-03, LLM-04, LLM-05, LLM-06
+**Success Criteria** (what must be TRUE):
+  1. Document processing returns honest "content extraction not yet supported" stub instead of a hallucinated filename summary — no misleading AI output surfaces from the doc processor
+  2. Re-enriching a risk replaces the existing AI enrichment block exactly once — opening risk detail after two enrichment runs shows one block, not two stacked
+  3. Vendor AI question generation returns a clear, user-readable error message on LLM parse failure instead of a confusing 400 "invalid format" response
+  4. Vendor scorecard displays real last-assessment date and open findings count pulled from the database — no more placeholder dashes
+  5. Settings shows a visible warning banner when no embeddings provider is configured, explaining that semantic search and agent clustering will degrade
+  6. Model name input in provider configuration uses a selection component from the discovered list — free-text entry is blocked, and the backend rejects configs with model IDs that fail provider validation
+  7. Admin can complete the full 6-step LLM Config Wizard (provider select → API key → model discovery → model select → benchmark → routing assignment) and have the resulting config and routing assignments active without leaving Settings
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01-PLAN.md — Bug fixes: FIX-01 doc processor stub, FIX-03 enrichment idempotency, FIX-04 vendor 400 error, FIX-05 scorecard real data, FIX-06 embeddings warning, FIX-07 model name validation
+- [ ] 06-02-PLAN.md — LLM Config Wizard frontend: 6-step wizard in settings.tsx, routing table card, smart defaults from benchmark results, embeddings health banner
+
+### Phase 7: Foresight Teaser
+**Goal**: The Foresight page is a polished, compelling preview that communicates the v2 vision — replacing the bare stub with an Apple-keynote-quality "coming soon" that makes the roadmap tangible
+**Depends on**: Phase 6
+**Requirements**: FORE-01
+**Success Criteria** (what must be TRUE):
+  1. Foresight page loads at its route and shows visual previews for all four planned features: Monte Carlo simulation, OSINT forecasting, agent findings inbox, and what-if scenario builder
+  2. The page uses the established minimalist design language (Linear/Vercel aesthetic) with no broken layouts or placeholder text visible
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01-PLAN.md — Foresight teaser page: polished coming-soon layout with visual mockups for Monte Carlo, OSINT, agent feed, what-if builder
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+v1.0 phases complete. v1.1 executes in order: 5 → 6 → 7
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Server Foundation | 5/5 | Complete    | 2026-03-18 |
-| 2. Public Access and Security | 3/3 | Complete    | 2026-03-18 |
-| 3. Dashboard Polish and Demo Readiness | 4/4 | Complete    | 2026-03-18 |
-| 4. AI Differentiators Surfaced | 2/2 | Complete    | 2026-03-18 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Server Foundation | v1.0 | 5/5 | Complete | 2026-03-18 |
+| 2. Public Access and Security | v1.0 | 3/3 | Complete | 2026-03-18 |
+| 3. Dashboard Polish and Demo Readiness | v1.0 | 4/4 | Complete | 2026-03-18 |
+| 4. AI Differentiators Surfaced | v1.0 | 2/2 | Complete | 2026-03-18 |
+| 5. LLM Intelligence Backend | v1.1 | 0/3 | Not started | - |
+| 6. Bug Fixes and Wizard UI | v1.1 | 0/2 | Not started | - |
+| 7. Foresight Teaser | v1.1 | 0/1 | Not started | - |

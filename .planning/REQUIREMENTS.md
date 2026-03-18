@@ -68,30 +68,30 @@ Deferred to v2. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LLM-01 | — | Pending |
-| LLM-02 | — | Pending |
-| LLM-03 | — | Pending |
-| LLM-04 | — | Pending |
-| LLM-05 | — | Pending |
-| LLM-06 | — | Pending |
-| ROUTE-01 | — | Pending |
-| ROUTE-02 | — | Pending |
-| ROUTE-03 | — | Pending |
-| ROUTE-04 | — | Pending |
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| FIX-04 | — | Pending |
-| FIX-05 | — | Pending |
-| FIX-06 | — | Pending |
-| FIX-07 | — | Pending |
-| FORE-01 | — | Pending |
+| LLM-01 | Phase 5 | Pending |
+| LLM-02 | Phase 5 | Pending |
+| LLM-03 | Phase 5 | Pending |
+| LLM-04 | Phase 5 | Pending |
+| LLM-05 | Phase 5 | Pending |
+| LLM-06 | Phase 5 | Pending |
+| ROUTE-01 | Phase 5 | Pending |
+| ROUTE-02 | Phase 5 | Pending |
+| ROUTE-03 | Phase 5 | Pending |
+| ROUTE-04 | Phase 5 | Pending |
+| FIX-01 | Phase 6 | Pending |
+| FIX-02 | Phase 5 | Pending |
+| FIX-03 | Phase 6 | Pending |
+| FIX-04 | Phase 6 | Pending |
+| FIX-05 | Phase 6 | Pending |
+| FIX-06 | Phase 6 | Pending |
+| FIX-07 | Phase 6 | Pending |
+| FORE-01 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18
+- Mapped to phases: 18
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-18*
-*Last updated: 2026-03-18 after milestone v1.1 definition*
+*Last updated: 2026-03-18 — traceability filled after roadmap creation*
