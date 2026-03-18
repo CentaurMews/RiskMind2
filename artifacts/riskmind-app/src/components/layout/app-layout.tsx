@@ -8,6 +8,7 @@ import {
 import logo from "@assets/risk_mind_1773670829732.png";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { AlertBell } from "@/components/dashboard/alert-bell";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -195,6 +196,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <span className="font-mono text-xs px-2 py-1 bg-secondary rounded-md capitalize">{tenantName}</span>
           </div>
           <div className="flex items-center gap-4">
+            <AlertBell />
             <div className="text-sm text-muted-foreground hidden sm:flex items-center gap-2">
               <span className="truncate max-w-[200px]">{user.email}</span>
               <span className="text-xs px-1.5 py-0.5 bg-secondary rounded capitalize">{userRoleLabel}</span>
