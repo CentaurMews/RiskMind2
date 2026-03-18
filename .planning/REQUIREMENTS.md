@@ -40,24 +40,24 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 
 ### UI Polish
 
-- [ ] **UI-01**: Consistent card design and spacing across all pages
-- [ ] **UI-02**: Empty state messaging with placeholder illustrations and "Get started" CTAs on all list views
-- [ ] **UI-03**: Loading states (skeleton screens/spinners) on all data-fetching pages
-- [ ] **UI-04**: Error states with toast notifications instead of raw error text
-- [ ] **UI-05**: Consistent navigation — sidebar active states, breadcrumbs on detail pages, page titles
-- [ ] **UI-06**: Role-based UI enforcement — admin controls hidden for viewers, read-only for auditors
-- [ ] **UI-07**: Pagination, search, and filter controls on all list views (risks, vendors, controls, signals)
+- [x] **UI-01**: Consistent card design and spacing across all pages
+- [x] **UI-02**: Empty state messaging with placeholder illustrations and "Get started" CTAs on all list views
+- [x] **UI-03**: Loading states (skeleton screens/spinners) on all data-fetching pages
+- [x] **UI-04**: Error states with toast notifications instead of raw error text
+- [x] **UI-05**: Consistent navigation — sidebar active states, breadcrumbs on detail pages, page titles
+- [x] **UI-06**: Role-based UI enforcement — admin controls hidden for viewers, read-only for auditors
+- [x] **UI-07**: Pagination, search, and filter controls on all list views (risks, vendors, controls, signals)
 - [ ] **UI-08**: Risk trend sparklines on risk cards showing 30-day score trajectory
 - [x] **UI-09**: Command palette (⌘K) with semantic search — global search across risks, vendors, frameworks, signals via pgvector
 
 ### Vendor Management
 
-- [ ] **VEND-01**: Vendor scorecard summary — risk score, tier, last assessment date, open findings at a glance
-- [ ] **VEND-02**: Vendor lifecycle pipeline/kanban view — vendors visualized by lifecycle stage
+- [x] **VEND-01**: Vendor scorecard summary — risk score, tier, last assessment date, open findings at a glance
+- [x] **VEND-02**: Vendor lifecycle pipeline/kanban view — vendors visualized by lifecycle stage
 
 ### Compliance
 
-- [ ] **COMP-01**: Compliance posture percentage per framework ("73% compliant with ISO 27001")
+- [x] **COMP-01**: Compliance posture percentage per framework ("73% compliant with ISO 27001")
 
 ### AI Features
 
@@ -68,7 +68,7 @@ Requirements for demo-ready release. Each maps to roadmap phases.
 
 ### Export
 
-- [ ] **EXP-01**: CSV export for risk register data
+- [x] **EXP-01**: CSV export for risk register data
 
 ## v2 Requirements
 
@@ -126,19 +126,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-03 | Phase 3 | Pending |
 | DASH-04 | Phase 3 | Complete |
 | DASH-05 | Phase 3 | Pending |
-| UI-01 | Phase 3 | Pending |
-| UI-02 | Phase 3 | Pending |
-| UI-03 | Phase 3 | Pending |
-| UI-04 | Phase 3 | Pending |
-| UI-05 | Phase 3 | Pending |
-| UI-06 | Phase 3 | Pending |
-| UI-07 | Phase 3 | Pending |
+| UI-01 | Phase 3 | Complete |
+| UI-02 | Phase 3 | Complete |
+| UI-03 | Phase 3 | Complete |
+| UI-04 | Phase 3 | Complete |
+| UI-05 | Phase 3 | Complete |
+| UI-06 | Phase 3 | Complete |
+| UI-07 | Phase 3 | Complete |
 | UI-08 | Phase 3 | Pending |
 | UI-09 | Phase 3 | Complete |
-| VEND-01 | Phase 3 | Pending |
-| VEND-02 | Phase 3 | Pending |
-| COMP-01 | Phase 3 | Pending |
-| EXP-01 | Phase 3 | Pending |
+| VEND-01 | Phase 3 | Complete |
+| VEND-02 | Phase 3 | Complete |
+| COMP-01 | Phase 3 | Complete |
+| EXP-01 | Phase 3 | Complete |
 | AI-01 | Phase 4 | Pending |
 | AI-02 | Phase 4 | Pending |
 | AI-03 | Phase 4 | Pending |
