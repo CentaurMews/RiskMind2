@@ -1,4 +1,4 @@
-import { useListFrameworks, useGetComplianceScore, type Framework } from "@workspace/api-client-react";
+import { useListFrameworks, useGetComplianceScore, useGetMe, type Framework } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
@@ -67,6 +67,9 @@ function FrameworkCard({ fw }: { fw: Framework }) {
 
 export default function FrameworkList() {
   const { data: frameworks, isLoading } = useListFrameworks();
+  const { data: user } = useGetMe({ query: { queryKey: ["/api/v1/auth/me"] } });
+  const canEdit = user?.role === "admin" || user?.role === "risk_manager";
+  {/* canEdit gate: no create button present on this page — RBAC pattern available for future additions */}
 
   return (
     <AppLayout>
