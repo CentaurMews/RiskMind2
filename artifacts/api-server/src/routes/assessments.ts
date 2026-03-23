@@ -11,6 +11,7 @@ import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError } from "../lib/errors";
 import { streamComplete, complete, LLMUnavailableError } from "../lib/llm-service";
+import { computeTierFromRiskScore } from "../lib/allowed-transitions";
 import { enqueueJob, registerWorker } from "../lib/job-queue";
 import {
   computeScore,
@@ -54,6 +55,56 @@ Please analyze these responses and provide a summary that highlights:
 4) Overall assessment quality and completeness
 
 Provide a concise, professional summary suitable for executive review.`;
+}
+
+// ─── Risk Score Update Hook ────────────────────────────────────────────────────
+// Risk score convention: 0 = low risk (best), 100 = critical risk (worst)
+// Assessment Engine overall: 0-100 where 100 = perfect compliance
+// Conversion: riskScore = 100 - assessment.overall
+
+/**
+ * When an assessment with contextType='vendor' is completed, update the vendor's
+ * riskScore using the assessment engine score. Safe to call for non-vendor assessments.
+ */
+async function updateVendorRiskScoreFromAssessment(
+  assessment: { contextType: string; contextId: string | null; templateId: string; responses: unknown },
+  tenantId: string,
+): Promise<void> {
+  if (assessment.contextType !== "vendor" || !assessment.contextId) return;
+
+  // Load template to get questions
+  const [template] = await db
+    .select({ questions: assessmentTemplatesTable.questions })
+    .from(assessmentTemplatesTable)
+    .where(eq(assessmentTemplatesTable.id, assessment.templateId))
+    .limit(1);
+  if (!template) return;
+
+  const score = computeScore(
+    template.questions as AssessmentTemplateQuestions,
+    assessment.responses as AssessmentResponses,
+  );
+
+  const riskScore = Math.round((100 - score.overall) * 100) / 100;
+
+  // Load vendor to check overrideTier
+  const [vendor] = await db
+    .select({ tier: vendorsTable.tier, overrideTier: vendorsTable.overrideTier })
+    .from(vendorsTable)
+    .where(eq(vendorsTable.id, assessment.contextId))
+    .limit(1);
+  if (!vendor) return;
+
+  const newTier = vendor.overrideTier ?? computeTierFromRiskScore(riskScore);
+
+  await db
+    .update(vendorsTable)
+    .set({
+      riskScore: String(riskScore),
+      ...(!vendor.overrideTier && { tier: newTier }),
+      updatedAt: new Date(),
+    })
+    .where(eq(vendorsTable.id, assessment.contextId!));
 }
 
 // Register AI summary worker for assessments
@@ -369,6 +420,9 @@ router.post(
         })
         .where(eq(assessmentsTable.id, assessmentId))
         .returning();
+
+      // Update vendor risk score if this is a vendor-context assessment
+      await updateVendorRiskScoreFromAssessment(assessment, tenantId);
 
       const job = await enqueueJob(
         "ai-assess",
