@@ -21,7 +21,7 @@ created: 2026-03-23
 | Preset | new-york, baseColor: neutral, cssVariables: true |
 | Component library | Radix UI (via shadcn) |
 | Icon library | lucide-react |
-| Font | Inter (400, 500, 600, 700) — loaded via Google Fonts in index.css |
+| Font | Inter (400, 600) — loaded via Google Fonts in index.css |
 
 Source: `artifacts/riskmind-app/components.json`, `artifacts/riskmind-app/src/index.css`
 
@@ -47,12 +47,12 @@ Exceptions: Touch targets for drag-handle on reorderable question rows must be m
 
 ## Typography
 
-| Role | Size | Weight | Line Height |
-|------|------|--------|-------------|
-| Body | 14px | 400 | 1.5 |
-| Label | 14px | 500 | 1.4 |
-| Heading | 20px | 600 | 1.2 |
-| Display | 28px | 600 | 1.2 |
+| Role | Size | Weight | Line Height | Notes |
+|------|------|--------|-------------|-------|
+| Body | 14px | 400 | 1.5 | Default text, descriptions, metadata |
+| Label | 14px | 400 | 1.4 | Uppercase, letter-spacing: 0.05em — distinguishes from body by case + tracking, not weight |
+| Heading | 20px | 600 | 1.2 | Section names, card titles |
+| Display | 28px | 600 | 1.2 | Page h1, score numerals |
 
 Notes:
 - Score numerals (e.g. "84 / 100") rendered at 28px weight 600 inside the gauge/donut chart center text.
@@ -60,6 +60,8 @@ Notes:
 - Section names within the assessment wizard use the Heading role (20px / 600).
 - AI analysis narrative in results card uses 14px / 400, 1.5 line-height.
 - Muted metadata (AiProvenance, timestamps) inherits sizing from the existing `AiProvenance` component — do not re-declare a size token for this phase.
+- Score tier label below the ScoreGauge numeral: 14px / 400, uppercase, letter-spacing 0.05em (Label role).
+- "Preview" panel header label in template builder: 14px / 400, uppercase, letter-spacing 0.05em (Label role), muted color.
 
 Source: `artifacts/riskmind-app/src/index.css` (Inter font), `artifacts/riskmind-app/src/components/ai/ai-provenance.tsx` (AiProvenance component)
 
@@ -155,7 +157,7 @@ Three new pages required for this phase:
   - QuestionRow expanded state shows: question text Input, type Select, weight Input (0–10), branching conditions list via ConditionBuilder rows, "Add Condition" link.
   - "Save Template" primary button fixed at bottom of left panel.
 - **Right panel (Preview pane):**
-  - Labeled "Preview" in 14px/500 muted text at top.
+  - Labeled "PREVIEW" in 14px/400 uppercase letter-spacing-wide muted text at top (Label role).
   - Read-only rendering of current template as it would appear during an assessment session. Updates live as user edits left panel.
   - Preview uses same question rendering components as the assessment session to guarantee visual consistency.
 - **Mobile:** Preview panel hidden below 768px. "Preview" toggle button appears in header to open as Sheet.
@@ -179,7 +181,7 @@ Three new pages required for this phase:
 - **Layout:** Standard AppLayout with Breadcrumb. Single-column centered layout, max-width 800px.
 - **Page header:** Assessment subject name + "Completed {date}" in muted 14px.
 - **AiAnalysisCard** rendered first, full width. Shows AI narrative. "AI Analysis" Badge + AiProvenance (model, date) in card header. Card background uses `--muted` (hsl 240 4.8% 95.9% light) to stand out from white background. If AI summary is still generating, card shows Skeleton lines.
-- **Score section header:** "Overall Score" at 20px/600. ScoreGauge centered below header, 200px diameter. Score numeral 28px/600 in center. Score tier label ("High" / "Medium" / "Low" / "Critical") below numeral in 14px/500.
+- **Score section header:** "Overall Score" at 20px/600. ScoreGauge centered below header, 200px diameter. Score numeral 28px/600 in center. Score tier label ("High" / "Medium" / "Low" / "Critical") below numeral in 14px/400 uppercase letter-spacing-wide (Label role).
 - **Section scores:** "Section Breakdown" at 20px/600. List of SectionScoreBar rows, one per section, sorted by ascending score (worst first).
 - **Per-question detail:** Collapsible per section. Section row header: section name + score. Expanded: list of question rows — question text, answer given, per-question score, weight. Per-question score omitted for non-numeric question types.
 - **Action bar:** "Start New Assessment" (primary Button), "Export PDF" (outline Button, placeholder — shows "Coming soon" toast) — both in a row below score section.
