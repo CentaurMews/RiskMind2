@@ -1,5 +1,9 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { eq, and } from "drizzle-orm";
+
+function p(req: Request, name: string): string {
+  return String(req.params[name]);
+}
 import {
   db,
   integrationConfigsTable,
@@ -129,7 +133,7 @@ router.patch(
   async (req, res) => {
     try {
       const tenantId = req.user!.tenantId;
-      const id = req.params.id!;
+      const id = p(req, "id");
 
       const [existing] = await db
         .select()
@@ -194,7 +198,7 @@ router.delete(
   async (req, res) => {
     try {
       const tenantId = req.user!.tenantId;
-      const id = req.params.id!;
+      const id = p(req, "id");
 
       const [existing] = await db
         .select({ id: integrationConfigsTable.id })
@@ -227,7 +231,7 @@ router.post(
   async (req, res) => {
     try {
       const tenantId = req.user!.tenantId;
-      const id = req.params.id!;
+      const id = p(req, "id");
 
       const result = await getDecryptedConfig(id, tenantId);
       if (!result) {
@@ -260,7 +264,7 @@ router.post(
   async (req, res) => {
     try {
       const tenantId = req.user!.tenantId;
-      const id = req.params.id!;
+      const id = p(req, "id");
 
       const result = await getDecryptedConfig(id, tenantId);
       if (!result) {
