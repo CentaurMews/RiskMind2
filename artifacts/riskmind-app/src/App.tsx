@@ -22,6 +22,11 @@ import ControlList from "@/pages/compliance/control-list";
 import AlertList from "@/pages/alerts/alert-list";
 import Settings from "@/pages/settings/settings";
 import Foresight from "@/pages/foresight/foresight";
+import AssessmentList from "@/pages/assessments/index";
+import AssessmentTemplateLibrary from "@/pages/assessments/templates/index";
+import AssessmentTemplateBuilder from "@/pages/assessments/templates/builder";
+import AssessmentSession from "@/pages/assessments/session";
+import AssessmentResults from "@/pages/assessments/results";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +63,12 @@ function AppRouter() {
       <Route path="/alerts">{() => <ProtectedPage Component={AlertList} />}</Route>
       <Route path="/settings">{() => <ProtectedPage Component={Settings} />}</Route>
       <Route path="/foresight">{() => <ProtectedPage Component={Foresight} />}</Route>
+      <Route path="/assessments/templates/new">{() => <ProtectedPage Component={AssessmentTemplateBuilder} />}</Route>
+      <Route path="/assessments/templates/:id/edit">{() => <ProtectedPage Component={AssessmentTemplateBuilder} />}</Route>
+      <Route path="/assessments/templates">{() => <ProtectedPage Component={AssessmentTemplateLibrary} />}</Route>
+      <Route path="/assessments/:id/session">{() => <ProtectedPage Component={AssessmentSession} />}</Route>
+      <Route path="/assessments/:id/results">{() => <ProtectedPage Component={AssessmentResults} />}</Route>
+      <Route path="/assessments">{() => <ProtectedPage Component={AssessmentList} />}</Route>
       <Route path="/" component={() => {
         const [, setLocation] = useLocation();
         useEffect(() => {
