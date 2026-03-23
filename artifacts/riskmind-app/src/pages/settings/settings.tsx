@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { LlmConfigWizard } from "./llm-config-wizard";
 import { RoutingTableCard } from "./routing-table-card";
@@ -30,18 +30,84 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   ShieldAlert, Bot, Server, Loader2, Users, Shield,
   Plus, Pencil, Trash2, CheckCircle2, XCircle,
   Play, RefreshCw, Clock, AlertTriangle, Eye,
-  Link2, Zap, TrendingUp, Search, Lightbulb, Ban, X
+  Link2, Zap, TrendingUp, Search, Lightbulb, Ban, X,
+  Building2, Timer,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
+import { toast } from "@/hooks/use-toast";
+
+// ── Org Dependencies ──────────────────────────────────────────────────────────
+
+const CATEGORIES = [
+  { value: "email", label: "Email Provider" },
+  { value: "cloud", label: "Cloud Provider" },
+  { value: "cdn", label: "CDN" },
+  { value: "identity", label: "Identity Provider" },
+  { value: "payment", label: "Payment Processor" },
+  { value: "communication", label: "Communication Tools" },
+  { value: "other", label: "Other" },
+];
+
+type OrgDependency = {
+  id: string;
+  category: string;
+  providerName: string;
+  vendorId?: string | null;
+  vendorName?: string | null;
+  criticality?: string | null;
+  notes?: string | null;
+};
+
+type ConcentrationRisk = {
+  vendorId: string;
+  vendorName: string;
+  dependencyCount: number;
+  categories: string[];
+  openSignalCount: number;
+};
+
+type Vendor = { id: string; name: string };
+type Template = { id: string; name: string };
+
+// ── Monitoring Configs ────────────────────────────────────────────────────────
+
+type MonitoringConfig = {
+  id?: string;
+  tier: string;
+  cadenceDays: number;
+  scoreThreshold?: number | null;
+  assessmentTemplateId?: string | null;
+};
+
+// ── TierBadge (inline, matches vendor-list.tsx pattern) ───────────────────────
+
+const TIER_COLORS: Record<string, string> = {
+  critical: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400",
+  high: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
+  medium: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400",
+  low: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
+};
+
+function TierBadge({ tier }: { tier: string }) {
+  const cls = TIER_COLORS[tier] || "bg-muted text-muted-foreground";
+  return (
+    <Badge variant="outline" className={`capitalize ${cls}`}>
+      {tier}
+    </Badge>
+  );
+}
+
+// ── ROLES ─────────────────────────────────────────────────────────────────────
 
 const ROLES: { value: UpdateUserRoleBodyRole; label: string }[] = [
   { value: "admin", label: "Admin" },
@@ -130,6 +196,140 @@ export default function Settings() {
     query: { queryKey: ["/api/v1/settings/embeddings-health"] }
   });
   const [embeddingsBannerDismissed, setEmbeddingsBannerDismissed] = useState(false);
+
+  // ── Org Dependencies queries ────────────────────────────────────────────────
+  const { data: dependencies, refetch: refetchDeps } = useQuery<OrgDependency[]>({
+    queryKey: ["/api/v1/org-dependencies"],
+    queryFn: () => fetch("/api/v1/org-dependencies", { credentials: "include" }).then((r) => r.json()),
+  });
+
+  const { data: concentrationRisks } = useQuery<ConcentrationRisk[]>({
+    queryKey: ["/api/v1/org-dependencies/concentration-risk"],
+    queryFn: () => fetch("/api/v1/org-dependencies/concentration-risk", { credentials: "include" }).then((r) => r.json()),
+  });
+
+  const { data: allVendors } = useQuery<Vendor[]>({
+    queryKey: ["/api/v1/vendors"],
+    queryFn: () => fetch("/api/v1/vendors", { credentials: "include" }).then((r) => r.json()),
+  });
+
+  // ── Org dependency edit state ───────────────────────────────────────────────
+  const [editingDeps, setEditingDeps] = useState(false);
+  const [editData, setEditData] = useState<Record<string, { providerName: string; vendorId: string | null }>>({});
+
+  const openEditDeps = () => {
+    const initial: Record<string, { providerName: string; vendorId: string | null }> = {};
+    for (const cat of CATEGORIES) {
+      const existing = (dependencies || []).find((d) => d.category === cat.value);
+      initial[cat.value] = { providerName: existing?.providerName || "", vendorId: existing?.vendorId || null };
+    }
+    setEditData(initial);
+    setEditingDeps(true);
+  };
+
+  const handleSaveDeps = async () => {
+    const depList = dependencies || [];
+    const promises = CATEGORIES.map(async (cat) => {
+      const entry = editData[cat.value];
+      if (!entry) return;
+      const existing = depList.find((d) => d.category === cat.value);
+      const body = {
+        providerName: entry.providerName,
+        vendorId: entry.vendorId || undefined,
+        category: cat.value,
+      };
+      if (existing) {
+        await fetch(`/api/v1/org-dependencies/${existing.id}`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } else if (entry.providerName.trim()) {
+        await fetch("/api/v1/org-dependencies", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
+    });
+    await Promise.all(promises);
+    await refetchDeps();
+    setEditingDeps(false);
+    toast({ title: "Dependencies saved", description: "Infrastructure dependencies updated successfully." });
+  };
+
+  // ── Monitoring config queries & state ───────────────────────────────────────
+  const { data: monitoringConfigs, refetch: refetchMonitoring } = useQuery<MonitoringConfig[]>({
+    queryKey: ["/api/v1/monitoring-configs"],
+    queryFn: () => fetch("/api/v1/monitoring-configs", { credentials: "include" }).then((r) => r.json()),
+    enabled: user?.role === "admin",
+  });
+
+  const { data: templates } = useQuery<Template[]>({
+    queryKey: ["/api/v1/assessment-templates"],
+    queryFn: () => fetch("/api/v1/assessment-templates", { credentials: "include" }).then((r) => r.json()),
+    enabled: user?.role === "admin",
+  });
+
+  const [cadenceData, setCadenceData] = useState<Record<string, { cadenceDays: number; scoreThreshold: number | null; assessmentTemplateId: string | null }>>({
+    critical: { cadenceDays: 7, scoreThreshold: 50, assessmentTemplateId: null },
+    high: { cadenceDays: 30, scoreThreshold: 60, assessmentTemplateId: null },
+    medium: { cadenceDays: 90, scoreThreshold: 75, assessmentTemplateId: null },
+    low: { cadenceDays: 180, scoreThreshold: null, assessmentTemplateId: null },
+  });
+
+  useEffect(() => {
+    if (monitoringConfigs && monitoringConfigs.length > 0) {
+      setCadenceData((prev) => {
+        const next = { ...prev };
+        for (const cfg of monitoringConfigs) {
+          if (cfg.tier) {
+            next[cfg.tier] = {
+              cadenceDays: cfg.cadenceDays ?? prev[cfg.tier]?.cadenceDays ?? 7,
+              scoreThreshold: cfg.scoreThreshold ?? null,
+              assessmentTemplateId: cfg.assessmentTemplateId ?? null,
+            };
+          }
+        }
+        return next;
+      });
+    }
+  }, [monitoringConfigs]);
+
+  const handleSaveCadence = async () => {
+    for (const tier of ["critical", "high", "medium", "low"]) {
+      const entry = cadenceData[tier];
+      if (!entry || entry.cadenceDays < 1 || entry.cadenceDays > 365) {
+        toast({ title: "Invalid cadence", description: "Enter a number between 1 and 365.", variant: "destructive" });
+        return;
+      }
+      if (entry.scoreThreshold !== null && (entry.scoreThreshold < 0 || entry.scoreThreshold > 100)) {
+        toast({ title: "Invalid threshold", description: "Score threshold must be between 0 and 100.", variant: "destructive" });
+        return;
+      }
+    }
+    const promises = ["critical", "high", "medium", "low"].map((tier) => {
+      const entry = cadenceData[tier];
+      if (!entry || entry.cadenceDays <= 0) return Promise.resolve();
+      return fetch(`/api/v1/monitoring-configs/${tier}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cadenceDays: entry.cadenceDays,
+          assessmentTemplateId: entry.assessmentTemplateId || undefined,
+          scoreThreshold: entry.scoreThreshold,
+        }),
+      });
+    });
+    await Promise.all(promises);
+    await refetchMonitoring();
+    toast({ title: "Cadence saved", description: "Monitoring cadence configuration updated successfully." });
+  };
+
+  const [savingCadence, setSavingCadence] = useState(false);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [providerSheet, setProviderSheet] = useState<"closed" | "add" | "edit">("closed");
@@ -360,6 +560,14 @@ export default function Settings() {
             <TabsTrigger value="users" className="data-[state=active]:shadow-sm rounded-md">
               <Users className="h-4 w-4 mr-2" /> Users & Roles
             </TabsTrigger>
+            <TabsTrigger value="organization" className="data-[state=active]:shadow-sm rounded-md">
+              <Building2 className="h-4 w-4 mr-2" /> Organization
+            </TabsTrigger>
+            {user?.role === "admin" && (
+              <TabsTrigger value="monitoring" className="data-[state=active]:shadow-sm rounded-md">
+                <Timer className="h-4 w-4 mr-2" /> Monitoring
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <div className="mt-6">
@@ -713,6 +921,237 @@ export default function Settings() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* ORGANIZATION TAB */}
+            <TabsContent value="organization" className="m-0 space-y-6">
+              {/* Concentration Risk Summary */}
+              {Array.isArray(concentrationRisks) && concentrationRisks.length > 0 ? (
+                <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800" role="alert">
+                  <AlertTriangle className="h-4 w-4 text-amber-700" />
+                  <AlertTitle>Concentration Risk Detected</AlertTitle>
+                  <AlertDescription>
+                    {concentrationRisks.map((r) => (
+                      <div key={r.vendorId} className="mt-2">
+                        <span className="font-semibold">{r.vendorName}</span> — {r.dependencyCount} dependencies
+                        ({r.categories.join(", ")})
+                        {r.openSignalCount > 0 && (
+                          <Badge variant="destructive" className="ml-2">{r.openSignalCount} open signals</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Card className="border-muted">
+                  <CardContent className="flex items-center gap-3 py-4 text-muted-foreground text-sm">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                    No concentration risks detected.
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Infrastructure Dependencies */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-semibold">Infrastructure Dependencies</CardTitle>
+                    <CardDescription className="mt-1">Map your organization's critical infrastructure to vendors to detect concentration risk.</CardDescription>
+                  </div>
+                  {!editingDeps && (
+                    <Button variant="outline" size="sm" onClick={openEditDeps}>
+                      <Pencil className="h-4 w-4 mr-2" /> Edit All
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {!Array.isArray(dependencies) || (dependencies.length === 0 && !editingDeps) ? (
+                    <div className="text-center py-12 border-2 border-dashed rounded-xl space-y-3">
+                      <Building2 className="h-10 w-10 text-muted-foreground/30 mx-auto" />
+                      <div>
+                        <p className="font-medium">No Dependencies Configured</p>
+                        <p className="text-sm text-muted-foreground mt-1">Define your organization's critical infrastructure dependencies to detect concentration risk.</p>
+                      </div>
+                      <Button variant="outline" onClick={openEditDeps}>
+                        <Plus className="h-4 w-4 mr-2" /> Configure
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {CATEGORIES.map((cat) => {
+                        const existing = (dependencies || []).find((d) => d.category === cat.value);
+                        if (editingDeps) {
+                          const entry = editData[cat.value] || { providerName: "", vendorId: null };
+                          return (
+                            <div key={cat.value} className="grid grid-cols-[160px_1fr_1fr] gap-3 items-center py-2 border-b last:border-0">
+                              <Label className="text-sm font-semibold">{cat.label}</Label>
+                              <Input
+                                placeholder="Provider name (e.g. AWS)"
+                                value={entry.providerName}
+                                onChange={(e) =>
+                                  setEditData((prev) => ({ ...prev, [cat.value]: { ...prev[cat.value], providerName: e.target.value } }))
+                                }
+                              />
+                              <Select
+                                value={entry.vendorId || "none"}
+                                onValueChange={(val) =>
+                                  setEditData((prev) => ({ ...prev, [cat.value]: { ...prev[cat.value], vendorId: val === "none" ? null : val } }))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Link to vendor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">None</SelectItem>
+                                  {(allVendors || []).map((v) => (
+                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={cat.value} className="grid grid-cols-[160px_1fr] gap-3 items-center py-2 border-b last:border-0">
+                            <Label className="text-sm font-semibold">{cat.label}</Label>
+                            {existing ? (
+                              <span className="text-sm">
+                                {existing.providerName}
+                                {existing.vendorName && (
+                                  <span className="text-muted-foreground ml-1">— {existing.vendorName}</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Not configured</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {editingDeps && (
+                        <div className="flex justify-end gap-2 pt-2">
+                          <Button variant="outline" onClick={() => setEditingDeps(false)}>Cancel</Button>
+                          <Button onClick={handleSaveDeps}>Save Dependencies</Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* MONITORING TAB (admin only) */}
+            {user?.role === "admin" && (
+              <TabsContent value="monitoring" className="m-0 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-xl font-semibold">Monitoring Cadence</CardTitle>
+                    <CardDescription>
+                      Define how frequently vendors are re-assessed based on tier, and set score thresholds for automatic alerts.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {Array.isArray(monitoringConfigs) || true ? (
+                      <>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Tier</TableHead>
+                              <TableHead>Cadence (days)</TableHead>
+                              <TableHead>Score Threshold</TableHead>
+                              <TableHead>Assessment Template</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {["critical", "high", "medium", "low"].map((tier) => (
+                              <TableRow key={tier}>
+                                <TableCell><TierBadge tier={tier} /></TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={365}
+                                    value={cadenceData[tier]?.cadenceDays ?? ""}
+                                    onChange={(e) =>
+                                      setCadenceData((prev) => ({
+                                        ...prev,
+                                        [tier]: { ...prev[tier], cadenceDays: parseInt(e.target.value) || 0 },
+                                      }))
+                                    }
+                                    className="w-24"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    placeholder="No alert"
+                                    value={cadenceData[tier]?.scoreThreshold ?? ""}
+                                    onChange={(e) =>
+                                      setCadenceData((prev) => ({
+                                        ...prev,
+                                        [tier]: {
+                                          ...prev[tier],
+                                          scoreThreshold: e.target.value === "" ? null : parseInt(e.target.value) || 0,
+                                        },
+                                      }))
+                                    }
+                                    className="w-24"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={cadenceData[tier]?.assessmentTemplateId || "none"}
+                                    onValueChange={(val) =>
+                                      setCadenceData((prev) => ({
+                                        ...prev,
+                                        [tier]: { ...prev[tier], assessmentTemplateId: val === "none" ? null : val },
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="w-64">
+                                      <SelectValue placeholder="Select template" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">No template</SelectItem>
+                                      {(templates || []).map((t) => (
+                                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Typical: Critical = 7 days, High = 30, Medium = 90, Low = 180. Threshold: alert when vendor risk score reaches this value (0–100, higher = worse). Leave empty for no alerts.
+                        </p>
+                        <div className="flex justify-end">
+                          <Button
+                            onClick={async () => {
+                              setSavingCadence(true);
+                              try { await handleSaveCadence(); } finally { setSavingCadence(false); }
+                            }}
+                            disabled={savingCadence}
+                          >
+                            {savingCadence && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Save Cadence
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12 border-2 border-dashed rounded-xl space-y-3">
+                        <Timer className="h-10 w-10 text-muted-foreground/30 mx-auto" />
+                        <div>
+                          <p className="font-medium">Monitoring Not Configured</p>
+                          <p className="text-sm text-muted-foreground mt-1">Set cadence rules for each vendor tier to schedule automatic re-assessments.</p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
 
             {/* USERS TAB */}
             <TabsContent value="users" className="m-0">
