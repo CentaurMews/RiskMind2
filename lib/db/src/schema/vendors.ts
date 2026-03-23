@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, numeric, pgEnum, vector } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, numeric, pgEnum, vector, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { tenantsTable } from "./tenants";
@@ -33,6 +33,7 @@ export const vendorsTable = pgTable("vendors", {
   riskScore: numeric("risk_score", { precision: 5, scale: 2 }),
   overrideTier: vendorTierEnum("override_tier"),
   overrideReason: text("override_reason"),
+  nextAssessmentDue: date("next_assessment_due"),
   embedding: vector("embedding", { dimensions: 1536 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

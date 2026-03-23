@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { tenantsTable } from "./tenants";
@@ -10,6 +10,9 @@ export const frameworksTable = pgTable("frameworks", {
   version: text("version"),
   type: text("type"),
   description: text("description"),
+  complianceThreshold: numeric("compliance_threshold", { precision: 5, scale: 2 }),
+  importSource: text("import_source"),
+  importReference: text("import_reference"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
