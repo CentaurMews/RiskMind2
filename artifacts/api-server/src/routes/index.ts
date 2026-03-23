@@ -18,6 +18,7 @@ import assessmentTemplatesRouter from "./assessment-templates";
 import assessmentsRouter from "./assessments";
 import orgDependenciesRouter from "./org-dependencies";
 import monitoringRouter from "./monitoring";
+import integrationsRouter from "./integrations";
 import { authMiddleware } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -48,5 +49,6 @@ router.use(assessmentTemplatesRouter);
 router.use(assessmentsRouter);
 router.use(orgDependenciesRouter);
 router.use(monitoringRouter);
+router.use(integrationsRouter);
 
 export default router;
