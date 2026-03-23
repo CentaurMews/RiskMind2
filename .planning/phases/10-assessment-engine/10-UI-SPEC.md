@@ -57,11 +57,11 @@ Exceptions: Touch targets for drag-handle on reorderable question rows must be m
 Notes:
 - Score numerals (e.g. "84 / 100") rendered at 28px weight 600 inside the gauge/donut chart center text.
 - AI-generated follow-up question text uses body (14px / 400) — same as user-authored questions; distinction comes from the "AI Generated" badge, not size.
-- Section names within the assessment wizard rendered at 16px / 600 as section headings.
+- Section names within the assessment wizard use the Heading role (20px / 600).
 - AI analysis narrative in results card uses 14px / 400, 1.5 line-height.
-- Muted metadata (AiProvenance, timestamps) uses 11px / 400 following the established AiProvenance component pattern.
+- Muted metadata (AiProvenance, timestamps) inherits sizing from the existing `AiProvenance` component — do not re-declare a size token for this phase.
 
-Source: `artifacts/riskmind-app/src/index.css` (Inter font), `artifacts/riskmind-app/src/components/ai/ai-provenance.tsx` (11px pattern)
+Source: `artifacts/riskmind-app/src/index.css` (Inter font), `artifacts/riskmind-app/src/components/ai/ai-provenance.tsx` (AiProvenance component)
 
 ---
 
@@ -140,7 +140,7 @@ Three new pages required for this phase:
 
 - **Layout:** Standard AppLayout. Page header: "Assessment Templates" h1 (28px/600) + "New Template" primary button top-right.
 - **Filter bar:** Two toggle buttons — "All" / "Vendor" / "Compliance" / "Incident". Renders inline below header.
-- **Grid:** 3-column responsive grid (2-col tablet, 1-col mobile). Each card: template name (16px/600), type Badge, question count + section count as muted metadata (14px/400), description text (14px/400, 2-line clamp). Two actions per card: "Use Template" (primary Button), "Clone & Edit" (outline Button).
+- **Grid:** 3-column responsive grid (2-col tablet, 1-col mobile). Each card: template name (20px/600), type Badge, question count + section count as muted metadata (14px/400), description text (14px/400, 2-line clamp). Two actions per card: "Use Template" (primary Button), "Clone & Edit" (outline Button).
 - **Pre-built templates** distinguished with a "Built-in" Badge in muted style. Built-in templates have no delete action.
 - **Empty state:** Heading "No templates yet", body "Create your first assessment template to start evaluating vendors and compliance controls.", CTA "New Template".
 - **Loading:** 6 Skeleton cards in same 3-column grid.
@@ -151,7 +151,7 @@ Three new pages required for this phase:
 - **Left panel (Builder canvas):**
   - Template name Input + description Textarea at top (full width).
   - "Add Section" button below metadata fields.
-  - List of SectionBlock components. Each SectionBlock: section name Input + ordered list of QuestionRow + "Add Question" button.
+  - List of SectionBlock components. Each SectionBlock: section name Input (20px/600, Heading role) + ordered list of QuestionRow + "Add Question" button.
   - QuestionRow expanded state shows: question text Input, type Select, weight Input (0–10), branching conditions list via ConditionBuilder rows, "Add Condition" link.
   - "Save Template" primary button fixed at bottom of left panel.
 - **Right panel (Preview pane):**
@@ -244,7 +244,7 @@ Three new pages required for this phase:
 | Error — submission failed | "Submission failed. Your responses are saved — try again in a moment." (toast, destructive variant) |
 | Error — template save failed | "Template couldn't be saved. Check required fields and try again." (toast, destructive variant) |
 | Destructive — delete template | AlertDialog title: "Delete template?", body: "This template will be permanently deleted. Assessments already created from it are not affected.", confirm button: "Delete Template" (destructive), cancel: "Cancel" |
-| Destructive — abandon session | AlertDialog title: "Abandon this assessment?", body: "Your progress so far is saved. You can return and continue later from the Assessments list.", confirm button: "Abandon", cancel: "Keep going" |
+| Destructive — abandon session | AlertDialog title: "Abandon this assessment?", body: "Your progress so far is saved. You can return and continue later from the Assessments list.", confirm button: "Abandon Assessment" (destructive), cancel: "Keep going" |
 | "Built-in" template tooltip | "Pre-built template — clone to customize" |
 | Score tier label — 80–100 | "Low Risk" |
 | Score tier label — 60–79 | "Medium Risk" |
