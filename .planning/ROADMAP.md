@@ -222,7 +222,7 @@ Plans:
 - [x] 11-01-PLAN.md -- Wizard onboard API endpoints + assessment-to-risk-score update hook
 - [x] 11-02-PLAN.md -- Subprocessor, org-dependency, monitoring-config API routes + vendor-monitor worker
 - [x] 11-03-PLAN.md -- Wizard frontend page (vendor-onboard.tsx) + route registration
-- [ ] 11-04-PLAN.md -- Vendor detail subprocessors section + kanban score badge
+- [x] 11-04-PLAN.md -- Vendor detail subprocessors section + kanban score badge
 - [ ] 11-05-PLAN.md -- Settings Organization tab (dependencies + concentration risk) + Monitoring tab
 
 ### Phase 12: Signal Integrations
@@ -276,7 +276,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 8. Quick Fixes & Polish | v1.2 | 2/2 | Complete | 2026-03-23 |
 | 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
 | 10. Assessment Engine | v2.0 | 4/4 | Complete    | 2026-03-23 |
-| 11. Vendor Lifecycle Redesign | v2.0 | 3/5 | In Progress|  |
+| 11. Vendor Lifecycle Redesign | v2.0 | 4/5 | In Progress|  |
 | 12. Signal Integrations | v2.0 | 0/? | Not started | - |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
 | 14. Foresight v2 | v2.0 | 0/? | Not started | - |
