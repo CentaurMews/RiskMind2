@@ -57,6 +57,7 @@ export default function Dashboard() {
             icon={ShieldAlert}
             delta={3}
             isLoading={risksLoading}
+            href="/risks"
           />
           <KpiCard
             title="Open Alerts"
@@ -65,6 +66,7 @@ export default function Dashboard() {
             iconClassName="text-destructive"
             delta={-1}
             isLoading={alertsLoading}
+            href="/alerts"
           />
           <KpiCard
             title="Active Vendors"
@@ -72,33 +74,36 @@ export default function Dashboard() {
             icon={Users}
             subtitle="Managed Third-Parties"
             isLoading={vendorsLoading}
+            href="/vendors"
           />
           {/* Compliance Score — keep custom progress bar, add skeleton */}
-          <Card className="hover:shadow-md transition-shadow relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-            <div className="flex flex-row items-center justify-between px-6 pt-6 pb-2 relative z-10">
-              <span className="text-sm font-medium text-muted-foreground">Compliance Score</span>
-              <ShieldCheck className="h-4 w-4 text-emerald-500" />
-            </div>
-            <CardContent className="relative z-10">
-              {complianceLoading ? (
-                <>
-                  <Skeleton className="h-8 w-[60px] mb-2" />
-                  <Skeleton className="h-1.5 w-full mt-3 rounded-full" />
-                </>
-              ) : (
-                <>
-                  <div className="text-3xl font-bold">{compScore}%</div>
-                  <div className="w-full bg-secondary h-1.5 mt-3 rounded-full overflow-hidden">
-                    <div
-                      className="bg-emerald-500 h-full rounded-full"
-                      style={{ width: `${compScore}%` }}
-                    />
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+          <Link href="/compliance" className="block">
+            <Card className="cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+              <div className="flex flex-row items-center justify-between px-6 pt-6 pb-2 relative z-10">
+                <span className="text-sm font-medium text-muted-foreground">Compliance Score</span>
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              </div>
+              <CardContent className="relative z-10">
+                {complianceLoading ? (
+                  <>
+                    <Skeleton className="h-8 w-[60px] mb-2" />
+                    <Skeleton className="h-1.5 w-full mt-3 rounded-full" />
+                  </>
+                ) : (
+                  <>
+                    <div className="text-3xl font-bold">{compScore}%</div>
+                    <div className="w-full bg-secondary h-1.5 mt-3 rounded-full overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full"
+                        style={{ width: `${compScore}%` }}
+                      />
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Heatmap + Executive Summary */}
