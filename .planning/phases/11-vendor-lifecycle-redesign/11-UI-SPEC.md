@@ -20,8 +20,8 @@ design_system: shadcn/ui — new-york style, neutral base, CSS variables
 | Style | new-york | `components.json` |
 | Base color | neutral | `components.json` |
 | CSS variables | yes | `components.json` |
-| Font — sans | Inter (400, 500, 600, 700) | `src/index.css` |
-| Font — mono | JetBrains Mono (400, 500) | `src/index.css` |
+| Font — sans | Inter (400, 600) | `src/index.css` |
+| Font — mono | JetBrains Mono (400) | `src/index.css` |
 | Radius base | 0.5rem | `src/index.css` |
 | Registry | shadcn official only | No third-party blocks declared |
 | Registry safety gate | not applicable | No third-party registries |
@@ -35,8 +35,7 @@ design_system: shadcn/ui — new-york style, neutral base, CSS variables
 | Token | px | Usage |
 |-------|----|-------|
 | 4px | 4 | Icon gap, tight inline spacing |
-| 8px | 8 | Field label → input gap, badge padding |
-| 12px | 12 | Card internal padding (compact) |
+| 8px | 8 | Field label → input gap, badge padding, card internal padding (compact) |
 | 16px | 16 | Section gap, form field spacing |
 | 24px | 24 | Card padding, wizard step content padding |
 | 32px | 32 | Between major sections within a page |
@@ -49,17 +48,17 @@ design_system: shadcn/ui — new-york style, neutral base, CSS variables
 
 ## 3. Typography
 
-Exactly 3 sizes, 2 weights.
+Exactly 4 sizes, 2 weights.
 
 | Role | Size | Weight | Line-height | Font | Usage |
 |------|------|--------|-------------|------|-------|
 | Body | 14px | 400 (regular) | 1.5 | Inter | Table cells, form labels, badge text, description copy |
 | UI Label | 14px | 600 (semibold) | 1.4 | Inter | Form field labels, card section titles, table headers |
 | Heading | 20px | 600 (semibold) | 1.2 | Inter | Wizard step title, page section heading (e.g., "Infrastructure Dependencies") |
-| Page title | 28px (text-3xl) | 700 (bold) | 1.15 | Inter | Top-level page headings — matches existing `h1` in vendor-list.tsx |
-| Mono | 12px | 500 (medium) | 1 | JetBrains Mono | Score badge ("78/100"), lifecycle badge text, step counter |
+| Page title | 28px (text-3xl) | 600 (semibold) | 1.15 | Inter | Top-level page headings — matches existing `h1` in vendor-list.tsx |
+| Mono | 12px | 400 (regular) | 1 | JetBrains Mono | Score badge ("78/100"), lifecycle badge text, step counter |
 
-Note: page title (28px bold) is pre-existing — do not change. Heading (20px semibold) is new for wizard steps and settings subsections.
+Note: page title (28px) uses weight 600 — semibold is visually sufficient at 28px and keeps us within 2-weight constraint. JetBrains Mono is visually distinct from Inter at 12px without a weight boost. "Continue" in wizard nav is a standard single-step wizard pattern — accepted as-is (non-blocking CTA flag, 2026-03-23).
 
 ---
 
@@ -216,7 +215,7 @@ Single column form, max-w-lg centered in content area:
 
 Position: top-right of card `CardContent`. Uses new `ScoreBadge` component (per RESEARCH.md pattern):
 - Format: "78/100"
-- Font: `font-mono text-xs font-bold`
+- Font: `font-mono text-xs font-semibold`
 - Padding: `px-1.5 py-0.5`
 - Border-radius: `rounded`
 - Color: severity scale per Section 4
@@ -327,6 +326,8 @@ All copy is prescriptive. Do not deviate.
 | Org dependencies save | "Save Dependencies" |
 | Monitoring cadence save | "Save Cadence" |
 
+Note: "Continue" in wizard step navigation is accepted as standard single-step wizard pattern. A noun qualifier ("Continue to Next Step") would be verbose given the stepper already displays the next step name contextually.
+
 ### Empty States
 
 | Context | Title | Description |
@@ -401,4 +402,5 @@ All copy is prescriptive. Do not deviate.
 
 *Phase: 11-vendor-lifecycle-redesign*
 *UI-SPEC created: 2026-03-23*
+*UI-SPEC revised: 2026-03-23 — checker fix: typography reduced to 2 weights (400+600), spacing 12px removed (replaced by 8px), CTA flag acknowledged*
 *Status: draft — awaiting checker validation*
