@@ -238,7 +238,7 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 12-01-PLAN.md — Foundation: deps install, adapter types, integrations CRUD route, signal feed poller scheduler
+- [x] 12-01-PLAN.md — Foundation: deps install, adapter types, integrations CRUD route, signal feed poller scheduler
 - [ ] 12-02-PLAN.md — NVD CVE adapter (pagination, rate limiting) + Shodan adapter (DNS resolve, host query)
 - [ ] 12-03-PLAN.md — Sentinel adapter (Log Analytics KQL) + MISP adapter (REST API, IoC attributes)
 - [ ] 12-04-PLAN.md — Email adapter (imapflow, mailparser, LLM extraction, prompt injection safety)
@@ -284,6 +284,6 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
 | 10. Assessment Engine | v2.0 | 4/4 | Complete    | 2026-03-23 |
 | 11. Vendor Lifecycle Redesign | v2.0 | 5/5 | Complete    | 2026-03-23 |
-| 12. Signal Integrations | v2.0 | 0/5 | Planning complete | - |
+| 12. Signal Integrations | v2.0 | 1/5 | In Progress|  |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
 | 14. Foresight v2 | v2.0 | 0/? | Not started | - |

@@ -35,11 +35,11 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 
 ### Signal Integrations
 
-- [ ] **SGNL-01**: System polls NVD API v2 on configurable schedule, filters by tenant-configured product/vendor tags, and auto-creates signals with CVE ID, CVSS score, and description
-- [ ] **SGNL-02**: System queries Shodan API by domain/IP for vendor records, surfacing open ports, exposed services, and CVE matches as signals
-- [ ] **SGNL-03**: System ingests Microsoft Sentinel alerts/incidents via Log Analytics API with OAuth2 credentials, normalizing to signal schema and deduplicating by incident ID
-- [ ] **SGNL-04**: System connects to MISP instances via API key, pulling events and attributes (IP, domain, hash, CVE) normalized to signals with configurable feed selection
-- [ ] **SGNL-05**: System polls configured IMAP mailbox, using LLM to extract signal fields from email subject and body, with deduplication by message-id
+- [x] **SGNL-01**: System polls NVD API v2 on configurable schedule, filters by tenant-configured product/vendor tags, and auto-creates signals with CVE ID, CVSS score, and description
+- [x] **SGNL-02**: System queries Shodan API by domain/IP for vendor records, surfacing open ports, exposed services, and CVE matches as signals
+- [x] **SGNL-03**: System ingests Microsoft Sentinel alerts/incidents via Log Analytics API with OAuth2 credentials, normalizing to signal schema and deduplicating by incident ID
+- [x] **SGNL-04**: System connects to MISP instances via API key, pulling events and attributes (IP, domain, hash, CVE) normalized to signals with configurable feed selection
+- [x] **SGNL-05**: System polls configured IMAP mailbox, using LLM to extract signal fields from email subject and body, with deduplication by message-id
 
 ### Foresight
 
@@ -96,11 +96,11 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 | COMP-01 | Phase 13 | Pending |
 | COMP-02 | Phase 13 | Pending |
 | COMP-03 | Phase 13 | Pending |
-| SGNL-01 | Phase 12 | Pending |
-| SGNL-02 | Phase 12 | Pending |
-| SGNL-03 | Phase 12 | Pending |
-| SGNL-04 | Phase 12 | Pending |
-| SGNL-05 | Phase 12 | Pending |
+| SGNL-01 | Phase 12 | Complete |
+| SGNL-02 | Phase 12 | Complete |
+| SGNL-03 | Phase 12 | Complete |
+| SGNL-04 | Phase 12 | Complete |
+| SGNL-05 | Phase 12 | Complete |
 | FRST-01 | Phase 14 | Pending |
 | FRST-02 | Phase 14 | Pending |
 | FRST-03 | Phase 14 | Pending |
