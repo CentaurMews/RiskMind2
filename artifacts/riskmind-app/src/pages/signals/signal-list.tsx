@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Activity, Search, Bot, ArrowRight, Check, X, Loader2, Sparkles, Eye, AlertTriangle } from "lucide-react";
+import { SourceBadge } from "@/components/signals/source-badge";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -417,7 +418,7 @@ export default function SignalList() {
                 ) : (
                   data?.data?.map((signal) => (
                     <TableRow key={signal.id} className="group hover:bg-muted/30">
-                      <TableCell className="font-mono text-xs uppercase text-muted-foreground">{signal.source}</TableCell>
+                      <TableCell><SourceBadge source={signal.source ?? ""} /></TableCell>
                       <TableCell className="font-medium text-sm max-w-[400px] truncate" title={signal.content}>{signal.content}</TableCell>
                       <TableCell>{statusBadge(signal.status || "pending")}</TableCell>
                       <TableCell>
