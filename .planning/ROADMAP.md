@@ -197,7 +197,13 @@ Plans:
   3. On submission, the system computes and displays weighted scores at the question, section, and overall level — score is deterministic for the same response set
   4. Pre-built templates (Vendor Security, Compliance Control, Incident Assessment) are available from a template library and can be used without any manual setup
   5. Completed assessment shows an AI-generated summary highlighting anomalies, inconsistencies, and gaps in the response set
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 10-01-PLAN.md -- Assessment engine types, scoring logic, and test infrastructure
+- [ ] 10-02-PLAN.md -- Backend API routes, AI endpoints, pre-built template seeds, OpenAPI spec
+- [ ] 10-03-PLAN.md -- Frontend template library page and template builder with components
+- [ ] 10-04-PLAN.md -- Frontend session wizard, results page, assessment list, and navigation wiring
 
 ### Phase 11: Vendor Lifecycle Redesign
 **Goal**: Users can onboard a new vendor through a guided wizard with AI enrichment auto-triggered, track 4th-party subprocessors, configure continuous monitoring cadence per risk tier, and see vendor risk scores driven by assessment results
@@ -262,7 +268,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 7. Foresight Teaser | v1.1 | 1/1 | Complete | 2026-03-18 |
 | 8. Quick Fixes & Polish | v1.2 | 2/2 | Complete | 2026-03-23 |
 | 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
-| 10. Assessment Engine | v2.0 | 0/? | Not started | - |
+| 10. Assessment Engine | v2.0 | 0/4 | Planned | - |
 | 11. Vendor Lifecycle Redesign | v2.0 | 0/? | Not started | - |
 | 12. Signal Integrations | v2.0 | 0/? | Not started | - |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
