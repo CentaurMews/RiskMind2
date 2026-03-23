@@ -9,10 +9,10 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 
 ### Assessment Engine
 
-- [ ] **ASMT-01**: User can create, edit, and delete assessment templates with questions of various types (text, boolean, multiple choice, numeric) and configurable weights
-- [ ] **ASMT-02**: User can define conditional branching rules on questions (IF answer to Q equals/contains/greater-than value THEN show/hide question) via JSON condition editor
+- [x] **ASMT-01**: User can create, edit, and delete assessment templates with questions of various types (text, boolean, multiple choice, numeric) and configurable weights
+- [x] **ASMT-02**: User can define conditional branching rules on questions (IF answer to Q equals/contains/greater-than value THEN show/hide question) via JSON condition editor
 - [ ] **ASMT-03**: User can create an assessment from a template, assign it to a subject (vendor or compliance framework), track responses, and mark it complete
-- [ ] **ASMT-04**: System computes weighted numeric scores per question, section, and overall assessment with configurable scoring mode
+- [x] **ASMT-04**: System computes weighted numeric scores per question, section, and overall assessment with configurable scoring mode
 - [ ] **ASMT-05**: LLM generates contextual follow-up questions based on prior responses during an active assessment session
 - [ ] **ASMT-06**: System provides pre-built assessment templates (Vendor Security/SIG Lite-inspired, Compliance Control/ISO 27001-inspired, Incident Assessment)
 - [ ] **ASMT-07**: After assessment submission, LLM analyzes response set to highlight anomalies, inconsistencies, and gaps stored as ai_summary
@@ -79,10 +79,10 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ASMT-01 | Phase 10 | Pending |
-| ASMT-02 | Phase 10 | Pending |
+| ASMT-01 | Phase 10 | Complete |
+| ASMT-02 | Phase 10 | Complete |
 | ASMT-03 | Phase 10 | Pending |
-| ASMT-04 | Phase 10 | Pending |
+| ASMT-04 | Phase 10 | Complete |
 | ASMT-05 | Phase 10 | Pending |
 | ASMT-06 | Phase 10 | Pending |
 | ASMT-07 | Phase 10 | Pending |
