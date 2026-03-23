@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LLM Intelligence + Fixes + Polish
 status: completed
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-03-23T07:54:48.856Z"
+stopped_at: Completed 08-quick-fixes-and-polish 08-02-PLAN.md
+last_updated: "2026-03-23T07:55:37.699Z"
 last_activity: 2026-03-23
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
   percent: 100
 ---
 
@@ -53,6 +53,7 @@ Progress: [██████████] 100%
 | Phase 06-bug-fixes-and-wizard-ui P02 | 6 | 2 tasks | 3 files |
 | Phase 07-foresight-teaser P01 | 5 | 1 tasks | 1 files |
 | Phase 08-quick-fixes-and-polish P01 | 15 | 2 tasks | 7 files |
+| Phase 08-quick-fixes-and-polish P02 | 4 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,9 @@ Recent decisions affecting current work:
 - [Phase 08-quick-fixes-and-polish]: Email domain slug extraction uses only first label (acme.com → acme) to match existing tenant slug pattern
 - [Phase 08-quick-fixes-and-polish]: tenantName/tenantSlug added as optional fields in UserProfile OpenAPI schema for backward compatibility
 - [Phase 08-quick-fixes-and-polish]: Social login buttons show Coming Soon toast; no OAuth flow wired in v2.0
+- [Phase 08-quick-fixes-and-polish]: KpiCard wraps Card in wouter Link when href prop provided; card-level hover styles conditioned on href presence
+- [Phase 08-quick-fixes-and-polish]: HeatmapGrid uses Tailwind md:hidden / hidden md:grid for responsive toggle — no JS resize detection needed
+- [Phase 08-quick-fixes-and-polish]: Compliance Score card wrapped in Link at dashboard level — preserves custom progress bar markup
 
 ### Pending Todos
 
@@ -96,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T07:54:48.848Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-03-23T07:55:37.686Z
+Stopped at: Completed 08-quick-fixes-and-polish 08-02-PLAN.md
 Resume file: None

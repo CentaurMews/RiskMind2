@@ -12,13 +12,13 @@
 
 ### Dashboard
 
-- [ ] **DASH-06**: Dashboard KPI cards (Active Risks, Open Alerts, Active Vendors, Compliance Score) are clickable, navigating to respective list pages (GH #72)
+- [x] **DASH-06**: Dashboard KPI cards (Active Risks, Open Alerts, Active Vendors, Compliance Score) are clickable, navigating to respective list pages (GH #72)
 
 ### Mobile
 
-- [ ] **MOB-01**: Heatmap renders readable on mobile screens (simplified layout or scroll) (GH #73)
-- [ ] **MOB-02**: Tables show horizontal scroll indicator/shadow affordance on mobile (GH #73)
-- [ ] **MOB-03**: Touch targets meet 44px minimum, all pages usable at 375px width (GH #73)
+- [x] **MOB-01**: Heatmap renders readable on mobile screens (simplified layout or scroll) (GH #73)
+- [x] **MOB-02**: Tables show horizontal scroll indicator/shadow affordance on mobile (GH #73)
+- [x] **MOB-03**: Touch targets meet 44px minimum, all pages usable at 375px width (GH #73)
 
 ### Cleanup
 
@@ -75,10 +75,10 @@
 |-------------|-------|--------|
 | LOGIN-01 | Phase 8 | Complete |
 | LOGIN-02 | Phase 8 | Complete |
-| DASH-06 | Phase 8 | Pending |
-| MOB-01 | Phase 8 | Pending |
-| MOB-02 | Phase 8 | Pending |
-| MOB-03 | Phase 8 | Pending |
+| DASH-06 | Phase 8 | Complete |
+| MOB-01 | Phase 8 | Complete |
+| MOB-02 | Phase 8 | Complete |
+| MOB-03 | Phase 8 | Complete |
 | CLEAN-01 | Phase 8 | Complete |
 
 **Coverage:**
