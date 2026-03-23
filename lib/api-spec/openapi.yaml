@@ -58,6 +58,10 @@ tags:
     description: AI-powered interview sessions for risk creation and control assessment
   - name: agent
     description: Autonomous Risk Intelligence Agent — runs, findings, queue, and configuration
+  - name: assessmentTemplates
+    description: Assessment template management — CRUD with pre-built template protection
+  - name: assessments
+    description: Assessment lifecycle — create, save responses, submit with scoring, AI follow-up, AI summary
 paths:
   /v1/health:
     get:
@@ -3052,6 +3056,432 @@ paths:
         "200":
           description: Session terminated
 
+  /v1/assessment-templates:
+    get:
+      operationId: listAssessmentTemplates
+      tags: [assessmentTemplates]
+      summary: List assessment templates
+      description: Returns all assessment templates for the tenant, optionally filtered by contextType.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: contextType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [vendor, framework]
+      responses:
+        "200":
+          description: List of assessment templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssessmentTemplate"
+    post:
+      operationId: createAssessmentTemplate
+      tags: [assessmentTemplates]
+      summary: Create assessment template
+      description: Creates a new assessment template with questions JSONB.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAssessmentTemplateRequest"
+      responses:
+        "201":
+          description: Template created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentTemplate"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/assessment-templates/{id}:
+    get:
+      operationId: getAssessmentTemplate
+      tags: [assessmentTemplates]
+      summary: Get assessment template by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Assessment template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentTemplate"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+    patch:
+      operationId: updateAssessmentTemplate
+      tags: [assessmentTemplates]
+      summary: Update assessment template
+      description: Updates a template. Pre-built templates ([PREBUILT] prefix) cannot be modified.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAssessmentTemplateRequest"
+      responses:
+        "200":
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentTemplate"
+        "400":
+          description: Cannot modify pre-built template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+    delete:
+      operationId: deleteAssessmentTemplate
+      tags: [assessmentTemplates]
+      summary: Delete assessment template
+      description: Deletes a template. Pre-built templates cannot be deleted.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  id:
+                    type: string
+        "400":
+          description: Cannot delete pre-built template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/assessment-templates/{id}/clone:
+    post:
+      operationId: cloneAssessmentTemplate
+      tags: [assessmentTemplates]
+      summary: Clone assessment template
+      description: Creates an editable copy of any template (including pre-built ones).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Cloned template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentTemplate"
+
+  /v1/assessments:
+    get:
+      operationId: listAssessments
+      tags: [assessments]
+      summary: List assessments
+      description: Returns all assessments for the tenant, optionally filtered by status or contextType.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [draft, active, completed, abandoned]
+        - name: contextType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [vendor, framework]
+      responses:
+        "200":
+          description: List of assessments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssessmentSummary"
+    post:
+      operationId: createAssessment
+      tags: [assessments]
+      summary: Create assessment
+      description: Creates a new assessment from a template, linked to a vendor or framework.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAssessmentRequest"
+      responses:
+        "201":
+          description: Assessment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assessment"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+        "404":
+          description: Template, vendor, or framework not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/assessments/{id}:
+    get:
+      operationId: getAssessment
+      tags: [assessments]
+      summary: Get assessment by ID
+      description: Returns assessment with full template data.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Assessment with template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assessment"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/assessments/{id}/responses:
+    patch:
+      operationId: updateAssessmentResponses
+      tags: [assessments]
+      summary: Save assessment session progress
+      description: Saves current session responses JSONB. Rejected if assessment is completed or abandoned.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentResponsesUpdate"
+      responses:
+        "200":
+          description: Updated assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assessment"
+        "400":
+          description: Assessment is completed or abandoned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/assessments/{id}/submit:
+    post:
+      operationId: submitAssessment
+      tags: [assessments]
+      summary: Submit and score assessment
+      description: Computes score via weighted algorithm, sets status to completed, and enqueues AI summary job.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Assessment submitted with score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentSubmitResult"
+        "400":
+          description: Already completed or abandoned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/assessments/{id}/follow-up:
+    post:
+      operationId: getAssessmentFollowUp
+      tags: [assessments]
+      summary: Generate AI follow-up question (SSE)
+      description: Streams an AI-generated follow-up question based on a specific answer. Returns text/event-stream.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [questionId]
+              properties:
+                questionId:
+                  type: string
+                questionText:
+                  type: string
+                answer:
+                  description: The answer given to the question
+                sectionResponses:
+                  type: object
+      responses:
+        "200":
+          description: SSE stream of follow-up question generation
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /v1/assessments/{id}/abandon:
+    post:
+      operationId: abandonAssessment
+      tags: [assessments]
+      summary: Abandon assessment
+      description: Sets assessment status to abandoned. Cannot abandon a completed assessment.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Assessment abandoned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assessment"
+        "400":
+          description: Cannot abandon completed assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
+  /v1/assessments/{id}/results:
+    get:
+      operationId: getAssessmentResults
+      tags: [assessments]
+      summary: Get assessment results
+      description: Returns completed assessment with full score breakdown computed via weighted algorithm.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Assessment results with score breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentResults"
+        "400":
+          description: Assessment not yet completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RFC7807Error"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -5193,3 +5623,217 @@ components:
               type: integer
             totalRuns:
               type: integer
+
+
+    AssessmentTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isPrebuilt:
+          type: boolean
+        questions:
+          type: object
+          description: AssessmentTemplateQuestions JSONB — contains sections with questions
+        contextType:
+          type: string
+          enum: [vendor, framework]
+        version:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateAssessmentTemplateRequest:
+      type: object
+      required: [title, questions, contextType]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        questions:
+          type: object
+          description: AssessmentTemplateQuestions — must have sections array
+          required: [sections]
+          properties:
+            sections:
+              type: array
+              items:
+                type: object
+            version:
+              type: integer
+        contextType:
+          type: string
+          enum: [vendor, framework]
+
+    UpdateAssessmentTemplateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        questions:
+          type: object
+
+    Assessment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        templateId:
+          type: string
+          format: uuid
+        contextType:
+          type: string
+          enum: [vendor, framework]
+        contextId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [draft, active, completed, abandoned]
+        responses:
+          type: object
+          description: AssessmentResponses JSONB — currentSectionIndex, responses map, aiFollowUps, completedSections
+        score:
+          type: string
+          nullable: true
+          description: Numeric score 0-100
+        aiSummary:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        template:
+          $ref: "#/components/schemas/AssessmentTemplate"
+          nullable: true
+
+    AssessmentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        templateId:
+          type: string
+          format: uuid
+        templateTitle:
+          type: string
+          nullable: true
+        contextType:
+          type: string
+          enum: [vendor, framework]
+        contextId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [draft, active, completed, abandoned]
+        score:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateAssessmentRequest:
+      type: object
+      required: [templateId, contextType, contextId]
+      properties:
+        templateId:
+          type: string
+          format: uuid
+        contextType:
+          type: string
+          enum: [vendor, framework]
+        contextId:
+          type: string
+          format: uuid
+
+    AssessmentResponsesUpdate:
+      type: object
+      properties:
+        currentSectionIndex:
+          type: integer
+        responses:
+          type: object
+          additionalProperties:
+            type: object
+        aiFollowUps:
+          type: array
+          items:
+            type: object
+        completedSections:
+          type: array
+          items:
+            type: string
+
+    AssessmentSubmitResult:
+      type: object
+      properties:
+        assessmentId:
+          type: string
+          format: uuid
+        score:
+          type: object
+          properties:
+            overall:
+              type: number
+            sections:
+              type: array
+              items:
+                type: object
+        jobId:
+          type: string
+          format: uuid
+        assessment:
+          $ref: "#/components/schemas/Assessment"
+
+    AssessmentResults:
+      type: object
+      properties:
+        assessment:
+          $ref: "#/components/schemas/Assessment"
+        score:
+          type: object
+          properties:
+            overall:
+              type: number
+            sections:
+              type: array
+              items:
+                type: object
+        template:
+          $ref: "#/components/schemas/AssessmentTemplate"
