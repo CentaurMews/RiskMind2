@@ -1,90 +1,117 @@
-# Requirements: RiskMind v1.2
+# Requirements: RiskMind
 
-**Defined:** 2026-03-19
-**Core Value:** Quick UX fixes and polish before major v2.0 platform features
+**Defined:** 2026-03-23
+**Core Value:** A working, demo-ready enterprise risk management platform that an internal organization can use to manage real risks, vendors, and compliance — powered by intelligent AI routing and accessible via https://app.riskmind.net.
 
-## v1.2 Requirements
+## v2.0 Requirements
 
-### Login
-
-- [x] **LOGIN-01**: Login form detects tenant from email domain — no tenant slug field (GH #70)
-- [x] **LOGIN-02**: Social login placeholders (Microsoft, Google) with "Coming soon" toast on click (GH #71)
-
-### Dashboard
-
-- [x] **DASH-06**: Dashboard KPI cards (Active Risks, Open Alerts, Active Vendors, Compliance Score) are clickable, navigating to respective list pages (GH #72)
-
-### Mobile
-
-- [x] **MOB-01**: Heatmap renders readable on mobile screens (simplified layout or scroll) (GH #73)
-- [x] **MOB-02**: Tables show horizontal scroll indicator/shadow affordance on mobile (GH #73)
-- [x] **MOB-03**: Touch targets meet 44px minimum, all pages usable at 375px width (GH #73)
-
-### Cleanup
-
-- [x] **CLEAN-01**: Remove Replit tenant UUID code from header bar — show tenant name instead (GH #74)
-
-## Future Requirements (v2.0)
+Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 
 ### Assessment Engine
-- **ASSESS-01**: AI-driven non-deterministic questionnaire system with elicitation techniques (GH #75)
-- **ASSESS-02**: Assessment planning workflow (objective, success criteria, question design, metrics) (GH #75)
-- **ASSESS-03**: Dedicated Assessment AI Agent (GH #75)
-- **ASSESS-04**: Shared engine for vendor assessment AND compliance assessment (GH #75)
-- **ASSESS-05**: Guest contributor portal for external assessment respondents (GH #75)
+
+- [ ] **ASMT-01**: User can create, edit, and delete assessment templates with questions of various types (text, boolean, multiple choice, numeric) and configurable weights
+- [ ] **ASMT-02**: User can define conditional branching rules on questions (IF answer to Q equals/contains/greater-than value THEN show/hide question) via JSON condition editor
+- [ ] **ASMT-03**: User can create an assessment from a template, assign it to a subject (vendor or compliance framework), track responses, and mark it complete
+- [ ] **ASMT-04**: System computes weighted numeric scores per question, section, and overall assessment with configurable scoring mode
+- [ ] **ASMT-05**: LLM generates contextual follow-up questions based on prior responses during an active assessment session
+- [ ] **ASMT-06**: System provides pre-built assessment templates (Vendor Security/SIG Lite-inspired, Compliance Control/ISO 27001-inspired, Incident Assessment)
+- [ ] **ASMT-07**: After assessment submission, LLM analyzes response set to highlight anomalies, inconsistencies, and gaps stored as ai_summary
 
 ### Vendor Lifecycle
-- **VEND-03**: Vendor wizard onboarding with smart data enrichment from internet/trust centers (GH #76)
-- **VEND-04**: Tiered monitoring programs (assessment cadence, types per risk tier) (GH #76)
-- **VEND-05**: Vendor dependency mapping (4th party risk — sub-vendor chains) (GH #76)
-- **VEND-06**: Vendor offboarding workflow (GH #76)
+
+- [ ] **VNDR-01**: User can onboard a vendor through a 4-step wizard: identity+tier, questionnaire assignment, document upload, AI enrichment review
+- [ ] **VNDR-02**: AI enrichment triggers during onboarding wizard to auto-populate vendor profile with industry, risk indicators, and known breaches
+- [ ] **VNDR-03**: User can add and view 4th-party subprocessors per vendor, with LLM extraction from uploaded vendor documents
+- [ ] **VNDR-04**: User can configure per-tier continuous monitoring cadence (Critical: weekly, High: monthly, etc.) with scheduled re-assessments and alerts on score threshold breach
+- [ ] **VNDR-05**: Vendor risk score aggregates from latest assessment score, displayed on scorecard and kanban card
+- [ ] **VNDR-06**: User can complete an org-level dependency interview identifying core vendor dependencies (email provider, cloud environment, CDN, etc.) to detect vendor concentration risk
+- [ ] **VNDR-07**: System cross-references org dependency data with signals (OSINT, Shodan, assessments, breach reports) to calibrate vendor risk and flag concentration risks
+
+### Compliance Flow
+
+- [ ] **COMP-01**: User can import compliance framework controls via CSV or JSON with validation and duplicate detection
+- [ ] **COMP-02**: User can assign assessment templates to a compliance framework, mapping questions to control IDs, with responses updating control compliance status
+- [ ] **COMP-03**: User can configure per-framework compliance thresholds (0-100%) with dashboard showing COMPLIANT/AT-RISK/NON-COMPLIANT status
 
 ### Signal Integrations
-- **SIG-01**: Signal source configuration and management in Settings (GH #77)
-- **SIG-02**: Email signal ingestion (GH #77)
-- **SIG-03**: Microsoft Sentinel SIEM integration (GH #77)
-- **SIG-04**: Shodan, CVE, Group-IB, MISP threat intel integrations (GH #77)
-- **SIG-05**: Finding-to-Risk pipeline with multi-select and LLM pre-population (GH #78)
 
-### Compliance
-- **COMP-02**: Framework import from international standards + custom frameworks/controls (GH #79)
-- **COMP-03**: Compliance assessment workflow via shared Assessment Engine (GH #79)
-- **COMP-04**: Compliance thresholds (low/normal/strict) with smart defaults and advisory text (GH #79)
-- **COMP-05**: Low compliance findings auto-feed into signals pipeline (GH #79)
+- [ ] **SGNL-01**: System polls NVD API v2 on configurable schedule, filters by tenant-configured product/vendor tags, and auto-creates signals with CVE ID, CVSS score, and description
+- [ ] **SGNL-02**: System queries Shodan API by domain/IP for vendor records, surfacing open ports, exposed services, and CVE matches as signals
+- [ ] **SGNL-03**: System ingests Microsoft Sentinel alerts/incidents via Log Analytics API with OAuth2 credentials, normalizing to signal schema and deduplicating by incident ID
+- [ ] **SGNL-04**: System connects to MISP instances via API key, pulling events and attributes (IP, domain, hash, CVE) normalized to signals with configurable feed selection
+- [ ] **SGNL-05**: System polls configured IMAP mailbox, using LLM to extract signal fields from email subject and body, with deduplication by message-id
 
-### Foresight v2
-- **FORE-02**: Monte Carlo simulation (GH #80)
-- **FORE-03**: OSINT risk horizon forecasting (GH #80)
-- **FORE-04**: Agent intelligence feed with approve/dismiss (GH #80)
-- **FORE-05**: What-if scenario builder (GH #80)
+### Foresight
 
-## Future Requirements (v2.1)
+- [ ] **FRST-01**: User can run Monte Carlo simulations with FAIR-labeled inputs (TEF, TC, CS, DIFF) for 10k-100k iterations, producing ALE and percentile breakdown
+- [ ] **FRST-02**: User can view loss exceedance curve visualization with configurable confidence interval markers (50th, 90th, 99th percentile)
+- [ ] **FRST-03**: User can create, save, clone, and compare named risk scenarios with parameter sets linked to risk register entries
+- [ ] **FRST-04**: System suggests simulation parameters from real OSINT data (CVE/NVD frequency, MISP threat data, Shodan exposure) with "calibrated from real data" indicator
+- [ ] **FRST-05**: Dashboard shows top-N risks by expected annual loss (ALE) widget integrated with existing KPI section
 
-### i18n
-- **I18N-01**: Multi-language support — English, Spanish, Arabic (GH #81)
-- **I18N-02**: RTL layout support for Arabic (GH #81)
+## Future Requirements
 
-### Auth
-- **AUTH-01**: Microsoft OAuth social login (GH #82)
-- **AUTH-02**: Google OAuth social login (GH #82)
-- **AUTH-03**: User self-registration workflow (GH #82)
+### i18n & Social Auth (v2.1)
+
+- **I18N-01**: Multi-language support (EN, ES, AR with RTL)
+- **AUTH-01**: Social login implementation (Microsoft, Google OAuth)
+- **AUTH-02**: User self-registration workflow
+
+### Deferred from v2.0
+
+- **ASMT-08**: Visual flowchart editor for assessment branching rules (drag-and-drop canvas)
+- **VNDR-08**: External vendor portal for direct questionnaire submission
+- **LLM-01**: LLM observability dashboard with token cost analytics
+- **RISK-01**: Risk clustering UI via pgvector similarity
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Mobile native app | Responsive web covers mobile needs |
+| SOAR playbook execution | Separate product category; treatment suggestions close the loop |
+| Blockchain audit trail | Append-only audit log with hash chaining sufficient for compliance |
+| ML risk prediction from historical data | Requires data volume not present at v2.0; Monte Carlo achieves similar value |
+| Quantitative scoring from Shodan port scans alone | Misleading without full context; Shodan findings feed into assessment-based scoring |
+| Real-time SIEM streaming (WebSocket) | Batch polling sufficient; sub-second streaming adds infrastructure complexity |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOGIN-01 | Phase 8 | Complete |
-| LOGIN-02 | Phase 8 | Complete |
-| DASH-06 | Phase 8 | Complete |
-| MOB-01 | Phase 8 | Complete |
-| MOB-02 | Phase 8 | Complete |
-| MOB-03 | Phase 8 | Complete |
-| CLEAN-01 | Phase 8 | Complete |
+| ASMT-01 | — | Pending |
+| ASMT-02 | — | Pending |
+| ASMT-03 | — | Pending |
+| ASMT-04 | — | Pending |
+| ASMT-05 | — | Pending |
+| ASMT-06 | — | Pending |
+| ASMT-07 | — | Pending |
+| VNDR-01 | — | Pending |
+| VNDR-02 | — | Pending |
+| VNDR-03 | — | Pending |
+| VNDR-04 | — | Pending |
+| VNDR-05 | — | Pending |
+| VNDR-06 | — | Pending |
+| VNDR-07 | — | Pending |
+| COMP-01 | — | Pending |
+| COMP-02 | — | Pending |
+| COMP-03 | — | Pending |
+| SGNL-01 | — | Pending |
+| SGNL-02 | — | Pending |
+| SGNL-03 | — | Pending |
+| SGNL-04 | — | Pending |
+| SGNL-05 | — | Pending |
+| FRST-01 | — | Pending |
+| FRST-02 | — | Pending |
+| FRST-03 | — | Pending |
+| FRST-04 | — | Pending |
+| FRST-05 | — | Pending |
 
 **Coverage:**
-- v1.2 requirements: 7 total
-- Mapped to phases: 7
-- Unmapped: 0
+- v2.0 requirements: 27 total
+- Mapped to phases: 0
+- Unmapped: 27 ⚠️
 
 ---
-*Requirements defined: 2026-03-19*
+*Requirements defined: 2026-03-23*
+*Last updated: 2026-03-23 after initial definition*
