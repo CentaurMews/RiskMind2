@@ -37,3 +37,19 @@
 - Foresight teaser page (4-card preview)
 
 **Last phase number:** 7
+
+## v1.2 — Quick Fixes & Mobile Polish (2026-03-23)
+
+**Goal:** Login UX improvements, dashboard interactivity, mobile responsiveness, and Replit artifact cleanup.
+
+**Phases:** 1 (complete)
+- Phase 8: Quick Fixes & Polish (2 plans)
+
+**Delivered:** 2 plans, 7 requirements
+- 2-field login with email domain slug detection
+- Social login button placeholders (Microsoft, Google)
+- Clickable KPI cards navigating to list pages
+- Mobile responsive heatmap, scroll shadows, 44px touch targets
+- Real tenant name in header (removed Replit UUID)
+
+**Last phase number:** 8
