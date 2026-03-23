@@ -202,7 +202,7 @@ Plans:
 Plans:
 - [x] 10-01-PLAN.md -- Assessment engine types, scoring logic, and test infrastructure
 - [x] 10-02-PLAN.md -- Backend API routes, AI endpoints, pre-built template seeds, OpenAPI spec
-- [ ] 10-03-PLAN.md -- Frontend template library page and template builder with components
+- [x] 10-03-PLAN.md -- Frontend template library page and template builder with components
 - [ ] 10-04-PLAN.md -- Frontend session wizard, results page, assessment list, and navigation wiring
 
 ### Phase 11: Vendor Lifecycle Redesign
@@ -268,7 +268,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 7. Foresight Teaser | v1.1 | 1/1 | Complete | 2026-03-18 |
 | 8. Quick Fixes & Polish | v1.2 | 2/2 | Complete | 2026-03-23 |
 | 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
-| 10. Assessment Engine | v2.0 | 2/4 | In Progress|  |
+| 10. Assessment Engine | v2.0 | 3/4 | In Progress|  |
 | 11. Vendor Lifecycle Redesign | v2.0 | 0/? | Not started | - |
 | 12. Signal Integrations | v2.0 | 0/? | Not started | - |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
