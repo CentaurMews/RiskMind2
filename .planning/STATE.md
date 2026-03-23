@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to execute
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-03-23T16:56:50.891Z"
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-03-23T17:01:51.611Z"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 12 (signal-integrations) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Plan: 3 of 5
 | Phase 11-vendor-lifecycle-redesign P05 | 2 | 2 tasks | 1 files |
 | Phase 12-signal-integrations P01 | 405 | 2 tasks | 7 files |
 | Phase 12-signal-integrations P02 | 300 | 2 tasks | 4 files |
+| Phase 12-signal-integrations P03 | 191 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,9 @@ Recent decisions affecting current work:
 - [Phase 12-signal-integrations]: Domain extraction uses vendor contactEmail — vendors table has no website column; email domain is the available domain signal for Shodan scanning
 - [Phase 12-signal-integrations]: Adapter barrel index.ts preferred over direct import in types.ts — avoids circular dependency risk and keeps types.ts as pure interface definitions
 - [Phase 12-signal-integrations]: Shodan adapter treats every poll as a full snapshot (since param unused) — Shodan host queries return current state; deduplication handles no-change via content hash
+- [Phase 12-signal-integrations]: Sentinel token scope is api.loganalytics.io/.default — required for Log Analytics workspace query, not management.azure.com
+- [Phase 12-signal-integrations]: Log Analytics row deserialization: zip columns[].name with rows[][] per table to produce Record<string,unknown>[] at parse time
+- [Phase 12-signal-integrations]: MISP IoC summary uses attribute counts (e.g., '3 IP(s)') not raw values — keeps signal content concise for LLM triage
 
 ### Pending Todos
 
@@ -134,7 +138,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T16:56:50.882Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-03-23T17:01:51.599Z
+Stopped at: Completed 12-03-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
