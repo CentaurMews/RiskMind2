@@ -11,21 +11,29 @@ export const protectedAuthRouter: IRouter = Router();
 
 publicAuthRouter.post("/v1/auth/login", async (req, res) => {
   try {
-    const { email, password, tenantSlug } = req.body;
-    if (!email || !password || !tenantSlug) {
-      badRequest(res, "Email, password, and tenantSlug are required");
+    const { email, password } = req.body;
+    if (!email || !password) {
+      badRequest(res, "Email and password are required");
       return;
     }
+
+    // Resolve tenant from email domain: admin@acme.com → acme.com → acme
+    const emailDomain = email.split('@')[1];
+    if (!emailDomain) {
+      badRequest(res, "Invalid email address");
+      return;
+    }
+    const domainSlug = emailDomain.split('.')[0]; // acme.com → acme
 
     const tenants = await db
       .select()
       .from(tenantsTable)
-      .where(eq(tenantsTable.slug, tenantSlug))
+      .where(eq(tenantsTable.slug, domainSlug))
       .limit(1);
 
     const tenant = tenants[0];
     if (!tenant) {
-      unauthorized(res, "Invalid credentials");
+      unauthorized(res, "No organization found for this email domain. Contact your administrator.");
       return;
     }
 
@@ -110,7 +118,7 @@ publicAuthRouter.post("/v1/auth/refresh", async (req, res) => {
 
 protectedAuthRouter.get("/v1/auth/me", async (req, res) => {
   try {
-    const users = await db
+    const result = await db
       .select({
         id: usersTable.id,
         email: usersTable.email,
@@ -118,12 +126,15 @@ protectedAuthRouter.get("/v1/auth/me", async (req, res) => {
         role: usersTable.role,
         tenantId: usersTable.tenantId,
         createdAt: usersTable.createdAt,
+        tenantName: tenantsTable.name,
+        tenantSlug: tenantsTable.slug,
       })
       .from(usersTable)
+      .innerJoin(tenantsTable, eq(usersTable.tenantId, tenantsTable.id))
       .where(and(eq(usersTable.id, req.user!.id), eq(usersTable.tenantId, req.user!.tenantId)))
       .limit(1);
 
-    const user = users[0];
+    const user = result[0];
     if (!user) {
       notFound(res, "User not found");
       return;

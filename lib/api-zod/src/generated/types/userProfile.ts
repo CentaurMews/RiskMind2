@@ -13,5 +13,7 @@ export interface UserProfile {
   name?: string | null;
   role: UserProfileRole;
   tenantId: string;
+  tenantName?: string;
+  tenantSlug?: string;
   createdAt?: Date;
 }

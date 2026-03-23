@@ -23,7 +23,6 @@ export const HealthCheckResponse = zod.object({
 export const LoginBody = zod.object({
   email: zod.string().email(),
   password: zod.string(),
-  tenantSlug: zod.string(),
 });
 
 export const LoginResponse = zod.object({
@@ -43,6 +42,8 @@ export const LoginResponse = zod.object({
       "vendor",
     ]),
     tenantId: zod.string().uuid(),
+    tenantName: zod.string().optional(),
+    tenantSlug: zod.string().optional(),
     createdAt: zod.date().optional(),
   }),
 });
@@ -78,6 +79,8 @@ export const GetMeResponse = zod.object({
     "vendor",
   ]),
   tenantId: zod.string().uuid(),
+  tenantName: zod.string().optional(),
+  tenantSlug: zod.string().optional(),
   createdAt: zod.date().optional(),
 });
 

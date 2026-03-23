@@ -3173,12 +3173,9 @@ components:
           format: email
         password:
           type: string
-        tenantSlug:
-          type: string
       required:
         - email
         - password
-        - tenantSlug
 
     LoginResponse:
       type: object
@@ -3231,6 +3228,10 @@ components:
         tenantId:
           type: string
           format: uuid
+        tenantName:
+          type: string
+        tenantSlug:
+          type: string
         createdAt:
           type: string
           format: date-time

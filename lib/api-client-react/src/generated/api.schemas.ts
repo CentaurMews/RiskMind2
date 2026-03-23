@@ -51,7 +51,6 @@ export interface UpdateUserRoleBody {
 export interface LoginRequest {
   email: string;
   password: string;
-  tenantSlug: string;
 }
 
 export type UserProfileRole =
@@ -73,6 +72,8 @@ export interface UserProfile {
   name?: string | null;
   role: UserProfileRole;
   tenantId: string;
+  tenantName?: string;
+  tenantSlug?: string;
   createdAt?: string;
 }
 
