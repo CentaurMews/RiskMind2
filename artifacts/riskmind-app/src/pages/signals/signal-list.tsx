@@ -44,6 +44,241 @@ function statusBadge(status: string) {
   return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
 }
 
+function SourceMetadataDisplay({ source, metadata }: { source: string; metadata: Record<string, unknown> }) {
+  const Field = ({ label, value }: { label: string; value: unknown }) => {
+    if (value == null || value === "") return null;
+    return (
+      <div>
+        <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+        <p className="text-sm">{String(value)}</p>
+      </div>
+    );
+  };
+
+  switch (source?.toLowerCase()) {
+    case "nvd": {
+      const m = metadata as Record<string, unknown>;
+      return (
+        <div className="space-y-2">
+          <Field label="CVE ID" value={m.cveId} />
+          <Field label="CVSS v3 Base Score" value={m.cvssV3BaseScore} />
+          <Field label="CVSS Vector" value={m.cvssVector} />
+          <Field label="Published" value={m.publishedDate} />
+          <Field label="Last Modified" value={m.lastModifiedDate} />
+          {m.affectedProducts != null && (
+            <div>
+              <span className="text-xs font-semibold text-muted-foreground">Affected Products</span>
+              <p className="text-sm">{Array.isArray(m.affectedProducts) ? (m.affectedProducts as string[]).join(", ") : String(m.affectedProducts)}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    case "shodan": {
+      const m = metadata as Record<string, unknown>;
+      return (
+        <div className="space-y-2">
+          <Field label="IP Address" value={m.ip} />
+          <Field label="Domain" value={m.domain} />
+          <Field label="Open Ports" value={Array.isArray(m.ports) ? (m.ports as unknown[]).join(", ") : m.ports} />
+          {m.services != null && Array.isArray(m.services) && (
+            <div>
+              <span className="text-xs font-semibold text-muted-foreground">Services</span>
+              <div className="mt-1 space-y-1">
+                {(m.services as Record<string, unknown>[]).map((svc, i) => (
+                  <p key={i} className="text-sm font-mono">:{String(svc.port)}/{String(svc.transport)} — {String(svc.product || "unknown")} {String(svc.version || "")}</p>
+                ))}
+              </div>
+            </div>
+          )}
+          {m.vulns != null && Array.isArray(m.vulns) && (m.vulns as string[]).length > 0 && (
+            <Field label="CVEs Found" value={(m.vulns as string[]).join(", ")} />
+          )}
+          <Field label="Last Scan" value={m.lastUpdate} />
+        </div>
+      );
+    }
+    case "sentinel": {
+      const m = metadata as Record<string, unknown>;
+      return (
+        <div className="space-y-2">
+          <Field label="Incident #" value={m.incidentNumber} />
+          <Field label="Title" value={m.title} />
+          <Field label="Severity" value={m.severity} />
+          <Field label="Status" value={m.status} />
+          <Field label="Classification" value={m.classification} />
+          <Field label="Created" value={m.createdTime} />
+          <Field label="Closed" value={m.closedTime} />
+          <Field label="Owner" value={m.owner} />
+        </div>
+      );
+    }
+    case "misp": {
+      const m = metadata as Record<string, unknown>;
+      const threatLevelNum = typeof m.threatLevel === "number" ? m.threatLevel : null;
+      const threatLabel = threatLevelNum === 1 ? "High" : threatLevelNum === 2 ? "Medium" : threatLevelNum === 3 ? "Low" : "Undefined";
+      const tags = m.tags as string[] | undefined;
+      const attributes = m.attributes as Record<string, string[]> | undefined;
+      return (
+        <div className="space-y-2">
+          <Field label="Event ID" value={m.eventId} />
+          <Field label="Info" value={m.info} />
+          <Field label="Threat Level" value={threatLabel} />
+          <Field label="Organization" value={m.orgName} />
+          <Field label="Attribute Count" value={m.attributeCount} />
+          {tags != null && tags.length > 0 && (
+            <div>
+              <span className="text-xs font-semibold text-muted-foreground">Tags</span>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {tags.map((tag, i) => (
+                  <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          {attributes != null && (
+            <div>
+              <span className="text-xs font-semibold text-muted-foreground">IoC Summary</span>
+              <div className="mt-1 text-sm space-y-0.5">
+                {attributes.ips?.length > 0 && <p>IPs: {attributes.ips.join(", ")}</p>}
+                {attributes.domains?.length > 0 && <p>Domains: {attributes.domains.join(", ")}</p>}
+                {attributes.hashes?.length > 0 && <p>Hashes: {attributes.hashes.slice(0, 3).join(", ")}{attributes.hashes.length > 3 ? ` +${attributes.hashes.length - 3} more` : ""}</p>}
+                {attributes.cves?.length > 0 && <p>CVEs: {attributes.cves.join(", ")}</p>}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+    case "email": {
+      const m = metadata as Record<string, unknown>;
+      const entities = m.entities as Record<string, string[]> | undefined;
+      return (
+        <div className="space-y-2">
+          <Field label="From" value={m.from} />
+          <Field label="To" value={m.to} />
+          <Field label="Subject" value={m.subject} />
+          <Field label="Date" value={m.date} />
+          <Field label="Severity" value={m.severity} />
+          {entities != null && (
+            <div>
+              <span className="text-xs font-semibold text-muted-foreground">Extracted Entities</span>
+              <div className="mt-1 text-sm space-y-0.5">
+                {entities.cveIds?.length > 0 && <p>CVEs: {entities.cveIds.join(", ")}</p>}
+                {entities.domains?.length > 0 && <p>Domains: {entities.domains.join(", ")}</p>}
+                {entities.ips?.length > 0 && <p>IPs: {entities.ips.join(", ")}</p>}
+                {entities.vendors?.length > 0 && <p>Vendors: {entities.vendors.join(", ")}</p>}
+              </div>
+            </div>
+          )}
+          {m.bodyPreview != null && (
+            <div>
+              <span className="text-xs font-semibold text-muted-foreground">Body Preview</span>
+              <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">{String(m.bodyPreview)}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    default:
+      return (
+        <div className="space-y-2">
+          {Object.entries(metadata).map(([key, value]) => (
+            <Field key={key} label={key} value={typeof value === "object" ? JSON.stringify(value) : value} />
+          ))}
+        </div>
+      );
+  }
+}
+
+type SignalWithMetadata = {
+  id?: string;
+  source?: string;
+  content?: string;
+  status?: string;
+  classification?: string | null;
+  confidence?: string | null;
+  createdAt?: string;
+  metadata?: Record<string, unknown> | null;
+};
+
+function SignalDetailPanel({
+  signal,
+  open,
+  onClose,
+}: {
+  signal: SignalWithMetadata | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [fullSignal, setFullSignal] = useState<SignalWithMetadata | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!signal?.id || !open) {
+      setFullSignal(null);
+      return;
+    }
+    // Fetch full signal details including metadata
+    setLoading(true);
+    const token = localStorage.getItem("accessToken");
+    fetch(`/api/v1/signals/${signal.id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => r.json())
+      .then((data) => setFullSignal(data))
+      .catch(() => setFullSignal(signal))
+      .finally(() => setLoading(false));
+  }, [signal?.id, open]);
+
+  const displayed = fullSignal ?? signal;
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Signal Details</SheetTitle>
+          <SheetDescription>Source: {displayed?.source}</SheetDescription>
+        </SheetHeader>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : displayed && (
+          <div className="mt-6 space-y-6">
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Content</h3>
+              <p className="mt-1 text-sm whitespace-pre-wrap">{displayed.content}</p>
+            </div>
+            <div className="flex gap-4">
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Status</h3>
+                <Badge variant="outline" className="mt-1">{displayed.status}</Badge>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Received</h3>
+                <p className="mt-1 text-sm">{displayed.createdAt ? format(new Date(displayed.createdAt), "MMM d, HH:mm") : "—"}</p>
+              </div>
+            </div>
+
+            {/* Source Details card */}
+            {displayed.metadata != null && Object.keys(displayed.metadata).length > 0 && (
+              <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <SourceBadge source={displayed.source ?? ""} />
+                  Source Details
+                </h3>
+                <SourceMetadataDisplay source={displayed.source ?? ""} metadata={displayed.metadata} />
+              </div>
+            )}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function FindingPanel({
   signalId,
   open,
@@ -261,6 +496,7 @@ export default function SignalList() {
   const queryClient = useQueryClient();
   const [retriggering, setRetriggering] = useState<Record<string, boolean>>({});
   const [findingPanelSignalId, setFindingPanelSignalId] = useState<string | null>(null);
+  const [selectedSignal, setSelectedSignal] = useState<SignalWithMetadata | null>(null);
 
   const handleRetriggerTriage = async (signalId: string) => {
     setRetriggering((prev) => ({ ...prev, [signalId]: true }));
@@ -417,7 +653,11 @@ export default function SignalList() {
                   </TableRow>
                 ) : (
                   data?.data?.map((signal) => (
-                    <TableRow key={signal.id} className="group hover:bg-muted/30">
+                    <TableRow
+                      key={signal.id}
+                      className="group hover:bg-muted/30 cursor-pointer"
+                      onClick={() => setSelectedSignal(signal)}
+                    >
                       <TableCell><SourceBadge source={signal.source ?? ""} /></TableCell>
                       <TableCell className="font-medium text-sm max-w-[400px] truncate" title={signal.content}>{signal.content}</TableCell>
                       <TableCell>{statusBadge(signal.status || "pending")}</TableCell>
@@ -444,7 +684,7 @@ export default function SignalList() {
                                 variant="ghost"
                                 className="h-7 text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30"
                                 disabled={retriggering[signal.id!] || false}
-                                onClick={() => signal.id && handleRetriggerTriage(signal.id)}
+                                onClick={(e) => { e.stopPropagation(); signal.id && handleRetriggerTriage(signal.id); }}
                                 title="Re-queue AI triage for this signal"
                               >
                                 {retriggering[signal.id!]
@@ -458,7 +698,7 @@ export default function SignalList() {
                                 variant="outline"
                                 className="h-7 text-xs"
                                 disabled={triageMutation.isPending}
-                                onClick={() => signal.id && handleMarkTriaged(signal.id)}
+                                onClick={(e) => { e.stopPropagation(); signal.id && handleMarkTriaged(signal.id); }}
                               >
                                 <ArrowRight className="h-3 w-3 mr-1" />
                                 Triage
@@ -468,7 +708,7 @@ export default function SignalList() {
                                 variant="default"
                                 className="h-7 text-xs"
                                 disabled={triageFullMutation.isPending}
-                                onClick={() => signal.id && handleFullTriage(signal.id)}
+                                onClick={(e) => { e.stopPropagation(); signal.id && handleFullTriage(signal.id); }}
                                 title="Triage and create finding in one step"
                               >
                                 {triageFullMutation.isPending
@@ -484,7 +724,7 @@ export default function SignalList() {
                                 size="sm"
                                 variant="outline"
                                 className="h-7 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
-                                onClick={() => signal.id && setFindingPanelSignalId(signal.id)}
+                                onClick={(e) => { e.stopPropagation(); signal.id && setFindingPanelSignalId(signal.id); }}
                                 title="View linked finding (if exists)"
                               >
                                 <Eye className="h-3 w-3 mr-1" />
@@ -495,7 +735,7 @@ export default function SignalList() {
                                 variant="ghost"
                                 className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
                                 disabled={promoteMutation.isPending}
-                                onClick={() => signal.id && handlePromote(signal.id, signal.content)}
+                                onClick={(e) => { e.stopPropagation(); signal.id && handlePromote(signal.id, signal.content); }}
                                 title="Promote to finding"
                               >
                                 <Check className="h-4 w-4" />
@@ -505,7 +745,7 @@ export default function SignalList() {
                                 variant="ghost"
                                 className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                 disabled={triageMutation.isPending}
-                                onClick={() => signal.id && handleDismiss(signal.id)}
+                                onClick={(e) => { e.stopPropagation(); signal.id && handleDismiss(signal.id); }}
                                 title="Dismiss signal"
                               >
                                 <X className="h-4 w-4" />
@@ -516,7 +756,7 @@ export default function SignalList() {
                               size="sm"
                               variant="outline"
                               className="h-7 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                              onClick={() => signal.id && setFindingPanelSignalId(signal.id)}
+                              onClick={(e) => { e.stopPropagation(); signal.id && setFindingPanelSignalId(signal.id); }}
                             >
                               <Eye className="h-3 w-3 mr-1" />
                               View Finding
@@ -553,6 +793,12 @@ export default function SignalList() {
         signalId={findingPanelSignalId}
         open={!!findingPanelSignalId}
         onClose={() => setFindingPanelSignalId(null)}
+      />
+
+      <SignalDetailPanel
+        signal={selectedSignal}
+        open={!!selectedSignal}
+        onClose={() => setSelectedSignal(null)}
       />
     </AppLayout>
   );
