@@ -36,7 +36,7 @@ import {
   Plus, Pencil, Trash2, CheckCircle2, XCircle,
   Play, RefreshCw, Clock, AlertTriangle, Eye,
   Link2, Zap, TrendingUp, Search, Lightbulb, Ban, X,
-  Building2, Timer,
+  Building2, Timer, Plug, Globe, Cloud, Bug, Mail, ShieldCheck,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -181,6 +181,359 @@ const SEVERITY_COLORS: Record<string, string> = {
   low: "text-blue-700 border-blue-200 bg-blue-50",
   info: "text-muted-foreground",
 };
+
+// ── Integrations ──────────────────────────────────────────────────────────────
+
+type IntegrationSourceField = {
+  key: string;
+  label: string;
+  type: "text" | "password" | "number" | "toggle";
+  placeholder?: string;
+  required?: boolean;
+  defaultValue?: boolean;
+};
+
+type IntegrationSource = {
+  type: string;
+  label: string;
+  icon: typeof ShieldCheck;
+  description: string;
+  fields: IntegrationSourceField[];
+};
+
+const INTEGRATION_SOURCES: IntegrationSource[] = [
+  {
+    type: "nvd",
+    label: "NVD / CVE",
+    icon: ShieldCheck,
+    description: "NIST National Vulnerability Database",
+    fields: [
+      { key: "apiKey", label: "API Key (optional)", type: "password", placeholder: "NVD API key for higher rate limits" },
+      { key: "keywords", label: "Product Keywords", type: "text", placeholder: "e.g. microsoft, apache, linux (comma-separated)" },
+    ],
+  },
+  {
+    type: "shodan",
+    label: "Shodan",
+    icon: Globe,
+    description: "Internet-connected device search engine",
+    fields: [
+      { key: "apiKey", label: "API Key", type: "password", placeholder: "Shodan API key", required: true },
+    ],
+  },
+  {
+    type: "sentinel",
+    label: "Microsoft Sentinel",
+    icon: Cloud,
+    description: "Azure SIEM via Log Analytics API",
+    fields: [
+      { key: "azureTenantId", label: "Azure Tenant ID", type: "text", placeholder: "Azure AD tenant ID (not RiskMind tenant)", required: true },
+      { key: "clientId", label: "Client ID", type: "text", placeholder: "App registration client ID", required: true },
+      { key: "clientSecret", label: "Client Secret", type: "password", placeholder: "App registration client secret", required: true },
+      { key: "workspaceId", label: "Log Analytics Workspace ID", type: "text", placeholder: "Workspace GUID", required: true },
+    ],
+  },
+  {
+    type: "misp",
+    label: "MISP",
+    icon: Bug,
+    description: "Open-source threat intelligence platform",
+    fields: [
+      { key: "baseUrl", label: "MISP Instance URL", type: "text", placeholder: "https://misp.example.com", required: true },
+      { key: "apiKey", label: "API Key", type: "password", placeholder: "MISP automation key", required: true },
+    ],
+  },
+  {
+    type: "email",
+    label: "Email Inbox",
+    icon: Mail,
+    description: "IMAP mailbox for security advisories",
+    fields: [
+      { key: "host", label: "IMAP Host", type: "text", placeholder: "imap.gmail.com", required: true },
+      { key: "port", label: "Port", type: "number", placeholder: "993", required: true },
+      { key: "user", label: "Username", type: "text", placeholder: "alerts@company.com", required: true },
+      { key: "pass", label: "Password", type: "password", placeholder: "App password", required: true },
+      { key: "tls", label: "Use TLS", type: "toggle", defaultValue: true },
+      { key: "mailbox", label: "Mailbox", type: "text", placeholder: "INBOX" },
+    ],
+  },
+];
+
+type IntegrationConfig = {
+  id: string;
+  sourceType: string;
+  isActive: boolean;
+  lastPolledAt?: string | null;
+  lastError?: string | null;
+};
+
+function IntegrationCard({
+  source,
+  integration,
+  token,
+  onRefresh,
+}: {
+  source: IntegrationSource;
+  integration?: IntegrationConfig;
+  token: string | null;
+  onRefresh: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [formValues, setFormValues] = useState<Record<string, string | boolean>>({});
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const config: Record<string, string | boolean | number> = {};
+      for (const field of source.fields) {
+        if (field.type === "toggle") {
+          config[field.key] = formValues[field.key] !== undefined ? formValues[field.key] as boolean : (field.defaultValue ?? false);
+        } else if (field.type === "number") {
+          const v = formValues[field.key] as string;
+          if (v) config[field.key] = parseInt(v);
+        } else {
+          const v = formValues[field.key] as string;
+          if (v) config[field.key] = v;
+        }
+      }
+      await fetch("/api/v1/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ sourceType: source.type, config, isActive: true }),
+      });
+      toast({ title: "Saved", description: `${source.label} configuration saved.` });
+      setFormValues({});
+      setExpanded(false);
+      onRefresh();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    if (!integration?.id) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch(`/api/v1/integrations/${integration.id}/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+      });
+      const data = await res.json();
+      const result = { ok: data.ok ?? false, message: data.message ?? (data.ok ? "Connection successful" : "Connection failed") };
+      setTestResult(result);
+      toast({
+        title: result.ok ? "Connection OK" : "Connection Failed",
+        description: result.message,
+        variant: result.ok ? "default" : "destructive",
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    if (!integration?.id) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(`/api/v1/integrations/${integration.id}/trigger`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+      });
+      const data = await res.json();
+      toast({ title: "Sync complete", description: `${data.signalsCreated ?? 0} signals created.` });
+      onRefresh();
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleToggleActive = async (isActive: boolean) => {
+    if (!integration?.id) return;
+    await fetch(`/api/v1/integrations/${integration.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeader },
+      body: JSON.stringify({ isActive }),
+    });
+    onRefresh();
+  };
+
+  const handleRemove = async () => {
+    if (!integration?.id) return;
+    if (!window.confirm(`Remove ${source.label} integration? This cannot be undone.`)) return;
+    await fetch(`/api/v1/integrations/${integration.id}`, {
+      method: "DELETE",
+      headers: { ...authHeader },
+    });
+    toast({ title: "Removed", description: `${source.label} integration removed.` });
+    onRefresh();
+  };
+
+  const Icon = source.icon;
+  const isConfigured = !!integration;
+
+  return (
+    <Card className="border shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+              <Icon className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-base">{source.label}</CardTitle>
+              <CardDescription className="text-xs mt-0.5">{source.description}</CardDescription>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isConfigured ? (
+              integration.isActive ? (
+                <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 text-xs">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />Active
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground text-xs">
+                  Inactive
+                </Badge>
+              )
+            ) : (
+              <Badge variant="outline" className="text-muted-foreground text-xs">Not configured</Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? "Hide" : "Configure"}
+            </Button>
+          </div>
+        </div>
+        {isConfigured && (
+          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+            {integration.lastPolledAt && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Last polled: {format(new Date(integration.lastPolledAt), "MMM d, HH:mm")}
+              </span>
+            )}
+            {integration.lastError && (
+              <span className="text-red-600 flex items-center gap-1">
+                <XCircle className="h-3 w-3" />
+                Error: {integration.lastError.slice(0, 60)}
+              </span>
+            )}
+          </div>
+        )}
+      </CardHeader>
+
+      {expanded && (
+        <CardContent className="pt-0 space-y-4">
+          <div className="border-t pt-4 space-y-3">
+            {source.fields.map((field) => (
+              <div key={field.key} className="space-y-1.5">
+                <Label className="text-sm">{field.label}{field.required && <span className="text-destructive ml-1">*</span>}</Label>
+                {field.type === "toggle" ? (
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={formValues[field.key] !== undefined ? formValues[field.key] as boolean : (field.defaultValue ?? false)}
+                      onCheckedChange={(v) => setFormValues((prev) => ({ ...prev, [field.key]: v }))}
+                    />
+                    <span className="text-sm text-muted-foreground">{formValues[field.key] !== undefined ? (formValues[field.key] ? "Enabled" : "Disabled") : (field.defaultValue ? "Enabled" : "Disabled")}</span>
+                  </div>
+                ) : (
+                  <Input
+                    type={field.type}
+                    placeholder={isConfigured && (field.type === "password") ? "Current key saved — enter new value to replace" : field.placeholder}
+                    value={(formValues[field.key] as string) || ""}
+                    onChange={(e) => setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                  />
+                )}
+              </div>
+            ))}
+
+            {source.type === "sentinel" && (
+              <Alert className="border-blue-200 bg-blue-50">
+                <AlertDescription className="text-xs text-blue-800">
+                  Requires an Azure App Registration with <strong>Log Analytics Reader</strong> role.{" "}
+                  <a
+                    href="https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-authorization"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    See Microsoft docs
+                  </a>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+              Save
+            </Button>
+            {isConfigured && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTest}
+                  disabled={testing}
+                >
+                  {testing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Play className="h-3 w-3 mr-1" />}
+                  Test Connection
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSyncNow}
+                  disabled={syncing}
+                >
+                  {syncing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                  Sync Now
+                </Button>
+                <div className="flex items-center gap-2 ml-2">
+                  <Switch
+                    checked={integration.isActive}
+                    onCheckedChange={handleToggleActive}
+                    id={`active-${source.type}`}
+                  />
+                  <Label htmlFor={`active-${source.type}`} className="text-xs text-muted-foreground cursor-pointer">
+                    {integration.isActive ? "Active" : "Inactive"}
+                  </Label>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive ml-auto"
+                  onClick={handleRemove}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Remove
+                </Button>
+              </>
+            )}
+          </div>
+
+          {testResult && (
+            <div className={`rounded-lg border p-3 text-sm flex items-center gap-2 ${testResult.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
+              {testResult.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+              {testResult.message}
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
 
 export default function Settings() {
   const { data: user, isLoading: userLoading } = useGetMe();
@@ -330,6 +683,26 @@ export default function Settings() {
   };
 
   const [savingCadence, setSavingCadence] = useState(false);
+
+  // ── Integrations state ──────────────────────────────────────────────────────
+  const [integrations, setIntegrations] = useState<IntegrationConfig[]>([]);
+  const [intLoading, setIntLoading] = useState(false);
+
+  const fetchIntegrations = () => {
+    const token = localStorage.getItem("accessToken");
+    setIntLoading(true);
+    fetch("/api/v1/integrations", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => r.json())
+      .then((data) => setIntegrations(data.data ?? []))
+      .catch(() => setIntegrations([]))
+      .finally(() => setIntLoading(false));
+  };
+
+  useEffect(() => {
+    fetchIntegrations();
+  }, []);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [providerSheet, setProviderSheet] = useState<"closed" | "add" | "edit">("closed");
@@ -566,6 +939,11 @@ export default function Settings() {
             {user?.role === "admin" && (
               <TabsTrigger value="monitoring" className="data-[state=active]:shadow-sm rounded-md">
                 <Timer className="h-4 w-4 mr-2" /> Monitoring
+              </TabsTrigger>
+            )}
+            {user?.role === "admin" && (
+              <TabsTrigger value="integrations" className="data-[state=active]:shadow-sm rounded-md">
+                <Plug className="h-4 w-4 mr-2" />Integrations
               </TabsTrigger>
             )}
           </TabsList>
@@ -1150,6 +1528,37 @@ export default function Settings() {
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
+            )}
+
+            {/* INTEGRATIONS TAB */}
+            {user?.role === "admin" && (
+              <TabsContent value="integrations" className="m-0 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Plug className="h-5 w-5" /> Signal Integrations</CardTitle>
+                    <CardDescription>Configure external signal sources. Credentials are encrypted at rest and never exposed in API responses.</CardDescription>
+                  </CardHeader>
+                </Card>
+                {intLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground" /></div>
+                ) : (
+                  <div className="space-y-3">
+                    {INTEGRATION_SOURCES.map((source) => {
+                      const integration = integrations.find((i) => i.sourceType === source.type);
+                      const token = localStorage.getItem("accessToken");
+                      return (
+                        <IntegrationCard
+                          key={source.type}
+                          source={source}
+                          integration={integration}
+                          token={token}
+                          onRefresh={fetchIntegrations}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </TabsContent>
             )}
 
