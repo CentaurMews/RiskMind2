@@ -1,365 +1,157 @@
 # Stack Research
 
-**Domain:** LLM provider model auto-discovery, benchmarking, and intelligent per-task routing — v1.1 additions to RiskMind ERM platform
-**Researched:** 2026-03-18
-**Confidence:** HIGH (provider APIs verified via official docs; existing codebase inspected directly)
+**Domain:** RiskMind v2.0 — Assessment Engine, Vendor Lifecycle Redesign, Compliance Flow, Signal Integrations (Sentinel/Shodan/CVE/MISP/Email), Foresight v2 (Monte Carlo + OSINT)
+**Researched:** 2026-03-23
+**Confidence:** HIGH for most areas (verified against official docs and npm registry); MEDIUM for Sentinel SDK (perpetual beta); LOW for MISP Node.js (no maintained package exists)
 
 ---
 
-> **Scope note:** This document covers ONLY the new capabilities required for v1.1 (provider wizard, model listing, benchmarking, routing). The existing validated stack (Express 5, React + Vite, Drizzle ORM, PostgreSQL, OpenAI SDK ^6.29, Anthropic SDK ^0.78, AES-256-GCM encryption) is already installed and not re-documented here.
+> **Scope note:** This document covers ONLY new dependencies and integration patterns required for v2.0. The existing validated stack (Express 5, React 19 + Vite 7, Drizzle ORM, Zod v4, shadcn/ui, Tailwind v4, pgvector, openai ^6.29, @anthropic-ai/sdk ^0.78, recharts ^2.x, react-hook-form, node-cron equivalent via in-process polling) is already installed and not re-documented here.
 
 ---
 
 ## New Dependencies Required
 
-**Short answer: zero new npm packages.** The existing `openai` and `@anthropic-ai/sdk` SDKs expose every API method needed. Model listing, connection testing, and structured routing can be implemented entirely within the existing stack using Node.js `fetch` for providers not covered by the SDKs.
+### Signal Integrations
 
-### Core Technologies (Existing — Leveraged for New Features)
+| Package | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| `imapflow` | ^1.2.9 | IMAP email ingestion — connect to inbox, idle for new messages, fetch/parse raw emails | Actively maintained (last published 6 days ago), TypeScript-native, supports IDLE push for zero-poll email monitoring. node-imap is unmaintained. |
+| `mailparser` | ^3.9.4 | Parse raw MIME email into structured object (subject, from, body, attachments) | Maintained by Nodemailer team, 3.9.3+ patches XSS in `textToHtml()`. Handles 100MB+ messages as stream. 782 dependents. |
+| `@azure/arm-securityinsight` | ^1.0.0-beta.6 | Microsoft Sentinel management plane — read incidents, alerts, security events | Official Azure SDK. Still beta but stable since 2022; no GA release planned. Pair with `@azure/identity` for auth. |
+| `@azure/identity` | ^4.13.0 | Azure credential management — `ClientSecretCredential` for service principal auth to Sentinel | Required by all Azure SDKs. `DefaultAzureCredential` is overkill for server-to-server; use `ClientSecretCredential` directly. |
 
-| Technology | Version | New Usage | Why Sufficient |
-|------------|---------|-----------|----------------|
-| `openai` | ^6.29.0 | `client.models.list()` covers OpenAI, Gemini (compat), Groq, Mistral, Together, Ollama | OpenAI Node SDK supports any OpenAI-compatible base URL; the same `GET /v1/models` call works for all these providers |
-| `@anthropic-ai/sdk` | ^0.78.0 | `client.models.list()` — Anthropic added a real `/v1/models` endpoint (not hardcoded anymore) | SDK exposes `anthropic.models.list()` returning paginated `ModelInfo[]` with `id`, `display_name`, `created_at` |
-| `drizzle-orm` | catalog | New `llm_routing_rules` table, schema migration | Already in use; add one table for routing config |
-| `zod` | catalog | New Zod schemas for wizard steps, benchmark results, routing table | Already in use |
-| Node.js `fetch` | Node 20 built-in | Fallback for providers with non-OpenAI-compat list endpoints (Google Gemini native API) | Avoids adding `node-fetch` or `axios` — built-in since Node 18 |
+**Shodan:** Do NOT add a package. `shodan-client` npm is 6 years unmaintained (v3.2.0, 2019). Use Node.js built-in `fetch` directly against `https://api.shodan.io/` — the REST API is simple enough (3-4 endpoints used: `/shodan/host/{ip}`, `/shodan/host/search`, `/dns/resolve`).
 
----
+**NVD/CVE:** Do NOT add a package. No maintained Node.js wrapper exists for NVD API v2. Use built-in `fetch` with a rate limiter (see below). NVD API v2 base URL: `https://services.nvd.nist.gov/rest/json/cves/2.0`. Rate limit: 50 req/30 sec with API key.
 
-## Provider Model Listing — API Reference
+**MISP:** Do NOT add a package. No maintained Node.js MISP client exists on npm. MISP exposes a documented REST API (`/events`, `/attributes/restSearch`) with Bearer token auth. Use built-in `fetch`. MISP has an OpenAPI spec available for reference.
 
-This is the critical technical reference for implementing the wizard's "auto-fetch models" step.
+### Rate Limiting (for External API Calls)
 
-### OpenAI
+| Package | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| `p-ratelimit` | ^1.2.0 | Throttle outbound HTTP calls to rate-limited APIs (NVD: 50/30s, Shodan: varies by plan, MISP: configurable) | TypeScript-native, wraps any async function, configurable interval + concurrency. Avoid `bottleneck` — last updated 2019, maintenance inactive. |
 
-| Field | Value |
-|-------|-------|
-| Endpoint | `GET /v1/models` |
-| Base URL | `https://api.openai.com/v1` |
-| Auth | `Authorization: Bearer {apiKey}` |
-| SDK method | `client.models.list()` → async iterable of `Model` objects |
-| Response field | `id` (e.g. `"gpt-4o"`, `"text-embedding-3-small"`) |
-| Filter needed | Exclude fine-tuned IDs (contain `:`) and deprecated (`-0301`, `-0314` suffixes) for cleaner display |
+### Scheduled Polling (Signal Feeds)
 
-```typescript
-const client = new OpenAI({ apiKey, baseURL: "https://api.openai.com/v1" });
-const models = await client.models.list();
-// models.data is Model[] with .id field
-```
+**node-cron is already available** — confirm before adding. The existing `ai-enrichment` service uses in-process scheduling. If `node-cron` is not already installed: add `node-cron@^4.2.1` with `@types/node-cron`. This handles cron-style polling for Shodan, CVE/NVD, MISP, and Sentinel feeds.
 
-### Anthropic
+**Do NOT add BullMQ or Redis** — the existing pattern of in-process scheduled jobs (proven by the enrichment queue) is sufficient. BullMQ requires Redis, adding a new infrastructure dependency that the deployment does not have. Signal polling jobs are low-frequency (hourly to daily) and do not require distributed queue semantics.
 
-| Field | Value |
-|-------|-------|
-| Endpoint | `GET /v1/models` |
-| Base URL | `https://api.anthropic.com` |
-| Auth | `X-Api-Key: {apiKey}`, `anthropic-version: 2023-06-01` |
-| SDK method | `anthropic.models.list()` → paginated `ModelInfo[]` |
-| Response fields | `id`, `display_name`, `created_at`, `type: "model"` |
-| Notes | Returns only production models; no fine-tunes. Pagination via `after_id`/`before_id`. `has_more` flag for multi-page. |
+### Foresight v2 — Monte Carlo
 
-```typescript
-const client = new Anthropic({ apiKey });
-const page = await client.models.list({ limit: 100 });
-// page.data is ModelInfo[] with .id and .display_name
-```
+| Package | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| `simple-statistics` | ^7.8.8 | Statistical distributions (normal, lognormal, PERT, triangular), random sampling, percentile calculations | Zero dependencies, includes TypeScript types, runs in Node and browser. Version 7.8.8 is current. Purpose-built for exactly these distribution functions. |
 
-### Google Gemini (OpenAI-compatible mode)
+**No other Monte Carlo library needed.** Monte Carlo simulation for risk is straightforward: sample N times from `simple-statistics` distributions, compute loss distribution, extract P50/P90/P99 percentiles. This is custom business logic, not a pre-packaged simulation framework.
 
-| Field | Value |
-|-------|-------|
-| Base URL for OpenAI SDK | `https://generativelanguage.googleapis.com/v1beta/openai/` |
-| Model list endpoint | `GET /v1/models` (via OpenAI SDK with above base URL) |
-| Auth | `Authorization: Bearer {geminiApiKey}` |
-| Notes | Google added OpenAI-compat in late 2024. Use `openai_compat` provider type. The compat endpoint supports `GET /v1/models` — reuse `client.models.list()`. |
+### Frontend Additions
 
-```typescript
-const client = new OpenAI({
-  apiKey: geminiApiKey,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
-});
-const models = await client.models.list();
-// Returns gemini-2.0-flash, gemini-2.5-pro, etc.
-```
+| Package | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| `recharts` | ^3.8.0 | Upgrade from 2.x (already installed at ^2.15.4) — histogram / density charts for Monte Carlo loss distribution | v3 brings improved TypeScript types and composable API. Already used; upgrade is low-risk. Check 3.0 migration guide for breaking changes in axis/tooltip props. |
 
-### Groq
-
-| Field | Value |
-|-------|-------|
-| Base URL | `https://api.groq.com/openai/v1` |
-| Model list endpoint | `GET /openai/v1/models` |
-| Auth | `Authorization: Bearer {apiKey}` |
-| SDK method | `client.models.list()` via OpenAI SDK with Groq base URL |
-| Notes | Full OpenAI-compat. Use `openai_compat` provider type with `baseUrl = "https://api.groq.com/openai/v1"` |
-
-### Mistral
-
-| Field | Value |
-|-------|-------|
-| Base URL | `https://api.mistral.ai/v1` |
-| Model list endpoint | `GET /v1/models` |
-| Auth | `Authorization: Bearer {apiKey}` |
-| SDK method | `client.models.list()` via OpenAI SDK with Mistral base URL |
-| Notes | OpenAI-compatible. Returns `id`, `object: "model"`, `owned_by`. Use `openai_compat` provider type. |
-
-### Together AI
-
-| Field | Value |
-|-------|-------|
-| Base URL | `https://api.together.xyz/v1` |
-| Model list endpoint | `GET /v1/models` |
-| Auth | `Authorization: Bearer {apiKey}` |
-| SDK method | `client.models.list()` via OpenAI SDK with Together base URL |
-| Notes | 200+ open-source models. Response is verbose — filter by `type: "chat"` or `type: "language"` to surface relevant completions models. |
-
-### Ollama / Private
-
-| Field | Value |
-|-------|-------|
-| Endpoint | `GET /api/tags` |
-| Base URL | User-provided (e.g. `http://localhost:11434`) |
-| Auth | None (local) |
-| SDK method | Cannot use OpenAI SDK for listing. Use `fetch` directly. |
-| Response | `{ models: [{ name, model, modified_at, size, details: { family, parameter_size } }] }` |
-
-```typescript
-// Ollama model listing — native API only, not OpenAI-compat
-const res = await fetch(`${baseUrl}/api/tags`);
-const data = await res.json();
-const modelIds = data.models.map((m: { name: string }) => m.name);
-```
-
-Note: Ollama also exposes `GET /v1/models` via its OpenAI-compat layer, but `/api/tags` is more reliable and returns richer metadata (size, family, quantization).
+**Assessment Engine (wizard stepper):** No new packages needed. React Hook Form (already installed) + Zod v4 + shadcn/ui Dialog/Stepper primitives handle multi-step questionnaire flows. The AI branching logic is server-side (LLM decides next question), so the frontend is a simple step renderer, not a declarative form engine like SurveyJS.
 
 ---
 
-## Provider Type Mapping
+## Recommended Stack — Full Picture
 
-The existing `llm_provider_type` enum only has `openai_compat` and `anthropic`. The wizard needs to present named providers to users but internally route them to the correct client strategy:
+### New Backend Packages
 
-| Wizard Provider Label | Internal `providerType` | `baseUrl` |
-|----------------------|------------------------|-----------|
-| OpenAI | `openai_compat` | `null` (SDK default) |
-| Google Gemini | `openai_compat` | `https://generativelanguage.googleapis.com/v1beta/openai/` |
-| Groq | `openai_compat` | `https://api.groq.com/openai/v1` |
-| Mistral | `openai_compat` | `https://api.mistral.ai/v1` |
-| Together AI | `openai_compat` | `https://api.together.xyz/v1` |
-| Ollama / Private | `openai_compat` | User-provided URL |
-| Anthropic | `anthropic` | `null` (SDK default) |
+| Package | Version | Install In | Notes |
+|---------|---------|-----------|-------|
+| `imapflow` | ^1.2.9 | `artifacts/api-server` | IMAP ingestion. Has built-in TypeScript types. |
+| `mailparser` | ^3.9.4 | `artifacts/api-server` | MIME parsing. Patch CVE-2026-3455 — use >=3.9.3. |
+| `@azure/arm-securityinsight` | ^1.0.0-beta.6 | `artifacts/api-server` | Sentinel SDK. Beta but stable since 2022. |
+| `@azure/identity` | ^4.13.0 | `artifacts/api-server` | Azure auth. Already used by Azure SDKs ecosystem. |
+| `p-ratelimit` | ^1.2.0 | `artifacts/api-server` | Rate limit NVD/Shodan/MISP outbound calls. |
+| `simple-statistics` | ^7.8.8 | `artifacts/api-server` | Monte Carlo sampling + distribution math. |
+| `node-cron` | ^4.2.1 | `artifacts/api-server` | Cron scheduling for signal feed polling (if not already present). |
 
-No schema change needed to `llm_provider_type` enum. The `baseUrl` field already distinguishes providers within `openai_compat`.
+### New Frontend Packages
 
-Add a new optional `displayProvider` text column to `llm_configs` to store the human-readable provider label (e.g. `"Groq"`, `"Google Gemini"`) for display purposes only.
-
----
-
-## Benchmark Approach
-
-### What to Measure
-
-| Metric | How to Measure | Use |
-|--------|---------------|-----|
-| Time to first token (TTFT) | `Date.now()` before call, capture time of first streamed chunk | Indicates responsiveness for streaming UIs |
-| Total latency | `Date.now()` before and after full `complete()` call | Simpler fallback for non-streaming benchmark |
-| Estimated tokens/sec | `(output_token_count / elapsed_ms) * 1000` | Throughput proxy |
-| Quality score | Structured scoring prompt (see below) | Capability proxy |
-
-### Standard Benchmark Prompt
-
-Use a short, deterministic prompt that tests instruction-following and JSON output — a capability needed by RiskMind's risk enrichment and triage tasks:
-
-```
-You are a risk analyst. Respond ONLY with valid JSON.
-Assess this risk: "Vendor XYZ lacks SOC 2 certification."
-Return: { "severity": "high|medium|low", "category": "vendor|compliance|operational", "summary": "one sentence" }
-```
-
-**Quality scoring:** After calling the model, parse the JSON. Award:
-- 3 pts: Valid JSON with all three required keys and valid enum values
-- 2 pts: Valid JSON but missing a key or invalid enum
-- 1 pt: Text response with some structure
-- 0 pts: Error or completely unstructured output
-
-This avoids needing an external evaluator LLM. Scoring is deterministic and fast.
-
-### Benchmark Implementation
-
-No new packages needed. Use the existing `testConnection()` function pattern from `llm-service.ts` as the base, extend it for benchmark:
-
-```typescript
-// New function signature — extend llm-service.ts
-export async function benchmarkConfig(
-  configId: string,
-  tenantId: string
-): Promise<BenchmarkResult>
-
-interface BenchmarkResult {
-  success: boolean;
-  latencyMs: number;        // full round-trip
-  ttftMs: number | null;    // time to first token (streaming only)
-  tokensPerSec: number | null;
-  qualityScore: number;     // 0–3
-  error?: string;
-}
-```
-
-Run via streaming (`streamComplete`) to capture TTFT. Count output tokens by character estimate (÷ 4) if the provider does not return usage data.
-
-### Benchmark Storage
-
-Do NOT store benchmark results in the database permanently (over-engineering). Store them transiently:
-
-- Return results inline to the wizard UI via the existing `/api/settings/llm-configs/:id/test` endpoint (extend this endpoint, or add `/benchmark` sibling)
-- Optionally cache last benchmark result in the `llm_configs` row itself with two new nullable columns: `lastBenchmarkAt` (timestamp) and `lastBenchmarkResult` (jsonb)
-
----
-
-## Routing Table Design
-
-### New Database Table
-
-Add `llm_routing_rules` to store per-tenant per-task model assignments:
-
-```sql
-CREATE TABLE llm_routing_rules (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id   UUID NOT NULL REFERENCES tenants(id),
-  task_type   TEXT NOT NULL,   -- 'risk_enrichment' | 'signal_triage' | 'treatment_suggestions' | 'embeddings' | 'agent_reasoning' | 'general'
-  config_id   UUID REFERENCES llm_configs(id) ON DELETE SET NULL,
-  model       TEXT,            -- override model within the config (optional)
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(tenant_id, task_type)
-);
-```
-
-### Task Types (Enum)
-
-```typescript
-type TaskType =
-  | "risk_enrichment"       // AI enrichment badges, description enhancement
-  | "signal_triage"         // Signal severity classification (fast, cheap)
-  | "treatment_suggestions" // Risk treatment generation (quality matters)
-  | "embeddings"            // Vector embeddings (openai_compat only)
-  | "agent_reasoning"       // Autonomous risk agent (best reasoning model)
-  | "general"               // Fallback / catch-all
-```
-
-### `resolveConfig()` Extension
-
-Extend the existing `resolveConfig(tenantId, useCase)` signature to accept `taskType`:
-
-```typescript
-// Extended signature
-async function resolveConfig(
-  tenantId: string,
-  taskType: TaskType = "general"
-): Promise<ResolvedConfig | null>
-```
-
-Resolution priority:
-1. Check `llm_routing_rules` for `(tenantId, taskType)` — use that `config_id`
-2. If no rule, fall back to current logic: `isDefault = true` for `useCase = "general"` (or `"embeddings"`)
-3. If still nothing, pick any active config
-
-This is backward-compatible — all existing callers that pass `"general"` or `"embeddings"` continue to work.
-
-### Smart Defaults from Benchmark
-
-After benchmarking, suggest routing assignments based on observed metrics:
-
-| Task Type | Suggestion Logic |
-|-----------|-----------------|
-| `signal_triage` | Fastest model (lowest `latencyMs`) |
-| `agent_reasoning` | Highest `qualityScore`, then lowest latency as tiebreak |
-| `risk_enrichment` | Highest `qualityScore` |
-| `treatment_suggestions` | Highest `qualityScore` |
-| `embeddings` | Only offer `openai_compat` configs; prefer models with `embedding` in name |
-| `general` | Balanced (quality ≥ 2, latency ≤ 3000ms) |
-
-Suggestions are presented in the wizard UI — user can accept or override before saving.
-
----
-
-## Schema Additions Summary
-
-Two Drizzle migrations needed:
-
-**Migration 1: `llm_configs` additions**
-
-```typescript
-// Add to llm-configs.ts schema
-displayProvider: text("display_provider"),           // "Groq", "Google Gemini", etc.
-lastBenchmarkAt: timestamp("last_benchmark_at"),
-lastBenchmarkResult: jsonb("last_benchmark_result"),
-```
-
-**Migration 2: New `llm_routing_rules` table**
-
-```typescript
-// New file: lib/db/src/schema/llm-routing-rules.ts
-export const llmTaskTypeEnum = pgEnum("llm_task_type", [
-  "risk_enrichment",
-  "signal_triage",
-  "treatment_suggestions",
-  "embeddings",
-  "agent_reasoning",
-  "general",
-]);
-
-export const llmRoutingRulesTable = pgTable("llm_routing_rules", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenant_id").notNull().references(() => tenantsTable.id),
-  taskType: llmTaskTypeEnum("task_type").notNull(),
-  configId: uuid("config_id").references(() => llmConfigsTable.id, { onDelete: "set null" }),
-  model: text("model"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [uniqueIndex("llm_routing_rules_tenant_task_idx").on(t.tenantId, t.taskType)]);
-```
-
----
-
-## New API Endpoints
-
-Add to the existing `routes/settings.ts`:
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/api/settings/llm-configs/discover-models` | Accept `{providerType, baseUrl, apiKey}`, return model list — used in wizard step 3 |
-| `POST` | `/api/settings/llm-configs/:id/benchmark` | Run benchmark on saved config, return `BenchmarkResult` |
-| `GET` | `/api/settings/llm-routing` | Return current routing table for tenant |
-| `PUT` | `/api/settings/llm-routing` | Save full routing table (bulk upsert) |
-
-The `discover-models` endpoint takes raw credentials (never persisted in this call) and proxies the provider's model list. This avoids CORS issues — the frontend cannot call provider APIs directly due to CORS policies on most providers.
-
----
-
-## Frontend Additions
-
-No new frontend libraries required. Implement the wizard using:
-
-| Existing Tool | New Usage |
-|--------------|-----------|
-| `@radix-ui/react-dialog` | Already installed — use for wizard modal |
-| React state (`useState`) | Step tracking (steps 1–6) |
-| `@tanstack/react-query` | Already installed — `useMutation` for discover-models, benchmark, save |
-| `recharts` | Already installed — optional sparkline for benchmark latency result |
-| `react-hook-form` | Already installed — form validation for API key and base URL inputs |
-| shadcn/ui Select | Provider dropdown (step 1) |
-| shadcn/ui Combobox / multi-select | Model picker (step 4) |
-
-The routing table UI (step 6 / Settings page) is a plain table with Select dropdowns per task type — fully covered by existing shadcn/ui components.
+| Package | Version | Install In | Notes |
+|---------|---------|-----------|-------|
+| `recharts` | ^3.8.0 | `artifacts/riskmind-app` | Upgrade from 2.x. Required for histogram/density charts in Foresight v2. |
 
 ---
 
 ## Installation
 
 ```bash
-# No new packages required.
-# Run migrations after schema changes:
-cd /home/dante/RiskMind2 && pnpm drizzle-kit generate && pnpm drizzle-kit migrate
+# Backend — api-server
+cd /home/dante/RiskMind2/artifacts/api-server
+pnpm add imapflow mailparser @azure/arm-securityinsight @azure/identity p-ratelimit simple-statistics node-cron
+
+# Backend dev types
+pnpm add -D @types/node-cron
+
+# Frontend — riskmind-app (upgrade recharts)
+cd /home/dante/RiskMind2/artifacts/riskmind-app
+pnpm add recharts@^3.8.0
 ```
+
+---
+
+## Integration Patterns by Feature Area
+
+### Assessment Engine
+
+No new packages. Architecture is:
+- Server: New `assessment-engine` service. LLM generates next question based on prior answers (`complete()` from existing `llm-service.ts`). State stored in new `assessments` + `assessment_responses` DB tables.
+- Frontend: Step-by-step renderer. React Hook Form handles input. TanStack Query polls for AI-generated next question. shadcn/ui Progress + Dialog cover the shell.
+- Shared between Vendor onboarding and Compliance control assessment — parameterized by `assessmentType` enum.
+
+### Vendor Lifecycle Redesign
+
+No new packages. Wizard onboarding uses existing multi-step form pattern (React Hook Form + Zod + shadcn/ui). 4th party risk uses a graph query on the existing vendor relationships schema. Continuous monitoring hooks into the signal polling scheduler already established for Signal Integrations.
+
+### Compliance Flow
+
+No new packages. Framework import is a JSON/CSV upload parsed with built-in `JSON.parse` or existing CSV-to-JSON logic. Assessment uses the shared Assessment Engine. Thresholds are stored config values evaluated server-side.
+
+### Signal Integrations
+
+**Microsoft Sentinel:**
+- Auth: `ClientSecretCredential` from `@azure/identity` — tenants configure `tenantId`, `clientId`, `clientSecret`, `subscriptionId`, `resourceGroup`, `workspaceName` in settings.
+- Fetch: Use `@azure/arm-securityinsight` `SecurityInsights` client → `incidents.list()` / `incidents.listAlerts()` — or fall back to direct HTTP against Management API (`management.azure.com/subscriptions/.../providers/Microsoft.SecurityInsights/incidents?api-version=2024-09-01`) if SDK coverage is inadequate.
+- Polling: `node-cron` job per tenant with Sentinel configured, every 15 minutes.
+
+**Shodan:**
+- Auth: API key stored per-tenant in existing `signal_source_configs` (or new `integration_configs` table), AES-256-GCM encrypted (same pattern as LLM API keys).
+- Fetch: `fetch('https://api.shodan.io/shodan/host/{ip}?key={apiKey}')` — JSON response, no SDK.
+- Rate limit: Wrap calls with `p-ratelimit` — Shodan free tier: 1 req/sec, paid varies.
+- Trigger: On-demand (vendor enrichment) + daily scheduled sweep of monitored vendor IPs.
+
+**NVD/CVE:**
+- Auth: Optional API key (50 req/30s with key vs 5 req/30s without) — configure via environment variable `NVD_API_KEY`.
+- Fetch: `fetch('https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={vendor}')` — paginated.
+- Rate limit: `p-ratelimit` with `{ interval: 30000, rate: 45 }` (leave headroom below 50 limit).
+- Polling: Daily cron, incremental via `lastModStartDate` / `lastModEndDate` query params.
+
+**MISP:**
+- Auth: Bearer token (`Authorization: key {apikey}` header) — per-tenant config, encrypted.
+- Fetch: `fetch('https://{mispUrl}/events/index', { headers: { 'Authorization': 'key {token}', 'Accept': 'application/json' } })`
+- Polling: Configurable interval (default: hourly) via `node-cron`. Filter by `timestamp` to fetch only new events.
+
+**Email Ingestion:**
+- Connect: `imapflow` with IMAP credentials (host, port, user, password/OAuth2 token) — per-tenant config, encrypted.
+- Strategy: IDLE-based push when mailbox supports it (zero polling overhead), fallback to `node-cron` poll every 5 minutes.
+- Parse: `mailparser` `simpleParser(rawEmail)` → extract subject, from, body, attachments.
+- Extract signals: Pass parsed email body through existing LLM triage pipeline (`complete()`) to extract risk signals.
+
+### Foresight v2 — Monte Carlo
+
+- Simulation engine lives in a new `foresight-simulation.ts` service (server-side).
+- Input: Risk register entries with `likelihood` and `impact` fields + scenario parameters (distribution type, iterations).
+- Distributions: `simple-statistics` provides `randomNormal()`, `randomLogNormal()` via seeded sampling. For triangular distribution (PERT), implement manually — formula is trivial (2 lines).
+- Iterations: 10,000 default, 100,000 max. Node.js handles synchronously in ~50ms for 10k iterations — no worker thread needed.
+- Output: Array of simulated total loss values → compute P50/P90/P99 with `simple-statistics` `quantile()`.
+- Storage: Persist simulation run metadata + percentile results in new `foresight_simulations` table. Raw iteration arrays are NOT stored (too large).
+- Chart: Upgrade recharts to v3.8 for histogram / AreaChart showing loss distribution curve.
 
 ---
 
@@ -367,12 +159,19 @@ cd /home/dante/RiskMind2 && pnpm drizzle-kit generate && pnpm drizzle-kit migrat
 
 | Recommended | Alternative | Why Not |
 |-------------|-------------|---------|
-| Reuse `openai` SDK for all OpenAI-compat providers | Add `@mistralai/mistralai`, `groq-sdk`, `@google/generative-ai` SDKs | Each SDK is 50–200 kB; OpenAI SDK already handles all these via `baseURL`. No capability gap justifies the extra deps. |
-| Native `fetch` for Ollama `/api/tags` | Use OpenAI SDK with Ollama's `/v1/models` compat endpoint | `/api/tags` returns richer metadata (size, family, quantization) useful for display. Worth the 5-line fetch call. |
-| `llm_routing_rules` table | Add routing columns to `llm_configs` | Routing is a separate concern — one config can be assigned to multiple task types, and the routing table is tenant-level, not config-level. Separate table is cleaner. |
-| Deterministic JSON quality score | LLM-as-judge scoring | LLM-as-judge requires a second API call and costs money. Deterministic scoring is instant and good enough for comparing models in a wizard. |
-| Inline benchmark results (transient) | Full benchmark history table | Over-engineering for v1.1. A `lastBenchmarkResult` jsonb column on `llm_configs` is sufficient. History dashboard deferred to v2. |
-| Keep `useCase` enum as-is, add `llm_routing_rules` | Expand `useCase` enum with 6 task types | The existing `useCase` enum (`general`, `embeddings`) is fine as a coarse fallback. Fine-grained routing belongs in a separate table with its own task type enum, not the configs table. |
+| `imapflow` | `node-imap` | node-imap last committed 2020, unmaintained. imapflow is its spiritual successor from the same ecosystem (Nodemailer team). |
+| `imapflow` | EmailEngine (SaaS) | SaaS dependency, cost, vendor lock-in. imapflow gives full control. |
+| Direct `fetch` for Shodan | `shodan-client` npm | shodan-client v3.2.0, last published 6 years ago. Dead package. |
+| Direct `fetch` for NVD | `nvdlib` Python wrapper | Python library, wrong language. No maintained Node.js equivalent exists. |
+| Direct `fetch` for MISP | PyMISP | Python only. No Node.js official client. |
+| `@azure/arm-securityinsight` | Direct HTTP to Sentinel API | SDK handles auth token refresh and retry logic. Worth the dependency given the complexity of Azure ARM auth. |
+| `p-ratelimit` | `bottleneck` | Bottleneck is v2.19.5, last published 2019 (7 years ago). Maintenance inactive. Same result, better maintenance posture with p-ratelimit. |
+| `simple-statistics` | `jstat` | jStat last major update 2020, TypeScript types are external and outdated. simple-statistics has inline types and active maintenance. |
+| `simple-statistics` | Custom statistical code | Re-implementing normal distribution CDF and inverse CDF is error-prone. Use the library. |
+| `recharts` upgrade to v3 | Stay on v2.15.4 | v3 adds histogram-friendly APIs and better TypeScript types needed for Foresight distribution charts. Migration effort is low — axis and tooltip prop changes documented in migration guide. |
+| `node-cron` | BullMQ + Redis | BullMQ requires Redis. No Redis in current deployment. Signal polling is low-frequency (15min–daily). node-cron in-process is proven (used by existing enrichment jobs). Adding Redis is infrastructure overkill for this use case. |
+| In-process Monte Carlo (Node.js) | Worker threads | 10k iterations in simple-statistics takes ~50ms synchronously. No blocking concern. Worker threads add complexity for no measurable benefit at this scale. |
+| Assessment Engine custom-built | SurveyJS | SurveyJS is a full platform with its own form builder UI, rendering engine, and data model. RiskMind's assessment engine needs AI-driven dynamic branching where the LLM decides question order — SurveyJS's deterministic branching logic doesn't fit. Build the engine; use shadcn/ui for rendering. |
 
 ---
 
@@ -380,13 +179,17 @@ cd /home/dante/RiskMind2 && pnpm drizzle-kit generate && pnpm drizzle-kit migrat
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `langchain`, `llamaindex`, `ai` (Vercel AI SDK) | Heavy abstraction layers over APIs we already call directly. LangChain in particular adds 10+ transitive deps and its own patterns that conflict with the existing service layer. | Direct SDK calls (`openai`, `@anthropic-ai/sdk`) + `fetch` |
-| `@google/generative-ai` (Google AI SDK) | Gemini is fully OpenAI-compatible at `generativelanguage.googleapis.com/v1beta/openai/`. No separate SDK needed. | OpenAI SDK with Gemini base URL |
-| `groq-sdk` | Groq is fully OpenAI-compatible at `api.groq.com/openai/v1`. No separate SDK needed. | OpenAI SDK with Groq base URL |
-| Separate benchmark microservice / queue | Benchmark is a short interactive operation (< 5 seconds) triggered by the user during wizard setup. It does not need a job queue. | Inline HTTP call from the wizard, await result synchronously |
-| Redis for routing cache | Routing rules change rarely (only when user saves wizard). DB lookup is fast (indexed). Cache adds operational complexity. | Postgres query on every request (fast with index on `tenant_id, task_type`) |
-| `node-fetch` or `axios` | Node 20 has `fetch` built-in. | `globalThis.fetch` |
-| LLM observability / token cost tracking | Explicitly out of scope for v1.1 per PROJECT.md | Deferred to v2 LLM observability dashboard |
+| `shodan-client` | 6 years unmaintained, npm health score poor | Built-in `fetch` against `api.shodan.io` |
+| `bottleneck` | 7 years unmaintained (last release 2019) | `p-ratelimit` |
+| `BullMQ` / `bull` | Requires Redis infrastructure not present in deployment | `node-cron` in-process scheduling |
+| `Redis` | No Redis in current deployment; adds ops burden | Not needed — see BullMQ above |
+| `jstat` | Outdated TypeScript types, infrequent updates | `simple-statistics` |
+| `SurveyJS` | Deterministic form engine doesn't support AI-driven branching | Custom assessment engine + shadcn/ui components |
+| `axios` | Node.js 20 has `fetch` built-in | `globalThis.fetch` |
+| `node-fetch` | Same as above | `globalThis.fetch` |
+| Any Python MISP/NVD wrappers | Wrong runtime | Direct `fetch` with `p-ratelimit` |
+| `langchain` / `llamaindex` | Heavy abstraction over APIs already called directly | Existing `llm-service.ts` with openai + anthropic SDKs |
+| `@microsoft/microsoft-graph-client` | Graph API requires different permission scope from ARM API; adds auth complexity for minimal gain | `@azure/arm-securityinsight` + ARM API |
 
 ---
 
@@ -394,24 +197,51 @@ cd /home/dante/RiskMind2 && pnpm drizzle-kit generate && pnpm drizzle-kit migrat
 
 | Package | Version | Compatible With | Notes |
 |---------|---------|-----------------|-------|
-| `openai` | ^6.29.0 | Node.js 20, all OpenAI-compat providers | `client.models.list()` returns `AsyncPage<Model>` — iterate with `for await` or `.data` array |
-| `@anthropic-ai/sdk` | ^0.78.0 | Node.js 20 | `anthropic.models.list()` added in recent versions — confirmed available in 0.78.x |
-| Drizzle ORM | catalog | PostgreSQL 16 | `jsonb` column type available via `import { jsonb } from "drizzle-orm/pg-core"` |
-| Zod | catalog (v4) | TypeScript 5.9 | Use `z.enum()` for task type validation |
+| `imapflow` | ^1.2.9 | Node.js 20, TypeScript 5.9 | Built-in types, no `@types/` needed |
+| `mailparser` | ^3.9.4 | Node.js 20, TypeScript 5.9 | Requires `@types/mailparser` from npm (separate package) — check if bundled |
+| `@azure/arm-securityinsight` | ^1.0.0-beta.6 | Node.js 20, `@azure/identity` ^4.x | Beta API — no breaking changes expected but pin the version |
+| `@azure/identity` | ^4.13.0 | Node.js 20, Express 5 | Use `ClientSecretCredential` for server-to-server; not `DefaultAzureCredential` (which chain-tries many envs) |
+| `p-ratelimit` | ^1.2.0 | Node.js 20, TypeScript 5.9, ESM | Pure promise wrapper, ESM-compatible |
+| `simple-statistics` | ^7.8.8 | Node.js 20, TypeScript 5.9, browser | Zero dependencies, includes TypeScript definitions |
+| `recharts` | ^3.8.0 | React 19, TypeScript 5.9 | v3 migration guide documents axis/tooltip prop changes from v2. Check `recharts/recharts/wiki/3.0-migration-guide` before upgrading. |
+| `node-cron` | ^4.2.1 | Node.js 20, TypeScript 5.9, ESM | v4 changed the import path — use `import cron from 'node-cron'` not named import |
+
+---
+
+## Schema Additions Required (for Implementers)
+
+These are not library decisions but are stack-adjacent enough to note here:
+
+| Area | New Tables |
+|------|-----------|
+| Assessment Engine | `assessments`, `assessment_questions`, `assessment_responses` |
+| Signal Integrations | `integration_configs` (per-tenant connector config with encrypted credentials), `signal_source_type` enum expansion |
+| Foresight v2 | `foresight_simulations`, `foresight_scenarios` |
+| Vendor Lifecycle | Extend existing `vendors` table + new `vendor_monitoring_config` |
+| Compliance Flow | Extend existing `compliance_frameworks` + `compliance_thresholds` |
+
+All encrypted credentials (Sentinel service principal secrets, Shodan API keys, IMAP passwords, MISP tokens) use the existing AES-256-GCM pattern from `llm_configs`. Do not invent a new encryption scheme.
 
 ---
 
 ## Sources
 
-- Anthropic API docs — `platform.claude.com/docs/en/api/models/list` — confirmed `/v1/models` endpoint, response format with `id`, `display_name`, `has_more` (HIGH confidence)
-- OpenAI API docs — `platform.openai.com/docs/api-reference/models/list` — confirmed `GET /v1/models`, Bearer auth (HIGH confidence)
-- Google Gemini OpenAI compat docs — `ai.google.dev/gemini-api/docs/openai` — confirmed base URL `generativelanguage.googleapis.com/v1beta/openai/`, OpenAI SDK compatibility (HIGH confidence)
-- Groq API docs — `console.groq.com/docs/api-reference` — confirmed `https://api.groq.com/openai/v1/models` endpoint (HIGH confidence)
-- Mistral API docs — `docs.mistral.ai/api/endpoint/models` — confirmed `GET https://api.mistral.ai/v1/models`, Bearer auth (HIGH confidence)
-- Together AI docs — `docs.together.ai/reference/models-1` — confirmed `GET https://api.together.xyz/v1/models` (HIGH confidence)
-- Ollama API docs — `docs.ollama.com/api/tags` — confirmed `GET /api/tags`, response `models[]` array (HIGH confidence)
-- Codebase inspection — `artifacts/api-server/src/lib/llm-service.ts`, `lib/db/src/schema/llm-configs.ts`, `artifacts/api-server/package.json` — existing SDK versions and patterns (HIGH confidence)
+- [imapflow npm](https://www.npmjs.com/package/imapflow) — v1.2.9 confirmed, published 2026-03-17 (HIGH confidence)
+- [mailparser npm](https://www.npmjs.com/package/mailparser) — v3.9.4 confirmed, CVE-2026-3455 patched in 3.9.3 (HIGH confidence)
+- [@azure/arm-securityinsight npm](https://www.npmjs.com/package/@azure/arm-securityinsight) — v1.0.0-beta.6 latest (MEDIUM confidence — perpetual beta)
+- [@azure/identity npm](https://www.npmjs.com/package/@azure/identity) — v4.13.0 confirmed (HIGH confidence)
+- [Microsoft Sentinel REST API docs](https://learn.microsoft.com/en-us/rest/api/securityinsights/) — API version 2024-09-01 confirmed stable (HIGH confidence)
+- [NVD Developers Start Here](https://nvd.nist.gov/developers/start-here) — API v2 rate limits confirmed, no Node.js SDK endorsed (HIGH confidence)
+- [Shodan Developer API](https://developer.shodan.io/api) — REST API endpoints confirmed, official clients page lists only stale Node.js options (HIGH confidence)
+- [MISP OpenAPI spec](https://www.misp-project.org/openapi/) — REST API confirmed, no maintained Node.js client (HIGH confidence)
+- [shodan-client npm](https://www.npmjs.com/package/shodan-client) — v3.2.0, 6 years stale — confirmed DO NOT USE (HIGH confidence)
+- [bottleneck npm](https://www.npmjs.com/package/bottleneck) — v2.19.5, 7 years stale — confirmed DO NOT USE (HIGH confidence)
+- [simple-statistics npm](https://www.npmjs.com/package/simple-statistics) — v7.8.8 confirmed (HIGH confidence)
+- [recharts releases](https://github.com/recharts/recharts/releases) — v3.8.0 confirmed current (HIGH confidence)
+- [node-cron npm](https://www.npmjs.com/package/node-cron) — v4.2.1 confirmed (HIGH confidence)
+- [p-ratelimit GitHub](https://github.com/natesilva/p-ratelimit) — TypeScript native, concurrency + interval control (MEDIUM confidence — version not confirmed from npm; check before install)
+- Codebase inspection (`artifacts/api-server/package.json`, `artifacts/api-server/src/services/`, `artifacts/riskmind-app/package.json`) — existing stack confirmed (HIGH confidence)
 
 ---
-*Stack research for: RiskMind v1.1 — LLM provider wizard, model auto-discovery, benchmarking, intelligent routing*
-*Researched: 2026-03-18*
+*Stack research for: RiskMind v2.0 — Assessment Engine, Vendor Lifecycle, Compliance Flow, Signal Integrations, Foresight v2*
+*Researched: 2026-03-23*

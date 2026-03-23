@@ -1,617 +1,709 @@
 # Architecture Research
 
-**Domain:** LLM Intelligence Layer — model auto-discovery, benchmarking, and per-task routing integrated into existing RiskMind ERM app
-**Researched:** 2026-03-18
-**Confidence:** HIGH (derived from direct codebase inspection)
+**Domain:** Enterprise Risk Management Platform — v2.0 Integration Architecture
+**Researched:** 2026-03-23
+**Confidence:** HIGH (based on full codebase inspection + external API documentation)
 
 ---
 
-## System Overview
+## Standard Architecture
+
+### System Overview: Current State (v1.2)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Settings Page (React)                                           │
-│  ┌─────────────────────┐   ┌──────────────────────────────────┐ │
-│  │  LLM Config Wizard  │   │  Model Routing Table             │ │
-│  │  (6-step flow)      │   │  (6 task types → model picker)   │ │
-│  └──────────┬──────────┘   └──────────────┬───────────────────┘ │
-└─────────────┼────────────────────────────┼──────────────────────┘
-              │ POST /v1/settings/llm-*     │ PUT /v1/settings/llm-routing
-              ▼                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Express API — routes/settings.ts (extended)                     │
-│  ┌──────────────────┐  ┌───────────────────┐  ┌──────────────┐  │
-│  │ POST /discover   │  │ POST /benchmark   │  │ GET /routing │  │
-│  │ (proxy to vendor)│  │ (runs test prompt)│  │ PUT /routing │  │
-│  └──────────────────┘  └───────────────────┘  └──────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-              │                            │
-              ▼                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  lib/llm-service.ts (modified)                                   │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  resolveConfig(tenantId, taskType)  ← extended           │    │
-│  │  1. Check llm_task_routing for taskType override         │    │
-│  │  2. Fall back to llm_configs (isDefault, useCase)        │    │
-│  │  3. Return ResolvedConfig with model + credentials       │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  complete() / streamComplete() / generateEmbedding()    │    │
-│  │  All call resolveConfig(tenantId, taskType)              │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  PostgreSQL                                                      │
-│  ┌──────────────────┐  ┌─────────────────────────────────────┐  │
-│  │  llm_configs     │  │  llm_task_routing (NEW)             │  │
-│  │  (existing)      │  │  tenant_id, task_type, config_id    │  │
-│  │  - id, tenant_id │  │  model_override (nullable)          │  │
-│  │  - provider_type │  └─────────────────────────────────────┘  │
-│  │  - model         │  ┌─────────────────────────────────────┐  │
-│  │  - encrypted_key │  │  llm_benchmark_results (NEW)        │  │
-│  │  - use_case      │  │  config_id, latency_ms              │  │
-│  │  - is_default    │  │  tokens_per_sec, quality_score      │  │
-│  └──────────────────┘  │  benchmark_model (for multi-model)  │  │
-│                        └─────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+Internet → Cloudflare → cloudflared → localhost:4000
+                                            │
+                               ┌────────────▼────────────────────┐
+                               │        Express 5 (PM2)           │
+                               │   ┌──────────┐ ┌─────────────┐  │
+                               │   │ REST API │ │ React SPA   │  │
+                               │   │ /api/v1/ │ │ /           │  │
+                               │   └─────┬────┘ └─────────────┘  │
+                               │   ┌─────▼────┐                  │
+                               │   │   /mcp   │  (MCP handler)  │
+                               │   └──────────┘                  │
+                               │                                  │
+                               │  Background (same process):      │
+                               │  ┌──────────┐ ┌────────────┐    │
+                               │  │Job Queue │ │ Monitoring │    │
+                               │  │Processor │ │ Scheduler  │    │
+                               │  └──────────┘ └────────────┘    │
+                               │  ┌──────────┐                   │
+                               │  │  Agent   │                   │
+                               │  │Scheduler │                   │
+                               │  └──────────┘                   │
+                               └────────────┬────────────────────┘
+                                            │ Drizzle ORM
+                               ┌────────────▼────────────────────┐
+                               │   PostgreSQL 16 + pgvector       │
+                               │   30+ tables, all tenant-scoped  │
+                               └─────────────────────────────────┘
+```
+
+### System Overview: Target State (v2.0)
+
+```
+Internet → Cloudflare → cloudflared → localhost:4000
+                                            │
+                               ┌────────────▼────────────────────────────┐
+                               │           Express 5 (PM2)                │
+                               │   ┌──────────┐ ┌─────────────┐          │
+                               │   │ REST API │ │ React SPA   │          │
+                               │   │ /api/v1/ │ │ /           │          │
+                               │   └─────┬────┘ └─────────────┘          │
+                               │         │  [NEW routes added]            │
+                               │         │  /assessments                  │
+                               │         │  /foresight (implemented)      │
+                               │         │  /integrations                 │
+                               │                                          │
+                               │  Background (same process):              │
+                               │  ┌──────────┐ ┌────────────┐            │
+                               │  │Job Queue │ │ Monitoring │            │
+                               │  │Processor │ │ Scheduler  │            │
+                               │  └──────────┘ └────────────┘            │
+                               │  ┌──────────┐ ┌──────────────────────┐  │
+                               │  │  Agent   │ │ Signal Feed Poller   │  │
+                               │  │Scheduler │ │ [NEW] Shodan/NVD/    │  │
+                               │  └──────────┘ │ MISP/Sentinel/Email  │  │
+                               │               └──────────────────────┘  │
+                               └────────────┬────────────────────────────┘
+                                            │
+                               ┌────────────▼────────────────────────────┐
+                               │   PostgreSQL 16 + pgvector               │
+                               │   30+ tables → ~40+ tables after v2.0   │
+                               │   [NEW] assessments, assessment_sessions  │
+                               │   [NEW] assessment_responses             │
+                               │   [NEW] integration_configs              │
+                               │   [NEW] foresight_simulations            │
+                               │   [NEW] foresight_scenarios              │
+                               │   [NEW] vendor_fourth_party_links        │
+                               │   [MODIFIED] vendors (enrichment fields) │
+                               │   [MODIFIED] frameworks (import fields)  │
+                               │   [MODIFIED] signals (content_hash col)  │
+                               └─────────────────────────────────────────┘
 ```
 
 ---
 
-## Component Boundaries (v1.1 additions)
+## Component Boundaries and Responsibilities
 
-| Component | Location | Responsibility | New in v1.1 |
+### Existing Components (unchanged or minimally modified)
+
+| Component | Location | Responsibility | v2.0 Change |
 |-----------|----------|---------------|-------------|
-| `llm-service.ts` | `artifacts/api-server/src/lib/` | Config resolution, provider clients, completion/stream/embeddings | Extend `resolveConfig()` to accept `taskType`; add `discoverModels()`, `runBenchmark()` |
-| `routes/settings.ts` | `artifacts/api-server/src/routes/` | CRUD for LLM configs, test endpoint | Add `/discover`, `/benchmark`, `/routing` endpoints |
-| `ai-workers.ts` | `artifacts/api-server/src/lib/` | Job-based AI enrichment (triage, enrich, doc-process) | Thread `taskType` into each `callLLM()` call |
-| `agent-service.ts` | `artifacts/api-server/src/lib/` | Autonomous agent reasoning loop | Thread `agent_reasoning` taskType |
-| `interviews.ts` | `artifacts/api-server/src/routes/` | Streaming AI interview sessions | Thread `interviews` taskType |
-| `llm-task-routing` table | `lib/db/src/schema/` | Maps task types to config overrides per tenant | New table |
-| `llm-benchmark-results` table | `lib/db/src/schema/` | Stores benchmark latency/quality per config+model | New table |
-| `settings.tsx` | `artifacts/riskmind-app/src/pages/settings/` | Settings UI with provider list and routing table | Add wizard, routing table, benchmark display |
+| Job Queue | `artifacts/api-server/src/lib/job-queue.ts` | Postgres-backed, SKIP LOCKED, exponential backoff, multi-queue | Add new job types; no structural change |
+| LLM Service | `artifacts/api-server/src/lib/llm-service.ts` | Resolves tenant LLM config, routes by task type, openai_compat + anthropic SDKs | Add new task type: `assessment` |
+| AI Workers | `artifacts/api-server/src/lib/ai-workers.ts` | Registers handlers for ai-triage, enrich-risk, embed-entity queues | Add handlers for assessment scoring, simulation enrichment |
+| Monitoring Scheduler | `artifacts/api-server/src/lib/monitoring.ts` | KRI threshold evaluation, creates alerts | Add compliance posture threshold checks |
+| Agent Scheduler | `artifacts/api-server/src/lib/agent-scheduler.ts` | Autonomous risk intelligence, policy tiers | Feed real signal data (from new feeds) into agent context |
+| Risk Source Aggregator | `artifacts/api-server/src/services/risk-source-aggregator.ts` | Triage signals → findings, cluster by pgvector | New signal sources route through same path unchanged |
+
+### New Components (v2.0)
+
+| Component | Location | Responsibility |
+|-----------|----------|---------------|
+| Assessment Engine | `artifacts/api-server/src/lib/assessment-engine.ts` | Session state machine, AI question generation, response scoring |
+| Signal Feed Poller | `artifacts/api-server/src/lib/signal-feed-poller.ts` | Scheduled polling of external feeds (Shodan, NVD, MISP, Sentinel) |
+| Integration Config Manager | `artifacts/api-server/src/lib/integration-config.ts` | Per-tenant integration credentials, encrypted storage, enable/disable |
+| Monte Carlo Runner | `artifacts/api-server/src/lib/monte-carlo.ts` | CPU-bound simulation, 10k iterations, risk propagation calculations |
+| Framework Importer | `artifacts/api-server/src/lib/framework-importer.ts` | Parse OSCAL/JSON/CSV framework definitions, bulk-insert requirements |
+| Email Ingestion Handler | `artifacts/api-server/src/lib/email-ingestion.ts` | IMAP IDLE listener, extract signal content, route to job queue |
 
 ---
 
-## Schema Changes
+## Monorepo Structure: v2.0 Additions
 
-### New Table: `llm_task_routing`
-
-```sql
-CREATE TABLE llm_task_routing (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id   UUID NOT NULL REFERENCES tenants(id),
-  task_type   TEXT NOT NULL,
-  -- One of: risk_enrichment, signal_triage, treatment_suggestions,
-  --         embeddings, agent_reasoning, interviews, general
-  config_id   UUID REFERENCES llm_configs(id) ON DELETE SET NULL,
-  -- NULL = use system default (falls through to existing resolveConfig logic)
-  model_override TEXT,
-  -- Overrides the model on the linked config without changing the config itself.
-  -- Useful when one provider serves multiple models.
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (tenant_id, task_type)
-);
 ```
-
-**Rationale:** One row per (tenant, task_type). A NULL `config_id` row means "use default" — this lets the UI show the current effective model without requiring an override to exist.
-
-### New Table: `llm_benchmark_results`
-
-```sql
-CREATE TABLE llm_benchmark_results (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  config_id     UUID NOT NULL REFERENCES llm_configs(id) ON DELETE CASCADE,
-  tenant_id     UUID NOT NULL REFERENCES tenants(id),
-  model         TEXT NOT NULL,
-  -- The model used (may differ from config.model if testing a discovered model)
-  latency_ms    INTEGER NOT NULL,
-  tokens_per_sec NUMERIC(10, 2),
-  quality_score  NUMERIC(3, 2),
-  -- 0.0-1.0 derived from benchmark prompt evaluation
-  benchmark_prompt TEXT,
-  raw_response  TEXT,
-  ran_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX ON llm_benchmark_results (config_id, ran_at DESC);
-CREATE INDEX ON llm_benchmark_results (tenant_id, ran_at DESC);
+artifacts/api-server/src/
+├── lib/
+│   ├── assessment-engine.ts      [NEW] Session state, AI Q-gen, scoring
+│   ├── signal-feed-poller.ts     [NEW] External feed polling scheduler
+│   ├── integration-config.ts     [NEW] Encrypted integration credentials
+│   ├── monte-carlo.ts            [NEW] Simulation engine
+│   ├── framework-importer.ts     [NEW] OSCAL/JSON framework import parser
+│   └── email-ingestion.ts        [NEW] IMAP listener + signal routing
+├── routes/
+│   ├── assessments.ts            [NEW] Assessment CRUD + session endpoints
+│   ├── foresight.ts              [REPLACE stub] Monte Carlo + OSINT routes
+│   └── integrations.ts           [NEW] Integration config CRUD + trigger
+├── services/
+│   ├── risk-source-aggregator.ts [EXISTING — no changes needed]
+│   └── vendor-enrichment.ts      [NEW] Scheduled enrichment for monitoring
+│
+lib/db/src/schema/
+├── assessments.ts                [NEW] Core assessment tables
+├── integration-configs.ts        [NEW] External integration credentials
+├── foresight.ts                  [NEW] Simulation + scenario tables
+└── vendor-fourth-party.ts        [NEW] 4th party vendor relationship table
 ```
-
-**Rationale:** Stores benchmark history. The UI shows the most recent result per (config, model). The routing wizard uses quality_score + latency_ms to suggest default assignments.
-
-### Modified: `llm_use_case` enum
-
-The existing `llm_use_case` enum in `llm_configs` currently has `general` and `embeddings`. The scope calls for 6 task types in routing, but the routing assignment lives in `llm_task_routing`, not `llm_configs`. The `llm_configs` table does not need to change — the task routing table references it by `config_id`.
-
-The settings form already shows use-case values (`enrichment`, `triage`, `interviews`, `agent`) in its dropdown but these are NOT persisted to the DB today (the enum only accepts `general` | `embeddings`). Either:
-1. Expand the enum to the 6 task types, OR
-2. Keep `llm_configs.use_case` for high-level categorization and let `llm_task_routing` handle fine-grained routing
-
-**Recommendation:** Option 2. Keep `llm_configs.use_case` as `general | embeddings` (the existing behavior). Fine-grained per-task routing is entirely handled by the new `llm_task_routing` table. This minimizes DB migration risk.
 
 ---
 
-## `llm-service.ts` Modifications
+## Feature-to-Component Mapping
 
-### 1. Extend Task Types
+### Assessment Engine
 
-```typescript
-// Add to existing types
-export type LLMTaskType =
-  | "risk_enrichment"
-  | "signal_triage"
-  | "treatment_suggestions"
-  | "embeddings"
-  | "agent_reasoning"
-  | "interviews"
-  | "general";
+**What it is:** A shared service that both Vendor Lifecycle and Compliance Flow consume for AI-driven questionnaires. Manages a multi-turn session: generate question → collect answer → AI scores answer → generate next question → produce final report.
+
+**New tables:**
+
+```
+assessments
+  id, tenant_id, type (vendor | compliance | control),
+  subject_id (vendor_id or framework_id or control_id),
+  status (draft | active | completed | abandoned),
+  template_config jsonb,   -- question config / scoring criteria
+  final_score numeric,
+  created_at, updated_at
+
+assessment_sessions
+  id, tenant_id, assessment_id, user_id,
+  status (active | committed | abandoned),
+  transcript jsonb,        -- [{role, content, timestamp}] same shape as interview_sessions
+  responses jsonb,         -- {question_id: {answer, score, rationale}}
+  current_question_index int,
+  created_at, updated_at
+
+assessment_responses
+  id, tenant_id, session_id, question_key text,
+  answer text, ai_score numeric, ai_rationale text,
+  created_at
 ```
 
-### 2. Extend `resolveConfig()` Signature
+**Integration points:**
+- Extends the existing `interview_sessions` pattern (same transcript shape, same AI streaming pattern from `interviews.ts`)
+- Reuses `complete()` from `llm-service.ts` with new task type `"assessment"`
+- Enqueues `score_assessment_response` job for async AI scoring after each answer commit
+- Vendor flow: assessment linked to `vendor_id`; compliance flow: linked to `framework_id` or `control_id`
+- On session completion: writes aggregate score back to the parent entity (vendor `risk_score` updated, or control `status` updated + `control_test` record created)
 
-Current signature:
-```typescript
-async function resolveConfig(
-  tenantId: string,
-  useCase: "general" | "embeddings" = "general"
-): Promise<ResolvedConfig | null>
-```
-
-New signature:
-```typescript
-async function resolveConfig(
-  tenantId: string,
-  taskType: LLMTaskType = "general"
-): Promise<ResolvedConfig | null>
-```
-
-**Resolution order (inside `resolveConfig`):**
-1. Query `llm_task_routing` for (tenantId, taskType) — if row exists with non-null `config_id`, use that config + optional `model_override`
-2. If no task routing row, fall back to existing logic: query `llm_configs` for `isDefault=true` on `useCase="general"` (or `"embeddings"` for embeddings task)
-3. If no default, pick any active config (existing fallback logic)
-
-This is backward-compatible — all existing callers pass no taskType and get "general" resolution unchanged.
-
-### 3. New `discoverModels()` Export
-
-```typescript
-export async function discoverModels(
-  configId: string,
-  tenantId: string
-): Promise<{ models: string[]; error?: string }>
-```
-
-Called from the wizard step 3. Fetches live model lists from provider APIs:
-- `openai_compat` with no baseUrl: `GET https://api.openai.com/v1/models`
-- `openai_compat` with Ollama baseUrl: `GET {baseUrl}/api/tags`
-- `openai_compat` with other baseUrl: `GET {baseUrl}/models`
-- `anthropic`: returns hardcoded list (Anthropic has no public list endpoint)
-
-### 4. New `runBenchmark()` Export
-
-```typescript
-export async function runBenchmark(
-  configId: string,
-  tenantId: string,
-  model: string
-): Promise<{
-  latencyMs: number;
-  tokensPerSec: number | null;
-  qualityScore: number;
-  rawResponse: string;
-}>
-```
-
-Uses a fixed benchmark prompt (e.g., "Identify the top 3 risk factors in a typical SaaS vendor relationship. Respond in JSON: [{risk, severity, mitigation}]"). Evaluates quality by checking response is valid JSON with expected fields. Persists result to `llm_benchmark_results`.
+**New LLM task type:** Add `"assessment"` to the `LLMTaskType` union in `llm-service.ts`. No structural change to routing — it becomes one more routable task type tenants can assign a model to.
 
 ---
 
-## New API Endpoints
+### Vendor Lifecycle Redesign
 
-All under `routes/settings.ts`, requiring `admin` role.
+**What changes:**
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/v1/settings/llm-providers/:id/discover` | Trigger model discovery for a saved config |
-| `POST` | `/v1/settings/llm-providers/:id/benchmark` | Run benchmark for a specific model on a config |
-| `GET` | `/v1/settings/llm-routing` | Get current routing table for tenant |
-| `PUT` | `/v1/settings/llm-routing` | Update routing assignments (body: array of task→config mappings) |
-| `GET` | `/v1/settings/llm-benchmarks` | Get latest benchmark results for all configs |
-| `GET` | `/v1/settings/embeddings-health` | Check if embeddings provider is configured (addresses bug #6) |
+| Area | Current | v2.0 |
+|------|---------|-------|
+| Onboarding | Manual field entry | Multi-step wizard with progress state |
+| Enrichment | On-demand only | Auto-triggered on status transitions |
+| Monitoring | None beyond KRIs | Scheduled signal feed queries by vendor domain |
+| Questionnaires | Static JSON template | Replaced by Assessment Engine sessions |
+| 4th party risk | Not present | Vendor-to-vendor relationship table + risk propagation |
 
-The `/discover` endpoint proxies the request server-side (avoids CORS from browser, hides raw API keys).
+**Schema changes:**
+
+```
+-- vendors table: add columns
+website_domain text,            -- for Shodan/signal feed targeting
+enrichment_status text,         -- idle | queued | enriching | done | failed
+last_enriched_at timestamp,
+onboarding_step int default 0,  -- wizard progress
+onboarding_data jsonb,          -- draft data before final commit
+
+-- new table
+vendor_fourth_party_links
+  id, tenant_id,
+  primary_vendor_id uuid → vendors.id,
+  subvendor_id uuid → vendors.id,
+  relationship_type text,       -- subprocessor | hosting | saas | other
+  data_access_scope text,
+  risk_inherit boolean,
+  created_at
+```
+
+**Integration points:**
+- Onboarding wizard: purely frontend multi-step form writing to `vendor.onboarding_data`; final step commits all fields and triggers enrichment job
+- Enrichment auto-trigger: `vendors.ts` route patches status, calls `enqueueJob("vendor-enrich", ...)` when transitioning to `due_diligence` or `risk_assessment`
+- Monitoring: `signal-feed-poller.ts` queries Shodan/NVD with `vendor.website_domain` as lookup key; creates `signals` rows with `source = "shodan"` / `source = "nvd"`, which flow through the existing triage pipeline unchanged
+- Assessment Engine replaces `questionnaires`/`questionnaire_questions` tables for new vendor assessments (old tables kept for backwards compatibility)
+
+**Existing code that stays unchanged:** `allowed-transitions.ts` (7-state lifecycle), `vendor-status-events.ts` schema, kanban pipeline route handlers.
 
 ---
 
-## Wizard UI Flow (Settings Page)
+### Compliance Flow
 
-The wizard replaces the current "Add Provider" sheet with a multi-step flow when no providers exist, or is accessible via "Add with Wizard" button alongside the existing sheet.
+**What changes:**
+
+| Area | Current | v2.0 |
+|------|---------|-------|
+| Framework creation | Manual CRUD only | Manual CRUD + bulk import from JSON/OSCAL/CSV |
+| Control assessment | Basic `control_tests` records | Assessment Engine sessions per control |
+| Compliance thresholds | Posture % only (computed) | Configurable pass/fail thresholds per framework + alerts |
+
+**Schema changes:**
 
 ```
-Step 1 — Provider Identity
-  - Display Name (text input)
-  - Provider Preset dropdown:
-    OpenAI | Anthropic | Google Gemini | Mistral | Groq |
-    Together AI | Ollama/Private
-  - Provider preset auto-fills: providerType + baseUrl hint
+-- frameworks table: add columns
+import_source text,            -- manual | oscal | json | csv
+import_reference text,         -- original file name or URL
+compliance_threshold numeric,  -- 0-100, creates alert when posture drops below
 
-Step 2 — Credentials
-  - API Key (password input)
-  - Base URL (shown only for openai_compat; pre-filled from preset)
-  - "Continue" triggers POST /v1/settings/llm-providers to save a
-    temporary config (isDefault=false, model="pending")
-
-Step 3 — Discover Models
-  - Auto-triggers POST /v1/settings/llm-providers/:id/discover
-  - Shows loading spinner → model list with checkboxes
-  - For Anthropic: shows hardcoded curated list
-  - User selects which models to use
-
-Step 4 — Benchmark (optional, skippable)
-  - For each selected model: POST /v1/settings/llm-providers/:id/benchmark
-  - Shows latency bar + quality score
-  - Skippable ("Skip for now" link)
-
-Step 5 — Routing Assignment
-  - Table: 6 task types → model picker (dropdown)
-  - Smart defaults suggested based on benchmarks:
-    - Fast + cheap tasks (signal_triage): lowest latency model
-    - Quality tasks (risk_enrichment, agent_reasoning): highest quality model
-    - Embeddings: only shows openai_compat models
-  - PUT /v1/settings/llm-routing to save
-
-Step 6 — Confirmation
-  - Summary card showing assignments
-  - "Go to Settings" or "Add another provider"
+-- Reuse existing alerts table with alert_type = "compliance_threshold"
+-- Add to alertTypeEnum or use metadata jsonb field on alerts table
 ```
 
-**State management:** Wizard state lives in local React state (not persisted mid-wizard). Partial completion leaves a config saved in step 2 — the existing provider list handles cleanup.
+**Integration points:**
+- Framework importer: new `POST /api/v1/frameworks/import` endpoint; `framework-importer.ts` parses structure and bulk-inserts `framework_requirements` and stub `controls` in a single Drizzle transaction
+- Threshold monitoring: `monitoring.ts` gains a compliance posture check alongside existing KRI checks; when posture drops below `compliance_threshold`, creates an `alerts` row (reusing existing alerts infrastructure)
+- Assessment Engine usage: `POST /api/v1/assessments` with `type = "compliance"` and `subject_id = control_id`; on completion, creates a `control_test` record and updates control status
 
 ---
 
-## Routing Table UI (Settings LLM Tab)
+### Signal Integrations
 
-Alongside the existing provider list card, add a second card:
+**Architecture pattern:** All external signals funnel into the **existing** `signals` table via the **existing** triage pipeline. The signal feed poller is purely an ingestion adapter layer. No changes to the core Signal → Finding → Risk chain.
+
+**New scheduler: `signal-feed-poller.ts`**
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Model Routing                            [Edit]     │
-├─────────────────────────────────────────────────────┤
-│  Task Type          │  Assigned Model               │
-├─────────────────────┼───────────────────────────────┤
-│  Risk Enrichment    │  gpt-4o  (GPT-4o Production)  │
-│  Signal Triage      │  gpt-4o-mini  (same config)   │
-│  Treatment Suggest  │  claude-3-5-sonnet (Claude)   │
-│  Embeddings         │  text-embedding-3-small        │
-│  Agent Reasoning    │  gpt-4o                        │
-│  Interviews         │  gpt-4o  (default)            │
-└─────────────────────────────────────────────────────┘
+startSignalFeedPoller()
+  ├── runs on configurable interval (per integration)
+  ├── reads integration_configs (active integrations per tenant)
+  ├── for each active integration:
+  │     adapter = getAdapter(integration.type)   // shodan|nvd|misp|sentinel|email
+  │     rawItems = await adapter.fetch(integration.config, lastPolledAt)
+  │     signals = rawItems.map(toSignal)
+  │     bulk-insert into signals WHERE NOT EXISTS (dedup by content hash)
+  │     update integration_configs.last_polled_at
+  │     enqueue ai-triage job for each new signal
+  └── logs errors per-integration without killing other feeds
 ```
 
-Editing opens an inline form or sheet with dropdown pickers per task type. No wizard required for editing.
+**New table:**
+
+```
+integration_configs
+  id, tenant_id,
+  type text,                 -- shodan | nvd | misp | sentinel | email
+  name text,
+  encrypted_config text,     -- AES-256-GCM (reuse existing encryption.ts)
+  is_active boolean,
+  poll_interval_minutes int,
+  last_polled_at timestamp,
+  last_error text,
+  created_at, updated_at
+```
+
+**Deduplication strategy:** Add `content_hash text` column to `signals` table. Hash `SHA256(content)` before insert; skip if `(tenant_id, source, content_hash)` already exists. Prevents re-ingesting the same CVE or Shodan host record on subsequent polls.
+
+**Per-adapter integration points:**
+
+| Feed | Auth | Data Shape → Signal Mapping | Rate Limits |
+|------|------|----------------------------|-------------|
+| Shodan | API key (encrypted) | host data → `source: "shodan"`, `content: JSON.stringify(host)` | 1 req/sec free tier; paid removes limit |
+| NVD CVE API 2.0 | Optional API key | CVE items → `source: "nvd"`, content = CVE description + CVSS score | 5 req/30s no key; 50 req/30s with key |
+| MISP | API key + instance URL | events/attributes → `source: "misp"`, content = event info | No hard limit; instance-dependent |
+| Microsoft Sentinel | Azure OAuth2 client credentials | SecurityIncident → `source: "sentinel"`, content = incident details | Azure rate limits; use continuation tokens for pagination |
+| Email (IMAP) | IMAP host/user/password | message body → `source: "email"`, content = parsed text | Poll interval configurable; IDLE command preferred |
+
+**Email ingestion specifics:** Use `imapflow` npm package (modern, supports IDLE, actively maintained in 2025). IDLE avoids constant polling overhead. IMAP credentials stored in `integration_configs.encrypted_config` using existing `encryption.ts`.
+
+**Sentinel specifics:** Requires Azure OAuth2 client credentials flow. Store Azure `tenantId`, `clientId`, `clientSecret` encrypted in `integration_configs`. API endpoint: `https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/incidents`. This is the most complex integration; requires an Azure app registration by the customer before configuration.
 
 ---
 
-## Callers of `llm-service.ts` — Update Map
+### Foresight v2
 
-Every caller of `complete()` and `streamComplete()` needs to pass a `taskType`. Current callers:
+**What changes:** Replace the stub `foresight.ts` (currently returns 501 for all routes) with a full implementation.
 
-| File | Current call | Required change |
-|------|-------------|-----------------|
-| `lib/ai-workers.ts` — `ai-triage` worker | `complete(tenantId, ...)` | `complete(tenantId, ..., "signal_triage")` |
-| `lib/ai-workers.ts` — `ai-enrich` worker | `complete(tenantId, ...)` | `complete(tenantId, ..., "risk_enrichment")` |
-| `lib/ai-workers.ts` — `doc-process` worker | `complete(tenantId, ...)` | `complete(tenantId, ..., "risk_enrichment")` (document analysis is enrichment-class) |
-| `lib/agent-service.ts` — `reason()` | `complete(tenantId, ...)` | `complete(tenantId, ..., "agent_reasoning")` |
-| `routes/interviews.ts` — interview turn | `complete()` / `streamComplete()` | `complete(tenantId, ..., "interviews")` |
-| `routes/interviews.ts` — treatment suggestions | `complete(tenantId, ...)` | `complete(tenantId, ..., "treatment_suggestions")` |
+**New tables:**
 
-**Backward compatibility:** `complete()` public signature gains an optional third parameter `taskType?: LLMTaskType`. Defaults to `"general"`. All existing callers continue to work without change; updating them is an enhancement, not a requirement for correctness.
+```
+foresight_scenarios
+  id, tenant_id,
+  name text,
+  description text,
+  risk_ids uuid[],           -- which risks to include in the simulation
+  threat_factors jsonb,      -- custom probability adjustments per risk
+  created_at, updated_at
+
+foresight_simulations
+  id, tenant_id, scenario_id uuid → foresight_scenarios.id,
+  status text,               -- queued | running | completed | failed
+  iterations int default 10000,
+  results jsonb,             -- percentile buckets: p5, p25, p50, p75, p95, histogram
+  osint_snapshot jsonb,      -- cached signal data used in this run
+  duration_ms int,
+  error text,
+  created_at, completed_at
+```
+
+**Monte Carlo runner architecture:**
+
+```
+POST /api/v1/foresight/simulations
+  → validate scenario exists + belongs to tenant
+  → create foresight_simulations row (status: queued)
+  → enqueueJob("monte-carlo", "run", { simulationId })
+  → return 202 Accepted with simulationId
+
+Job worker: "monte-carlo" queue
+  → load risks from scenario.risk_ids
+  → query recent signals from signals table for risks in scope (OSINT snapshot)
+  → build probability distributions per risk (likelihood × impact with uncertainty)
+  → run N iterations: for each, sample from distributions, compute portfolio impact
+  → aggregate results into percentile buckets
+  → update foresight_simulations: status = completed, results = { p5, p25, p50, p75, p95 }
+```
+
+**OSINT data feeds for Foresight:** Reuse signal data already in the `signals` table (populated by `signal-feed-poller.ts`). Foresight simulation queries recent signals linked to simulation risks rather than calling external APIs inline. This avoids rate limit issues during simulation runs and keeps results deterministic from a snapshot.
+
+**Monte Carlo implementation:** Pure TypeScript, no native dependencies. 10k iterations on 10-20 risks runs in ~200ms in Node.js — no worker threads required at this scale. Use a seeded PRNG for reproducible runs (`seedrandom` npm package or a simple LCG implementation). If scenarios grow to 100+ risks with complex correlation matrices, move simulation math to `worker_threads`.
 
 ---
 
-## Data Flow: Wizard → Routing Resolution
+## Data Flow Changes
 
-### Wizard Save Flow
-
-```
-User completes wizard Step 5 (routing assignment)
-    │
-    ▼
-PUT /v1/settings/llm-routing
-  body: [
-    { taskType: "risk_enrichment", configId: "uuid-A", modelOverride: "gpt-4o" },
-    { taskType: "signal_triage", configId: "uuid-A", modelOverride: "gpt-4o-mini" },
-    ...
-  ]
-    │
-    ▼
-settings.ts route handler
-    │
-    ▼ UPSERT into llm_task_routing
-    (INSERT ON CONFLICT (tenant_id, task_type) DO UPDATE SET ...)
-    │
-    ▼
-200 OK — routing saved
-```
-
-### AI Task Resolution Flow (after routing configured)
+### New: Assessment Session Flow
 
 ```
-ai-workers.ts: "ai-enrich" job fires
-    │
-    ▼
-complete(tenantId, messages, "risk_enrichment")
-    │
-    ▼
-resolveConfig(tenantId, "risk_enrichment")
-    │
-    ├── Query llm_task_routing WHERE tenant_id=X AND task_type="risk_enrichment"
-    │         Found: config_id = "uuid-A", model_override = "gpt-4o"
-    │
-    ▼
-ResolvedConfig { providerType: "openai_compat", model: "gpt-4o", ... }
-    │
-    ▼
-buildOpenAIClient(config) → chat.completions.create(model: "gpt-4o")
-    │
-    ▼
-enriched response → DB update
+Client starts assessment session
+        │
+        ▼
+POST /api/v1/assessments/:id/sessions
+  → Creates assessment_sessions row (status: active)
+        │
+        ▼
+GET /api/v1/assessments/sessions/:id/next-question
+  → Assessment Engine: LLM generates next question (task: "assessment")
+  → Fallback: static question from template_config if LLM unavailable
+        │
+        ▼
+Client submits answer
+        │
+POST /api/v1/assessments/sessions/:id/responses
+  → Stores response in assessment_responses
+  → Enqueues score_assessment_response job
+        │
+        ▼
+Async: Job worker scores answer via AI
+  → updates assessment_responses.ai_score + ai_rationale
+        │
+        ▼
+On session commit:
+  → aggregate scores → write to parent entity
+  → vendor.risk_score updated (triggers monitoring re-evaluation)
+  → OR control.status updated + control_test record created
 ```
 
-### AI Task Resolution Flow (no routing configured — backward compat)
+### New: Signal Feed Ingestion Flow
 
 ```
-complete(tenantId, messages, "general")  ← existing callers unchanged
-    │
-    ▼
-resolveConfig(tenantId, "general")
-    │
-    ├── Query llm_task_routing: no row found (table empty for this tenant)
-    │
-    ├── Fall back: query llm_configs WHERE isDefault=true AND useCase="general"
-    │
-    ▼
-Existing behavior: pick default general config
+Signal Feed Poller (scheduled background, same process)
+  → reads active integration_configs per tenant
+  → calls external API adapter
+  → deduplicates via content_hash
+        │
+        ▼
+signals table INSERT
+  source: "shodan" | "nvd" | "misp" | "sentinel" | "email"
+        │
+        ▼
+enqueueJob("ai-triage", "classify", { signalId })
+        │
+        ▼ [EXISTING PIPELINE — NO CHANGES]
+AI Triage Worker → signal.status = "triaged"
+        │
+        ▼
+Manual or automated promotion to Finding
+        │
+        ▼
+Finding → Risk linkage via risk_sources table
+```
+
+### New: Foresight Simulation Flow
+
+```
+User configures scenario (risk IDs + threat factor adjustments)
+        │
+        ▼
+POST /api/v1/foresight/simulations → 202 Accepted + simulationId
+        │
+        ▼
+Job Queue: "monte-carlo" worker
+  1. Load risks from scenario.risk_ids
+  2. Query recent signals for these risks (OSINT snapshot)
+  3. Build probability distributions per risk
+  4. Run 10k iterations (sample, compute portfolio impact)
+  5. Compute percentile buckets: p5, p25, p50, p75, p95
+        │
+        ▼
+foresight_simulations.status = "completed"
+foresight_simulations.results = { percentiles, histogram }
+        │
+        ▼
+GET /api/v1/foresight/simulations/:id
+  (client polls until status = completed)
 ```
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Task-Type Router with Config Indirection
+### Pattern 1: Existing Job Queue as Universal Async Bus
 
-**What:** A separate routing table (`llm_task_routing`) maps task types to config IDs rather than embedding task type into `llm_configs`. The routing table is a pivot — it can be empty (fall through to default) or fully populated.
+**What:** Every new background operation (assessment scoring, signal ingestion, Monte Carlo, vendor enrichment) routes through the existing `job-queue.ts`. No new messaging infrastructure needed.
 
-**When to use:** When the same physical provider config (one set of credentials) should serve multiple task types with different models. Avoids creating duplicate config rows per task type.
+**When to use:** Any operation that: (a) takes >200ms, (b) involves an LLM, (c) calls external APIs, or (d) should survive process restarts.
 
-**Trade-offs:** Slightly more complex resolution logic in `resolveConfig()`; requires JOIN or two queries (routing lookup + config fetch). Acceptable given low query volume.
+**Trade-offs:** Simple, proven, tenant-scoped. Limitation: single-process, no horizontal scaling. Acceptable for the current single PM2 instance deployment.
 
 ```typescript
-// Resolution logic sketch
-async function resolveConfig(tenantId: string, taskType: LLMTaskType): Promise<ResolvedConfig | null> {
-  // Step 1: Check task-specific routing
-  const [routing] = await db.select().from(llmTaskRoutingTable)
-    .where(and(
-      eq(llmTaskRoutingTable.tenantId, tenantId),
-      eq(llmTaskRoutingTable.taskType, taskType)
-    )).limit(1);
+// Adding a new job type: just register a handler in ai-workers.ts at boot
+registerWorker("monte-carlo", async (job) => {
+  const { simulationId } = job.payload as { simulationId: string };
+  // ... simulation logic
+});
+```
 
-  if (routing?.configId) {
-    const [config] = await db.select().from(llmConfigsTable)
-      .where(and(eq(llmConfigsTable.id, routing.configId), eq(llmConfigsTable.isActive, true)))
-      .limit(1);
-    if (config) {
-      return {
-        providerType: config.providerType,
-        baseUrl: config.baseUrl,
-        apiKey: safeDecrypt(config.encryptedApiKey),
-        model: routing.modelOverride || config.model,
-      };
-    }
-  }
+### Pattern 2: Adapter Pattern for Signal Feeds
 
-  // Step 2: Fall back to existing default resolution
-  const useCase = taskType === "embeddings" ? "embeddings" : "general";
-  return resolveConfigByUseCase(tenantId, useCase);
+**What:** Each external signal source is an adapter implementing a common interface. The poller calls the interface; the concrete class handles auth, pagination, and data mapping.
+
+**When to use:** When integrating N external APIs with different auth/data shapes that all produce the same output type.
+
+```typescript
+interface SignalFeedAdapter {
+  type: string;
+  fetch(config: IntegrationConfig, since: Date): Promise<RawSignal[]>;
 }
+
+const adapters: Record<string, SignalFeedAdapter> = {
+  shodan: new ShodanAdapter(),
+  nvd: new NVDAdapter(),
+  misp: new MISPAdapter(),
+  sentinel: new SentinelAdapter(),
+  email: new EmailAdapter(),
+};
 ```
 
-### Pattern 2: Server-Side Model Discovery Proxy
+### Pattern 3: Assessment Engine as Shared Service (Not Microservice)
 
-**What:** Model discovery calls (e.g., `GET /v1/models` on OpenAI) are made server-side from the Express route handler, not from the browser. The browser calls `/v1/settings/llm-providers/:id/discover`.
+**What:** Assessment Engine is a TypeScript class within the API server, not a separate service. Both vendor and compliance routes import it directly.
 
-**When to use:** Always for this feature. API keys are stored encrypted in DB; they must never leave the server. CORS would also block direct browser-to-provider calls for many providers.
+**When to use:** When two features share identical business logic but different subjects (vendor vs. control). Avoids copy-paste, avoids over-engineering into microservices.
 
-**Trade-offs:** Discovery adds latency on the API server's outbound network. Acceptable — this is an admin-only setup flow, not a hot path.
+**Trade-offs:** Zero network overhead, single deployment. Tight coupling within the monolith — acceptable at this scale.
 
-### Pattern 3: Hardcoded Anthropic Model Catalog
+### Pattern 4: Encryption Reuse for Integration Credentials
 
-**What:** Anthropic has no `/models` list endpoint. The server returns a hardcoded list of known models filtered by `createdAt` date plausibility.
+**What:** Reuse existing `encryption.ts` (AES-256-GCM) for `integration_configs.encrypted_config`. Integration credentials stored identically to how LLM API keys are stored.
 
-**When to use:** Anthropic provider type only.
-
-**Known current models (as of March 2026):**
-```typescript
-const ANTHROPIC_MODELS = [
-  "claude-opus-4-5",
-  "claude-sonnet-4-5",
-  "claude-haiku-4-5",
-  "claude-3-5-sonnet-20241022",
-  "claude-3-5-haiku-20241022",
-  "claude-3-opus-20240229",
-  "claude-3-haiku-20240307",
-];
-```
-
-This list should live in `llm-service.ts` as a constant, not in the route handler, so it can be updated in one place.
-
-### Pattern 4: Benchmark via Fixed Probe Prompt
-
-**What:** A standardized benchmark prompt tests both connectivity and output quality. Quality score = 1.0 if response parses as valid JSON matching expected schema, 0.5 if text response with keywords, 0.0 if error/timeout.
-
-**When to use:** Wizard step 4 and the `/benchmark` endpoint.
-
-```typescript
-const BENCHMARK_PROMPT = `Identify the top 3 risk factors in a typical SaaS vendor relationship.
-Respond ONLY with valid JSON array: [{"risk": "string", "severity": "high|medium|low", "mitigation": "string"}]`;
-
-function scoreQuality(response: string): number {
-  try {
-    const parsed = JSON.parse(response);
-    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].risk && parsed[0].severity) return 1.0;
-    return 0.5;
-  } catch {
-    return response.toLowerCase().includes("risk") ? 0.3 : 0.0;
-  }
-}
-```
-
----
-
-## Build Order for v1.1 Features
-
-Dependencies flow in this order:
-
-```
-1. DB Schema (new tables)
-   lib/db/src/schema/llm-task-routing.ts   (new)
-   lib/db/src/schema/llm-benchmark-results.ts  (new)
-   lib/db/src/schema/index.ts              (export new tables)
-   → pnpm --filter @workspace/db run push  (apply to DB)
-
-2. API Spec update
-   lib/api-spec/openapi.yaml
-   → Add: POST /llm-providers/:id/discover
-   → Add: POST /llm-providers/:id/benchmark
-   → Add: GET/PUT /llm-routing
-   → Add: GET /llm-benchmarks
-   → Add: GET /embeddings-health
-   → Expand LlmUseCase enum if needed
-   → pnpm run codegen  (regenerates lib/api-zod + lib/api-client-react)
-
-3. Backend — llm-service.ts modifications
-   - Add LLMTaskType type
-   - Extend resolveConfig() for task routing
-   - Add discoverModels()
-   - Add runBenchmark()
-   - Export new functions
-
-4. Backend — settings.ts route additions
-   - /discover endpoint (calls discoverModels())
-   - /benchmark endpoint (calls runBenchmark(), saves result)
-   - GET/PUT /llm-routing endpoints
-
-5. Backend — wire taskType into callers
-   - ai-workers.ts: thread taskType into each callLLM()
-   - agent-service.ts: thread "agent_reasoning"
-   - interviews.ts: thread "interviews" / "treatment_suggestions"
-
-6. Frontend — settings.tsx changes
-   - Add wizard multi-step flow (replaces/augments the sheet)
-   - Add routing table card
-   - Add benchmark display
-   - Add embeddings health warning banner
-   (uses Orval-generated hooks from step 2)
-```
-
-**Critical dependency:** Steps 1-2 must complete before step 6 can compile (Orval hooks depend on spec). Steps 3-5 are backend-only and can be built + tested before the frontend in step 6.
-
----
-
-## Anti-Patterns
-
-### Anti-Pattern 1: Adding Task Types to `llm_configs.use_case`
-
-**What people do:** Expand the `llm_use_case` enum in `llm_configs` to include all 6 task types, then create one config row per task type.
-
-**Why it's wrong:** Forces N config rows for a single provider (one per task type), each with duplicate API key/baseUrl. When the API key rotates, you update N rows. It also doesn't handle the "same config, different model" case (e.g., using gpt-4o for enrichment and gpt-4o-mini for triage on the same OpenAI key).
-
-**Do this instead:** Keep `llm_configs` as provider-level credentials. Use the `llm_task_routing` table to map task types to (config, model) pairs.
-
-### Anti-Pattern 2: Model Discovery from the Browser
-
-**What people do:** Have the React frontend call `api.openai.com/v1/models` directly with the API key passed through a query parameter or Authorization header.
-
-**Why it's wrong:** Exposes API keys in browser network tab. Breaks for providers that set restrictive CORS headers (Anthropic blocks browser requests). Violates the security model where keys never leave the server.
-
-**Do this instead:** Route all provider API calls through the Express server via `/v1/settings/llm-providers/:id/discover`.
-
-### Anti-Pattern 3: Storing Benchmark Results in `llm_configs`
-
-**What people do:** Add `latency_ms`, `quality_score` columns directly to `llm_configs`.
-
-**Why it's wrong:** A single config may be benchmarked multiple times across multiple models. Storing only the latest result loses history. Benchmarks should be a time-series of observations, not a single value on the config.
-
-**Do this instead:** Separate `llm_benchmark_results` table with `ran_at` timestamp. The UI always shows the most recent result but the full history is available.
-
-### Anti-Pattern 4: Blocking the Wizard on Benchmark Completion
-
-**What people do:** Make benchmark a required step before saving routing.
-
-**Why it's wrong:** Benchmarks add latency and may fail for valid providers (rate limits, cold starts). Forcing users through benchmarks to configure their first provider creates friction and abandonment.
-
-**Do this instead:** Make benchmarks optional (skippable). Routing suggestions based on benchmarks only appear if benchmark data exists. The wizard completes without benchmark data.
-
-### Anti-Pattern 5: Separate `resolveConfig` paths for old vs. new callers
-
-**What people do:** Create `resolveConfigForTask()` as a new function alongside the existing `resolveConfig()`, duplicating the provider client construction logic.
-
-**Why it's wrong:** Two functions diverge over time. Bug fixes in one don't apply to the other. Provider additions require changes in both places.
-
-**Do this instead:** Single `resolveConfig(tenantId, taskType)` function with the task routing check added at the top. The existing `useCase` logic becomes the fallback within the same function.
+**When to use:** Always. Consistent encryption approach, single key management concern (`ENCRYPTION_KEY` env var). No new secrets management infrastructure needed.
 
 ---
 
 ## Integration Points
 
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| OpenAI `/v1/models` | Outbound GET from Express, using config's `apiKey` as `Authorization: Bearer` | Paginates; return all model IDs, filter to chat-capable |
-| Ollama `/api/tags` | Outbound GET from Express, no auth header | Returns `{models: [{name, ...}]}`; extract `.name` |
-| Anthropic (no list endpoint) | Return hardcoded constant `ANTHROPIC_MODELS` | Update list when new models release |
-| Other openai_compat | `GET {baseUrl}/models` with bearer token | Same format as OpenAI; may 404 (handle gracefully) |
-
-### Internal Workspace Boundaries
+### New Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `settings.ts` ↔ `llm-service.ts` | Direct import: `discoverModels()`, `runBenchmark()`, `testConnection()` | All three live in llm-service |
-| `ai-workers.ts` ↔ `llm-service.ts` | Direct import: `complete(tenantId, opts, taskType)` | taskType becomes optional param, defaults to "general" |
-| `agent-service.ts` ↔ `llm-service.ts` | Direct import: `complete(tenantId, opts, taskType)` | Pass `"agent_reasoning"` |
-| `interviews.ts` ↔ `llm-service.ts` | Direct import: `complete()`, `streamComplete()` | Pass `"interviews"` or `"treatment_suggestions"` |
-| Frontend ↔ new API endpoints | Orval-generated hooks (after codegen) | Must update API spec before running codegen |
-| `llm-task-routing` table ↔ `llm_configs` | Foreign key: `config_id → llm_configs.id ON DELETE SET NULL` | Deleting a config NULLs routing rows, causing fallback to default |
+| Assessment Engine ↔ LLM Service | Direct call: `complete(tenantId, ..., "assessment")` | Adds `"assessment"` to `LLMTaskType` union |
+| Signal Feed Poller ↔ Job Queue | `enqueueJob("ai-triage", ...)` per new signal | Existing queue, no structural change |
+| Signal Feed Poller ↔ Integration Configs | DB read on scheduler tick | Reads `integration_configs` to find active feeds per tenant |
+| Monte Carlo Runner ↔ Job Queue | Registered as `"monte-carlo"` queue worker | New queue name, same `registerWorker` pattern |
+| Monte Carlo Runner ↔ signals table | DB read for OSINT snapshot | Queries existing signals by tenant + source + recency |
+| Vendor Enrichment ↔ Assessment Engine | Vendor route triggers assessment session creation | Route-level coordination, no circular deps |
+| Compliance Monitoring ↔ Monitoring Scheduler | New check added to existing scheduler loop | Reuses existing alerts table |
+| Framework Importer ↔ DB | Bulk insert via Drizzle transaction | New service, existing ORM, existing tables |
+
+### External Service Integration Points
+
+| Service | Auth Method | Credential Storage | Notes |
+|---------|------------|-------------------|-------|
+| Shodan API | API key per tenant | `integration_configs.encrypted_config` | REST: `api.shodan.io`; 1 req/sec free tier |
+| NVD CVE API 2.0 | Optional API key | `integration_configs.encrypted_config` | `services.nvd.nist.gov`; 50 req/30s with key |
+| MISP | API key + instance URL | `integration_configs.encrypted_config` | Customer-hosted; URL varies per tenant |
+| Microsoft Sentinel | Azure OAuth2 client credentials | `integration_configs.encrypted_config` | Requires Azure app registration by customer |
+| Email IMAP | IMAP host/user/password | `integration_configs.encrypted_config` | Use `imapflow` npm package; supports IDLE |
+
+### OpenAPI and Orval Touch Points
+
+All new endpoints must be added to `lib/api-spec/openapi.yaml` before running Orval to regenerate `lib/api-client-react/` and `lib/api-zod/`. This is the **mandatory last step** of any backend route addition.
+
+New API surface required:
+
+```
+# Assessment Engine
+POST   /api/v1/assessments
+GET    /api/v1/assessments
+GET    /api/v1/assessments/:id
+POST   /api/v1/assessments/:id/sessions
+GET    /api/v1/assessments/sessions/:id
+POST   /api/v1/assessments/sessions/:id/responses
+POST   /api/v1/assessments/sessions/:id/commit
+GET    /api/v1/assessments/sessions/:id/report
+
+# Integration Configs
+GET    /api/v1/integrations
+POST   /api/v1/integrations
+PATCH  /api/v1/integrations/:id
+DELETE /api/v1/integrations/:id
+POST   /api/v1/integrations/:id/test        -- verify credentials
+POST   /api/v1/integrations/:id/trigger     -- manual poll
+
+# Foresight (replaces stub)
+GET    /api/v1/foresight/scenarios
+POST   /api/v1/foresight/scenarios
+GET    /api/v1/foresight/scenarios/:id
+PATCH  /api/v1/foresight/scenarios/:id
+DELETE /api/v1/foresight/scenarios/:id
+POST   /api/v1/foresight/simulations
+GET    /api/v1/foresight/simulations/:id
+
+# Vendor additions
+POST   /api/v1/vendors/:id/assessments      -- trigger assessment session
+GET    /api/v1/vendors/:id/fourth-party     -- list subvendors
+POST   /api/v1/vendors/:id/fourth-party     -- link subvendor
+
+# Framework additions
+POST   /api/v1/frameworks/import            -- bulk import
+PATCH  /api/v1/frameworks/:id/threshold     -- set compliance threshold
+```
+
+---
+
+## Recommended Build Order
+
+Dependencies determine order. Each item unlocks the next.
+
+### Stage 1: Schema Foundation (unblocks everything)
+
+Add all new Drizzle table files to `lib/db/src/schema/`. Export from `index.ts`. Run `drizzle-kit push`. No routes yet.
+
+Tables to add:
+1. `assessments` + `assessment_sessions` + `assessment_responses` (only existing-table foreign deps)
+2. `integration_configs` (standalone)
+3. `foresight_scenarios` + `foresight_simulations` (depends on `risks`)
+4. `vendor_fourth_party_links` (depends on `vendors`)
+
+Column additions:
+- `vendors`: `website_domain`, `enrichment_status`, `last_enriched_at`, `onboarding_step`, `onboarding_data`
+- `frameworks`: `compliance_threshold`, `import_source`, `import_reference`
+- `signals`: `content_hash` (for deduplication)
+
+### Stage 2: Assessment Engine (unblocks Vendor + Compliance)
+
+Build `assessment-engine.ts` service + `assessments.ts` route + OpenAPI spec entries. Register `"assessment"` task type in `llm-service.ts`. Register `score_assessment_response` job worker in `ai-workers.ts`. Run Orval to regenerate clients.
+
+Deliverable: Standalone assessment API that vendor and compliance routes can call.
+
+### Stage 3: Vendor Lifecycle Redesign (depends on Stage 2)
+
+- Update `vendors.ts` route: onboarding_data endpoints, 4th party endpoints, enrichment auto-trigger on status transitions
+- Build `vendor-enrichment.ts` service: queries signals already in DB for this vendor's domain, synthesizes enrichment
+- Wire Assessment Engine into vendor flow: `POST /api/v1/vendors/:id/assessments`
+- Frontend: wizard UX, monitoring dashboard, 4th party panel
+
+### Stage 4: Signal Integrations (depends on Stage 1 only — no other stage deps)
+
+- Build `integration-config.ts` (encrypted credential CRUD)
+- Build `signal-feed-poller.ts` with all 5 adapter implementations
+- Register `startSignalFeedPoller()` in `index.ts` alongside existing schedulers
+- Build `integrations.ts` route
+- Build `email-ingestion.ts` (IMAP + IDLE)
+- OpenAPI spec additions + Orval regeneration
+
+### Stage 5: Compliance Flow (depends on Stage 2)
+
+- Build `framework-importer.ts` (OSCAL/JSON/CSV parser, bulk insert)
+- Add `POST /api/v1/frameworks/import` endpoint to `compliance.ts` route
+- Add compliance threshold check to `monitoring.ts` scheduler
+- Wire Assessment Engine into control assessment flow
+- Frontend: import UI, threshold configuration, assessment session UI
+
+### Stage 6: Foresight v2 (depends on Stage 4 for OSINT signal data)
+
+- Build `monte-carlo.ts` simulation engine (pure TS, seeded PRNG, percentile aggregation)
+- Register `"monte-carlo"` job worker in `ai-workers.ts`
+- Replace stub `foresight.ts` with full scenario + simulation implementation
+- OpenAPI spec + Orval regeneration
+- Frontend: scenario builder, simulation polling UI, percentile visualization
+
+---
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Calling External APIs Synchronously in Route Handlers
+
+**What people do:** Place Shodan/NVD HTTP calls directly inside Express route handlers.
+
+**Why it's wrong:** External APIs have unpredictable latency (100-2000ms), hard rate limits, and failure modes. Synchronous calls block the event loop and cause cascading request timeouts.
+
+**Do this instead:** Route handlers only enqueue jobs or trigger the background poller. All external API calls run in the job queue workers or the signal feed poller.
+
+### Anti-Pattern 2: Creating a New Database Pool for New Features
+
+**What people do:** Instantiate a new `pg.Pool` or `drizzle()` instance inside a new service file.
+
+**Why it's wrong:** PostgreSQL default max connections is 100. Multiple pools waste connections. The existing `@workspace/db` export already provides a configured pool.
+
+**Do this instead:** Import `{ db }` from `@workspace/db`. New tables only need schema files in `lib/db/src/schema/` exported from `index.ts`.
+
+### Anti-Pattern 3: Storing External API Credentials in Environment Variables
+
+**What people do:** Add `SHODAN_API_KEY`, `MISP_API_KEY` etc. to `.env`.
+
+**Why it's wrong:** RiskMind is multi-tenant. Each tenant may have different Shodan API keys, different MISP instance URLs. Global env vars cannot handle per-tenant configuration.
+
+**Do this instead:** Store in `integration_configs.encrypted_config` using existing `encryption.ts` — same pattern as `llm_configs.encrypted_api_key`. Per-tenant, per-integration, encrypted at rest.
+
+### Anti-Pattern 4: Duplicating the Questionnaire System for Assessments
+
+**What people do:** Create separate tables and routes for compliance assessments with a second static JSON template model.
+
+**Why it's wrong:** Missing the AI-driven, non-deterministic nature of the feature requirement. Doubles maintenance surface. The existing `questionnaires` pattern is static and does not support multi-turn AI scoring.
+
+**Do this instead:** Build the Assessment Engine once. Route both vendor assessments and compliance control assessments through it. Keep `questionnaires` table only for historical data.
+
+### Anti-Pattern 5: Running Monte Carlo Inline on the HTTP Request
+
+**What people do:** Run 10k iterations synchronously when `POST /foresight/simulations` is called, return results in the response body.
+
+**Why it's wrong:** Even at 200ms, this blocks the Node.js event loop. Multiple concurrent requests saturate the server. Users experience timeouts on large scenarios.
+
+**Do this instead:** Return 202 Accepted with a `simulationId`. Run simulation in job queue worker. Client polls `GET /foresight/simulations/:id`. This is the established pattern already used for AI enrichment in the codebase.
+
+### Anti-Pattern 6: Bypassing the Signal → Finding → Risk Pipeline for New Signal Sources
+
+**What people do:** Create direct Shodan → Risk or NVD → Finding shortcuts to "simplify" new integrations.
+
+**Why it's wrong:** Destroys the Signal → Finding → Risk traceability chain that is a core architectural invariant. Breaks provenance tracking. Undermines the existing triage/confidence filtering that prevents noise from becoming risks.
+
+**Do this instead:** All external signal sources write to the `signals` table. The existing triage pipeline handles promotion to findings and risks.
 
 ---
 
 ## Scaling Considerations
 
-| Scale | Architecture | Notes |
-|-------|-------------|-------|
-| Current (1-20 users, 1 tenant) | Single DB lookup in resolveConfig adds ~1-2ms per AI call | Negligible; no caching needed |
-| Multi-tenant growth (10+ tenants) | Add in-memory LRU cache on routing table (TTL 60s) | Routing changes infrequently; cache invalidation on PUT /llm-routing |
-| High AI job volume | Routing resolution is pure DB read — no contention | Bottleneck remains LLM API latency, not routing lookup |
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| Current (1-10 tenants) | All background work in same PM2 process; 15-60 minute polling intervals are fine |
+| 10-100 tenants | Signal feed poller may hit external rate limits if all tenants share one IP; stagger per-tenant polling windows with jitter |
+| 100+ tenants | Extract signal feed poller and Monte Carlo runner to separate PM2 processes; consider pg-boss or BullMQ for job queue to support multiple workers |
+
+**First bottleneck:** Signal feed poller with many active tenants polling the same external APIs from the same IP address. Mitigation: per-adapter rate limiter + jittered polling start times per tenant.
+
+**Second bottleneck:** Monte Carlo simulations if many tenants run large scenarios simultaneously — CPU saturation on single process. Mitigation: `worker_threads` for simulation math, job queue concurrency cap.
 
 ---
 
 ## Sources
 
-- Direct inspection of `artifacts/api-server/src/lib/llm-service.ts`
-- Direct inspection of `artifacts/api-server/src/routes/settings.ts`
-- Direct inspection of `artifacts/api-server/src/lib/ai-workers.ts`
-- Direct inspection of `artifacts/api-server/src/lib/agent-service.ts`
-- Direct inspection of `artifacts/api-server/src/routes/interviews.ts`
-- Direct inspection of `lib/db/src/schema/llm-configs.ts`
-- Direct inspection of `lib/api-zod/src/generated/types/llmUseCase.ts`
-- Direct inspection of `artifacts/riskmind-app/src/pages/settings/settings.tsx`
-- `.planning/PROJECT.md` and `.planning/v1.1-scope.md`
+- Codebase inspection: `artifacts/api-server/`, `lib/db/src/schema/`, `docs/ARCHITECTURE.md` — HIGH confidence
+- Shodan REST API: [https://developer.shodan.io/api](https://developer.shodan.io/api) — MEDIUM confidence (official docs, REST patterns stable)
+- NVD CVE API 2.0: [https://nvd.nist.gov/developers/vulnerabilities](https://nvd.nist.gov/developers/vulnerabilities) — HIGH confidence (official NIST docs)
+- Microsoft Sentinel REST API: [https://learn.microsoft.com/en-us/rest/api/securityinsights/](https://learn.microsoft.com/en-us/rest/api/securityinsights/) — HIGH confidence (official Microsoft docs, 2025-09-01 API version confirmed current)
+- MISP REST API: [https://www.misp-project.org/features/](https://www.misp-project.org/features/) — HIGH confidence (official MISP docs)
+- ImapFlow: [https://blog.nodemailer.com/](https://blog.nodemailer.com/) — MEDIUM confidence (actively maintained, modern IMAP library for Node.js 2025)
+- Monte Carlo in Node.js: training data + WebSearch — MEDIUM confidence (pure JS is viable at 10k iterations / ~20 risks)
 
 ---
 
-*Architecture research for: RiskMind v1.1 — LLM model routing, auto-discovery, and benchmarking integration*
-*Researched: 2026-03-18*
+*Architecture research for: RiskMind v2.0 — Assessment Engine, Vendor Lifecycle, Compliance Flow, Signal Integrations, Foresight v2*
+*Researched: 2026-03-23*
