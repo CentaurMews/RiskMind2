@@ -162,7 +162,7 @@ Plans:
 **Milestone Goal:** Transform RiskMind from a demo-ready platform into a full-featured enterprise risk management system with AI-driven assessments, redesigned vendor lifecycle, compliance workflows, real signal integrations, and predictive foresight capabilities.
 
 - [x] **Phase 9: Schema Foundation** - Polymorphic assessment schema, integration config, foresight tables, signal deduplication column (completed 2026-03-23)
-- [ ] **Phase 10: Assessment Engine** - AI-driven shared questionnaire engine with templates, scoring, and LLM follow-up
+- [x] **Phase 10: Assessment Engine** - AI-driven shared questionnaire engine with templates, scoring, and LLM follow-up (completed 2026-03-23)
 - [ ] **Phase 11: Vendor Lifecycle Redesign** - Wizard onboarding, 4th party risk, continuous monitoring, AI enrichment
 - [ ] **Phase 12: Signal Integrations** - NVD, Shodan, Sentinel, MISP, email ingestion with per-tenant encrypted credentials
 - [ ] **Phase 13: Compliance Flow** - Framework import, assessment-to-control linkage, per-framework thresholds
@@ -203,7 +203,7 @@ Plans:
 - [x] 10-01-PLAN.md -- Assessment engine types, scoring logic, and test infrastructure
 - [x] 10-02-PLAN.md -- Backend API routes, AI endpoints, pre-built template seeds, OpenAPI spec
 - [x] 10-03-PLAN.md -- Frontend template library page and template builder with components
-- [ ] 10-04-PLAN.md -- Frontend session wizard, results page, assessment list, and navigation wiring
+- [x] 10-04-PLAN.md -- Frontend session wizard, results page, assessment list, and navigation wiring
 
 ### Phase 11: Vendor Lifecycle Redesign
 **Goal**: Users can onboard a new vendor through a guided wizard with AI enrichment auto-triggered, track 4th-party subprocessors, configure continuous monitoring cadence per risk tier, and see vendor risk scores driven by assessment results
@@ -268,7 +268,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 7. Foresight Teaser | v1.1 | 1/1 | Complete | 2026-03-18 |
 | 8. Quick Fixes & Polish | v1.2 | 2/2 | Complete | 2026-03-23 |
 | 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
-| 10. Assessment Engine | v2.0 | 3/4 | In Progress|  |
+| 10. Assessment Engine | v2.0 | 4/4 | Complete   | 2026-03-23 |
 | 11. Vendor Lifecycle Redesign | v2.0 | 0/? | Not started | - |
 | 12. Signal Integrations | v2.0 | 0/? | Not started | - |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
