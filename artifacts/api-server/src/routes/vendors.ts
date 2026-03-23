@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { eq, and, sql, ilike } from "drizzle-orm";
+import { eq, and, sql, ilike, aliasedTable } from "drizzle-orm";
 import crypto from "crypto";
 
 function p(req: Request, name: string): string {
@@ -1171,6 +1171,219 @@ router.put("/v1/vendors/:vendorId/documents/:id", requireRole("admin", "risk_man
     res.json(doc);
   } catch (err) {
     console.error("Update document error:", err);
+    serverError(res);
+  }
+});
+
+// ─── Subprocessor Endpoints ───────────────────────────────────────────────────
+
+/**
+ * GET /v1/vendors/:vendorId/subprocessors — List subprocessors for a vendor
+ */
+router.get("/v1/vendors/:vendorId/subprocessors", async (req, res) => {
+  try {
+    const vendorId = p(req, "vendorId");
+    const tenantId = req.user!.tenantId;
+
+    if (!(await verifyVendorOwnership(vendorId, tenantId, res))) return;
+
+    const subVendor = aliasedTable(vendorsTable, "sub_vendor");
+    const results = await db.select({
+      id: vendorSubprocessorsTable.id,
+      vendorId: vendorSubprocessorsTable.vendorId,
+      subprocessorId: vendorSubprocessorsTable.subprocessorId,
+      subprocessorName: subVendor.name,
+      relationshipType: vendorSubprocessorsTable.relationshipType,
+      criticality: vendorSubprocessorsTable.criticality,
+      discoveredBy: vendorSubprocessorsTable.discoveredBy,
+      createdAt: vendorSubprocessorsTable.createdAt,
+    })
+    .from(vendorSubprocessorsTable)
+    .leftJoin(subVendor, eq(vendorSubprocessorsTable.subprocessorId, subVendor.id))
+    .where(and(
+      eq(vendorSubprocessorsTable.vendorId, vendorId),
+      eq(vendorSubprocessorsTable.tenantId, tenantId)
+    ));
+
+    res.json(results);
+  } catch (err) {
+    console.error("List subprocessors error:", err);
+    serverError(res);
+  }
+});
+
+/**
+ * POST /v1/vendors/:vendorId/subprocessors — Add a subprocessor link
+ */
+router.post("/v1/vendors/:vendorId/subprocessors", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "vendorId");
+    const tenantId = req.user!.tenantId;
+
+    if (!(await verifyVendorOwnership(vendorId, tenantId, res))) return;
+
+    const { subprocessorId, name, relationshipType, criticality, discoveredBy } = req.body;
+
+    let resolvedSubprocessorId: string;
+
+    if (subprocessorId) {
+      // Link existing vendor
+      const [existingVendor] = await db.select({ id: vendorsTable.id })
+        .from(vendorsTable)
+        .where(and(eq(vendorsTable.id, subprocessorId), eq(vendorsTable.tenantId, tenantId)))
+        .limit(1);
+      if (!existingVendor) {
+        notFound(res, "Subprocessor vendor not found");
+        return;
+      }
+      resolvedSubprocessorId = subprocessorId;
+    } else if (name && typeof name === "string" && name.trim().length > 0) {
+      // Create new minimal vendor for the subprocessor
+      const [newVendor] = await db.insert(vendorsTable).values({
+        tenantId,
+        name: name.trim(),
+        status: "identification",
+        tier: "medium",
+      }).returning({ id: vendorsTable.id });
+      resolvedSubprocessorId = newVendor.id;
+    } else {
+      badRequest(res, "Either subprocessorId or name is required");
+      return;
+    }
+
+    try {
+      const [subprocessor] = await db.insert(vendorSubprocessorsTable).values({
+        tenantId,
+        vendorId,
+        subprocessorId: resolvedSubprocessorId,
+        relationshipType: relationshipType ?? null,
+        criticality: criticality ?? "medium",
+        discoveredBy: discoveredBy ?? "manual",
+      }).returning();
+
+      await recordAudit(req, "add_subprocessor", "vendor", vendorId, { subprocessorId: resolvedSubprocessorId });
+      res.status(201).json(subprocessor);
+    } catch (dbErr: any) {
+      if (dbErr?.code === "23505") {
+        conflict(res, "This vendor is already linked as a subprocessor.");
+        return;
+      }
+      throw dbErr;
+    }
+  } catch (err) {
+    console.error("Add subprocessor error:", err);
+    serverError(res);
+  }
+});
+
+/**
+ * DELETE /v1/vendors/:vendorId/subprocessors/:subId — Remove a subprocessor link
+ */
+router.delete("/v1/vendors/:vendorId/subprocessors/:subId", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "vendorId");
+    const subId = p(req, "subId");
+    const tenantId = req.user!.tenantId;
+
+    if (!(await verifyVendorOwnership(vendorId, tenantId, res))) return;
+
+    const deleted = await db.delete(vendorSubprocessorsTable)
+      .where(and(
+        eq(vendorSubprocessorsTable.id, subId),
+        eq(vendorSubprocessorsTable.vendorId, vendorId),
+        eq(vendorSubprocessorsTable.tenantId, tenantId),
+      ))
+      .returning({ id: vendorSubprocessorsTable.id });
+
+    if (deleted.length === 0) {
+      notFound(res, "Subprocessor link not found");
+      return;
+    }
+
+    await recordAudit(req, "remove_subprocessor", "vendor", vendorId, { subId });
+    res.status(204).send();
+  } catch (err) {
+    console.error("Remove subprocessor error:", err);
+    serverError(res);
+  }
+});
+
+/**
+ * POST /v1/vendors/:vendorId/extract-subprocessors — LLM extraction from documents
+ */
+router.post("/v1/vendors/:vendorId/extract-subprocessors", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "vendorId");
+    const tenantId = req.user!.tenantId;
+
+    if (!(await verifyVendorOwnership(vendorId, tenantId, res))) return;
+
+    const documents = await db.select({ extractedData: documentsTable.extractedData })
+      .from(documentsTable)
+      .where(and(
+        eq(documentsTable.vendorId, vendorId),
+        eq(documentsTable.tenantId, tenantId),
+        sql`${documentsTable.extractedData} IS NOT NULL`,
+      ));
+
+    if (documents.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    const extractedParts = documents
+      .map(d => (typeof d.extractedData === "string" ? d.extractedData : JSON.stringify(d.extractedData)))
+      .join("\n\n");
+    const extractedText = extractedParts.slice(0, 4000);
+
+    const prompt = `You are a third-party risk analyst extracting vendor relationships from a document.
+
+Document content (excerpt):
+${extractedText}
+
+Identify any third-party service providers, cloud infrastructure vendors, payment processors, CDN providers,
+identity/authentication services, data processors, or technology partners mentioned.
+
+For each identified third party, provide:
+- name: company name (required)
+- relationshipType: brief description (e.g., "cloud hosting", "payment processing", "CDN")
+- criticality: one of critical, high, medium, low
+
+Respond ONLY with a JSON array. If none found, return []. No other text.`;
+
+    const result = await complete(tenantId, {
+      messages: [
+        { role: "system", content: "You are a third-party risk analyst. Respond only with valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.3,
+      maxTokens: 1024,
+    });
+
+    let candidates: Array<{ name: string; relationshipType?: string; criticality?: string }>;
+    try {
+      const cleaned = result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      candidates = JSON.parse(cleaned);
+      if (!Array.isArray(candidates)) throw new Error("Expected array");
+    } catch {
+      candidates = [];
+    }
+
+    const validated = candidates
+      .filter((c: any) => c.name && typeof c.name === "string" && c.name.trim().length > 1)
+      .map((c: any) => ({
+        name: String(c.name).trim(),
+        relationshipType: c.relationshipType ? String(c.relationshipType).trim() : undefined,
+        criticality: ["critical", "high", "medium", "low"].includes(c.criticality) ? c.criticality : "medium",
+      }));
+
+    res.json(validated);
+  } catch (err) {
+    if (err instanceof LLMUnavailableError) {
+      res.status(503).json({ error: err.message });
+      return;
+    }
+    console.error("Extract subprocessors error:", err);
     serverError(res);
   }
 });
