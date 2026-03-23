@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to execute
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-03-23T15:31:49.147Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-03-23T15:39:12.568Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 12
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 11 (vendor-lifecycle-redesign) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Plan: 2 of 5
 | Phase 10-assessment-engine P03 | 531 | 2 tasks | 7 files |
 | Phase 10-assessment-engine P04 | 561 | 3 tasks | 11 files |
 | Phase 11-vendor-lifecycle-redesign P01 | 162 | 2 tasks | 2 files |
+| Phase 11-vendor-lifecycle-redesign P02 | 283 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Recent decisions affecting current work:
 - [Phase 11-vendor-lifecycle-redesign]: Wizard step inferred from data completeness (assessment + documents existence) — no wizardCompletedAt column added to vendors schema
 - [Phase 11-vendor-lifecycle-redesign]: riskScore = 100 - assessment.overall (higher = worse risk) — inverts compliance score to risk score
 - [Phase 11-vendor-lifecycle-redesign]: overrideTier respected in risk score hook — tier auto-updated only when no manual override is set
+- [Phase 11-vendor-lifecycle-redesign]: aliasedTable (not alias) is the Drizzle 0.45 export for table aliases — alias is absent from the main drizzle-orm index
+- [Phase 11-vendor-lifecycle-redesign]: concentration-risk route placed before /:id route pattern to prevent Express path conflict in org-dependencies router
+- [Phase 11-vendor-lifecycle-redesign]: scoreThreshold nullable in monitoring_configs — null means no threshold alerting for that tier; vendor-monitor worker skips alert insertion when null
 
 ### Pending Todos
 
@@ -114,7 +118,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T15:31:49.140Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-03-23T15:39:12.560Z
+Stopped at: Completed 11-02-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
