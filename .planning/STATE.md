@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to execute
-stopped_at: Completed 09-01-PLAN.md — assessments, integration-configs, foresight schema files
-last_updated: "2026-03-23T12:09:02.269Z"
+stopped_at: Completed 09-02-PLAN.md — vendor-subprocessors, org-dependencies, monitoring-configs schema + column additions to signals, vendors, frameworks
+last_updated: "2026-03-23T12:12:38.319Z"
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 09 (schema-foundation) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Plan: 2 of 3
 
 *Updated after each plan completion*
 | Phase 09-schema-foundation P01 | 2 | 2 tasks | 3 files |
+| Phase 09-schema-foundation P02 | 117s | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - [Phase 09-schema-foundation]: Polymorphic context_type enum + nullable context_id chosen over separate vendor_id/framework_id columns — enables shared assessment engine across vendor and compliance domains without schema branching
 - [Phase 09-schema-foundation]: JSONB questions stored on assessment_templates (not separate rows table) — simplifies template versioning via clone-and-increment pattern
 - [Phase 09-schema-foundation]: foresight_simulations.input_parameters snapshots FAIR params at run time — results remain self-contained even if parent scenario is edited
+- [Phase 09-schema-foundation]: Signals deduplication uses partial unique index WHERE content_hash IS NOT NULL — allows nullable hash on existing rows while enforcing uniqueness when hash is present
+- [Phase 09-schema-foundation]: monitoring-configs reuses vendorTierEnum from vendors.ts rather than defining a new text column — maintains enum consistency across tables
+- [Phase 09-schema-foundation]: vendor-subprocessors uses dual FK to same vendorsTable — subprocessors are vendors in the system enabling 4th-party risk tracking without a separate concept
 
 ### Pending Todos
 
@@ -82,7 +86,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T12:09:02.257Z
-Stopped at: Completed 09-01-PLAN.md — assessments, integration-configs, foresight schema files
+Last session: 2026-03-23T12:12:38.310Z
+Stopped at: Completed 09-02-PLAN.md — vendor-subprocessors, org-dependencies, monitoring-configs schema + column additions to signals, vendors, frameworks
 Resume file: None
 Next step: `/gsd:plan-phase 9`
