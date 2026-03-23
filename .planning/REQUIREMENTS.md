@@ -7,8 +7,8 @@
 
 ### Login
 
-- [ ] **LOGIN-01**: Login form detects tenant from email domain — no tenant slug field (GH #70)
-- [ ] **LOGIN-02**: Social login placeholders (Microsoft, Google) with "Coming soon" toast on click (GH #71)
+- [x] **LOGIN-01**: Login form detects tenant from email domain — no tenant slug field (GH #70)
+- [x] **LOGIN-02**: Social login placeholders (Microsoft, Google) with "Coming soon" toast on click (GH #71)
 
 ### Dashboard
 
@@ -22,7 +22,7 @@
 
 ### Cleanup
 
-- [ ] **CLEAN-01**: Remove Replit tenant UUID code from header bar — show tenant name instead (GH #74)
+- [x] **CLEAN-01**: Remove Replit tenant UUID code from header bar — show tenant name instead (GH #74)
 
 ## Future Requirements (v2.0)
 
@@ -73,13 +73,13 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOGIN-01 | Phase 8 | Pending |
-| LOGIN-02 | Phase 8 | Pending |
+| LOGIN-01 | Phase 8 | Complete |
+| LOGIN-02 | Phase 8 | Complete |
 | DASH-06 | Phase 8 | Pending |
 | MOB-01 | Phase 8 | Pending |
 | MOB-02 | Phase 8 | Pending |
 | MOB-03 | Phase 8 | Pending |
-| CLEAN-01 | Phase 8 | Pending |
+| CLEAN-01 | Phase 8 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 7 total

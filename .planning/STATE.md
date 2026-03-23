@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LLM Intelligence + Fixes + Polish
 status: completed
-stopped_at: Phase 8 context gathered
-last_updated: "2026-03-23T07:40:48.466Z"
-last_activity: 2026-03-18 — Phase 6 Plan 02 complete; wizard end-to-end verified by human; all LLM-01–LLM-06 requirements satisfied
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-23T07:54:48.856Z"
+last_activity: 2026-03-23
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 100
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 Phase: 6 of 7 (Bug Fixes and Wizard UI)
 Plan: 02 of 02 complete — Phase 6 done; Phase 7 next
 Status: Phase 6 complete — ready to start Phase 7 (Foresight Teaser)
-Last activity: 2026-03-18 — Phase 6 Plan 02 complete; wizard end-to-end verified by human; all LLM-01–LLM-06 requirements satisfied
+Last activity: 2026-03-23
 
 Progress: [██████████] 100%
 
@@ -52,6 +52,7 @@ Progress: [██████████] 100%
 | Phase 05-llm-intelligence-backend P03 | 4 minutes | 2 tasks | 4 files |
 | Phase 06-bug-fixes-and-wizard-ui P02 | 6 | 2 tasks | 3 files |
 | Phase 07-foresight-teaser P01 | 5 | 1 tasks | 1 files |
+| Phase 08-quick-fixes-and-polish P01 | 15 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,9 @@ Recent decisions affecting current work:
 - [Phase 06-bug-fixes-and-wizard-ui]: Wizard createProvider success triggers useEffect discover automatically via configId change
 - [Phase 07-foresight-teaser]: FeatureCard built manually inside CardContent for full layout control over icon, title, and badge
 - [Phase 07-foresight-teaser]: Card gradient (from-muted/40 to-card) visually distinguishes preview features from live features
+- [Phase 08-quick-fixes-and-polish]: Email domain slug extraction uses only first label (acme.com → acme) to match existing tenant slug pattern
+- [Phase 08-quick-fixes-and-polish]: tenantName/tenantSlug added as optional fields in UserProfile OpenAPI schema for backward compatibility
+- [Phase 08-quick-fixes-and-polish]: Social login buttons show Coming Soon toast; no OAuth flow wired in v2.0
 
 ### Pending Todos
 
@@ -92,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T07:40:48.454Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-quick-fixes-and-polish/08-CONTEXT.md
+Last session: 2026-03-23T07:54:48.848Z
+Stopped at: Completed 08-01-PLAN.md
+Resume file: None

@@ -197,7 +197,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Login: tenant-from-email resolution, social login placeholders, header tenant name fix
+- [x] 08-01-PLAN.md — Login: tenant-from-email resolution, social login placeholders, header tenant name fix
 - [ ] 08-02-PLAN.md — Dashboard: clickable KPI cards, mobile heatmap fallback, scroll shadows, touch targets
 
 ## Progress
@@ -214,4 +214,4 @@ v1.0 phases complete. v1.1 complete. v1.2 executes: Phase 8
 | 5. LLM Intelligence Backend | 3/3 | Complete    | 2026-03-18 | - |
 | 6. Bug Fixes and Wizard UI | 2/2 | Complete    | 2026-03-18 | - |
 | 7. Foresight Teaser | 1/1 | Complete    | 2026-03-18 | - |
-| 8. Quick Fixes & Polish | v1.2 | 0/2 | Not started | - |
+| 8. Quick Fixes & Polish | v1.2 | 1/2 | In Progress|  |
