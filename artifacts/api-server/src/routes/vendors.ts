@@ -15,6 +15,7 @@ import {
   assessmentsTable,
   vendorSubprocessorsTable,
   jobsTable,
+  monitoringConfigsTable,
 } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit, recordAuditDirect } from "../lib/audit";
@@ -610,6 +611,30 @@ router.post("/v1/vendors/:id/transition", requireRole("admin", "risk_manager"), 
       status: targetStatus,
       updatedAt: new Date(),
     }).where(eq(vendorsTable.id, vendor.id)).returning();
+
+    // When vendor enters monitoring, schedule first re-assessment via vendor-monitor worker
+    if (targetStatus === "monitoring") {
+      const tenantId = req.user!.tenantId;
+      const [monConfig] = await db.select()
+        .from(monitoringConfigsTable)
+        .where(and(
+          eq(monitoringConfigsTable.tenantId, tenantId),
+          eq(monitoringConfigsTable.tier, vendor.overrideTier || vendor.tier),
+        ))
+        .limit(1);
+      if (monConfig) {
+        const nextDue = new Date(Date.now() + monConfig.cadenceDays * 86400000);
+        await enqueueJob("vendor-monitor", "schedule_assessment",
+          { vendorId: vendor.id, tenantId },
+          tenantId,
+          { delayMs: monConfig.cadenceDays * 86400000 },
+        );
+        await db.update(vendorsTable).set({
+          nextAssessmentDue: nextDue,
+          updatedAt: new Date(),
+        }).where(eq(vendorsTable.id, vendor.id));
+      }
+    }
 
     await recordAudit(req, "transition", "vendor", vendor.id, { from: currentStatus, to: targetStatus });
     res.json(updated);
