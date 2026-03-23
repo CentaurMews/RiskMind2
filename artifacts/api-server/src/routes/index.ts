@@ -14,6 +14,8 @@ import interviewsRouter from "./interviews";
 import foresightRouter from "./foresight";
 import agentRouter from "./agent";
 import searchRouter from "./search";
+import assessmentTemplatesRouter from "./assessment-templates";
+import assessmentsRouter from "./assessments";
 import { authMiddleware } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -40,5 +42,7 @@ router.use(interviewsRouter);
 router.use(foresightRouter);
 router.use(agentRouter);
 router.use(searchRouter);
+router.use(assessmentTemplatesRouter);
+router.use(assessmentsRouter);
 
 export default router;
