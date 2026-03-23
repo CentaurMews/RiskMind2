@@ -235,7 +235,14 @@ Plans:
   3. After configuring Shodan, scanning a vendor domain surfaces open ports, exposed services, and CVE matches as signals linked to that vendor
   4. Sentinel alerts ingested via the Log Analytics API appear as normalized signals — re-ingesting the same incident ID does not create a duplicate
   5. An email sent to the configured IMAP mailbox is parsed by the LLM and appears as a signal with extracted fields — message body is sandboxed and cannot override signal classification
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Foundation: deps install, adapter types, integrations CRUD route, signal feed poller scheduler
+- [ ] 12-02-PLAN.md — NVD CVE adapter (pagination, rate limiting) + Shodan adapter (DNS resolve, host query)
+- [ ] 12-03-PLAN.md — Sentinel adapter (Log Analytics KQL) + MISP adapter (REST API, IoC attributes)
+- [ ] 12-04-PLAN.md — Email adapter (imapflow, mailparser, LLM extraction, prompt injection safety)
+- [ ] 12-05-PLAN.md — Settings Integrations tab UI + signal source badges
 
 ### Phase 13: Compliance Flow
 **Goal**: Users can import compliance framework controls, run assessments that update control compliance status, and configure per-framework pass/fail thresholds that drive dashboard status
@@ -277,6 +284,6 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
 | 10. Assessment Engine | v2.0 | 4/4 | Complete    | 2026-03-23 |
 | 11. Vendor Lifecycle Redesign | v2.0 | 5/5 | Complete    | 2026-03-23 |
-| 12. Signal Integrations | v2.0 | 0/? | Not started | - |
+| 12. Signal Integrations | v2.0 | 0/5 | Planning complete | - |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
 | 14. Foresight v2 | v2.0 | 0/? | Not started | - |
