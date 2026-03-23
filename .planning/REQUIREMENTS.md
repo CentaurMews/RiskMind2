@@ -79,39 +79,39 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ASMT-01 | — | Pending |
-| ASMT-02 | — | Pending |
-| ASMT-03 | — | Pending |
-| ASMT-04 | — | Pending |
-| ASMT-05 | — | Pending |
-| ASMT-06 | — | Pending |
-| ASMT-07 | — | Pending |
-| VNDR-01 | — | Pending |
-| VNDR-02 | — | Pending |
-| VNDR-03 | — | Pending |
-| VNDR-04 | — | Pending |
-| VNDR-05 | — | Pending |
-| VNDR-06 | — | Pending |
-| VNDR-07 | — | Pending |
-| COMP-01 | — | Pending |
-| COMP-02 | — | Pending |
-| COMP-03 | — | Pending |
-| SGNL-01 | — | Pending |
-| SGNL-02 | — | Pending |
-| SGNL-03 | — | Pending |
-| SGNL-04 | — | Pending |
-| SGNL-05 | — | Pending |
-| FRST-01 | — | Pending |
-| FRST-02 | — | Pending |
-| FRST-03 | — | Pending |
-| FRST-04 | — | Pending |
-| FRST-05 | — | Pending |
+| ASMT-01 | Phase 10 | Pending |
+| ASMT-02 | Phase 10 | Pending |
+| ASMT-03 | Phase 10 | Pending |
+| ASMT-04 | Phase 10 | Pending |
+| ASMT-05 | Phase 10 | Pending |
+| ASMT-06 | Phase 10 | Pending |
+| ASMT-07 | Phase 10 | Pending |
+| VNDR-01 | Phase 11 | Pending |
+| VNDR-02 | Phase 11 | Pending |
+| VNDR-03 | Phase 11 | Pending |
+| VNDR-04 | Phase 11 | Pending |
+| VNDR-05 | Phase 11 | Pending |
+| VNDR-06 | Phase 11 | Pending |
+| VNDR-07 | Phase 11 | Pending |
+| COMP-01 | Phase 13 | Pending |
+| COMP-02 | Phase 13 | Pending |
+| COMP-03 | Phase 13 | Pending |
+| SGNL-01 | Phase 12 | Pending |
+| SGNL-02 | Phase 12 | Pending |
+| SGNL-03 | Phase 12 | Pending |
+| SGNL-04 | Phase 12 | Pending |
+| SGNL-05 | Phase 12 | Pending |
+| FRST-01 | Phase 14 | Pending |
+| FRST-02 | Phase 14 | Pending |
+| FRST-03 | Phase 14 | Pending |
+| FRST-04 | Phase 14 | Pending |
+| FRST-05 | Phase 14 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27 ⚠️
+- Mapped to phases: 27
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-23 after initial definition*
+*Last updated: 2026-03-23 — phase mappings added for v2.0 roadmap*
