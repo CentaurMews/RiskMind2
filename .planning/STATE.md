@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to execute
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-03-23T16:50:20.162Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-03-23T16:56:50.891Z"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 17
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 12 (signal-integrations) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Plan: 2 of 5
 | Phase 11-vendor-lifecycle-redesign P04 | 239 | 2 tasks | 2 files |
 | Phase 11-vendor-lifecycle-redesign P05 | 2 | 2 tasks | 1 files |
 | Phase 12-signal-integrations P01 | 405 | 2 tasks | 7 files |
+| Phase 12-signal-integrations P02 | 300 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,9 @@ Recent decisions affecting current work:
 - [Phase 11-vendor-lifecycle-redesign]: Timer icon used for Monitoring tab trigger — ShieldAlert already used for access-denied heading; TierBadge recreated inline in settings.tsx to avoid cross-package import
 - [Phase 12-signal-integrations]: adapters registry is a plain mutable Record in types.ts — concrete adapter modules register at import time, no DI framework needed
 - [Phase 12-signal-integrations]: trigger endpoint returns graceful response when adapter not yet registered — allows Plans 02-04 to be deployed incrementally
+- [Phase 12-signal-integrations]: Domain extraction uses vendor contactEmail — vendors table has no website column; email domain is the available domain signal for Shodan scanning
+- [Phase 12-signal-integrations]: Adapter barrel index.ts preferred over direct import in types.ts — avoids circular dependency risk and keeps types.ts as pure interface definitions
+- [Phase 12-signal-integrations]: Shodan adapter treats every poll as a full snapshot (since param unused) — Shodan host queries return current state; deduplication handles no-change via content hash
 
 ### Pending Todos
 
@@ -130,7 +134,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T16:50:20.149Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-03-23T16:56:50.882Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
