@@ -10,7 +10,8 @@ export type LLMTaskType =
   | "treatment"
   | "embeddings"
   | "agent"
-  | "general";
+  | "general"
+  | "assessment";
 
 // Hardcoded Anthropic models — used as fallback when anthropic.models.list() is unavailable or errors
 export const ANTHROPIC_MODELS = [
@@ -484,7 +485,7 @@ export async function suggestRouting(
     .limit(50);
 
   if (recent.length === 0) {
-    return { enrichment: null, triage: null, treatment: null, embeddings: null, agent: null, general: null };
+    return { enrichment: null, triage: null, treatment: null, embeddings: null, agent: null, general: null, assessment: null };
   }
 
   // Group by configId, pick best per task heuristic:
@@ -514,6 +515,7 @@ export async function suggestRouting(
     agent: toEntry(bestQuality),
     treatment: toEntry(balanced),
     general: toEntry(fastest),
+    assessment: toEntry(balanced),
     embeddings: null, // User should pick explicit embeddings config
   };
 }
