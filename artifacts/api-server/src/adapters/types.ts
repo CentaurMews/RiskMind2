@@ -39,6 +39,8 @@ export interface EmailConfig {
   pass: string;
   tls: boolean;
   mailbox?: string;
+  /** Injected at poll time by signal-feed-poller — not stored in encryptedConfig */
+  tenantId?: string;
 }
 
 export type DecryptedConfig =

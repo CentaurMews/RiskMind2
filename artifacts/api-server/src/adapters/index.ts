@@ -7,12 +7,12 @@ import { nvdAdapter } from "./nvd.js";
 import { shodanAdapter } from "./shodan.js";
 import { sentinelAdapter } from "./sentinel.js";
 import { mispAdapter } from "./misp.js";
+import { emailAdapter } from "./email.js";
 
 adapters["nvd"] = nvdAdapter;
 adapters["shodan"] = shodanAdapter;
 adapters["sentinel"] = sentinelAdapter;
 adapters["misp"] = mispAdapter;
-
-// Email adapter registered in Plan 04.
+adapters["email"] = emailAdapter;
 
 export { adapters };
