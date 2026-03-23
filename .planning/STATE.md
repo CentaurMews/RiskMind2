@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: LLM Intelligence + Fixes + Polish
-status: completed
-stopped_at: Completed 07-01-PLAN.md
+milestone: v1.2
+milestone_name: Quick Fixes & Polish
+status: planning
+stopped_at: Milestone v1.2 started — requirements defined, ready to plan Phase 8
 last_updated: "2026-03-18T20:09:44.544Z"
 last_activity: 2026-03-18 — Phase 6 Plan 02 complete; wizard end-to-end verified by human; all LLM-01–LLM-06 requirements satisfied
 progress:

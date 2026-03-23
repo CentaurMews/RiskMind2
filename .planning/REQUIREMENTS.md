@@ -1,97 +1,90 @@
-# Requirements: RiskMind v1.1
+# Requirements: RiskMind v1.2
 
-**Defined:** 2026-03-18
-**Core Value:** Intelligent LLM management with per-task routing, audit bug fixes, and demo polish
+**Defined:** 2026-03-19
+**Core Value:** Quick UX fixes and polish before major v2.0 platform features
 
-## v1.1 Requirements
+## v1.2 Requirements
 
-Requirements for this milestone. Each maps to roadmap phases.
+### Login
 
-### LLM Wizard
+- [ ] **LOGIN-01**: Login form detects tenant from email domain — no tenant slug field (GH #70)
+- [ ] **LOGIN-02**: Social login placeholders (Microsoft, Google) with "Coming soon" toast on click (GH #71)
 
-- [x] **LLM-01**: Admin can add a new LLM provider by selecting from a dropdown (OpenAI, Anthropic, Google Gemini, Mistral, Groq, Together AI, Ollama/Private)
-- [x] **LLM-02**: Admin enters API key (and base URL for private providers) and system validates the connection
-- [x] **LLM-03**: System auto-discovers available models from the provider API and displays them for selection
-- [x] **LLM-04**: Admin can select one or more models from the discovered list and save the configuration
-- [x] **LLM-05**: Admin can test connection and run a benchmark (TTFT, total latency, quality heuristic) against any configured model
-- [x] **LLM-06**: System suggests optimal model assignment per task type based on benchmark results
+### Dashboard
 
-### Model Router
+- [ ] **DASH-06**: Dashboard KPI cards (Active Risks, Open Alerts, Active Vendors, Compliance Score) are clickable, navigating to respective list pages (GH #72)
 
-- [x] **ROUTE-01**: Routing table maps 6 task types (enrichment, triage, treatment, embeddings, agent, general) to specific model configurations
-- [x] **ROUTE-02**: Admin can view and override the routing table in Settings
-- [x] **ROUTE-03**: Each AI operation uses its routed model (not just the tenant default)
-- [x] **ROUTE-04**: Routing falls back to tenant default when no task-specific assignment exists
+### Mobile
 
-### Bug Fixes
+- [ ] **MOB-01**: Heatmap renders readable on mobile screens (simplified layout or scroll) (GH #73)
+- [ ] **MOB-02**: Tables show horizontal scroll indicator/shadow affordance on mobile (GH #73)
+- [ ] **MOB-03**: Touch targets meet 44px minimum, all pages usable at 375px width (GH #73)
 
-- [x] **FIX-01**: Document processing worker extracts real file content (not just filename) or shows clear "coming soon" instead of hallucinated summaries
-- [x] **FIX-02**: Autonomous agent persists local findings (cascade, cluster, predictive) before LLM reasoning call — findings survive LLM errors
-- [x] **FIX-03**: Re-enriching a risk replaces existing AI enrichment section instead of appending duplicate blocks
-- [x] **FIX-04**: Vendor AI question generation returns clear error message on LLM parse failure (not confusing "invalid format" 400)
-- [x] **FIX-05**: Vendor scorecard displays real data — last assessment date and open findings count computed from related tables
-- [x] **FIX-06**: Settings page shows warning when no embeddings provider is configured (semantic search, agent clustering silently degrade)
-- [x] **FIX-07**: Model name validation prevents saving invalid model IDs that don't match provider format
+### Cleanup
 
-### Foresight Teaser
+- [ ] **CLEAN-01**: Remove Replit tenant UUID code from header bar — show tenant name instead (GH #74)
 
-- [x] **FORE-01**: Foresight page shows polished "Coming Soon" preview with visual mockups of planned features (Monte Carlo, OSINT, scenario modeling, agent inbox)
+## Future Requirements (v2.0)
 
-## Future Requirements
+### Assessment Engine
+- **ASSESS-01**: AI-driven non-deterministic questionnaire system with elicitation techniques (GH #75)
+- **ASSESS-02**: Assessment planning workflow (objective, success criteria, question design, metrics) (GH #75)
+- **ASSESS-03**: Dedicated Assessment AI Agent (GH #75)
+- **ASSESS-04**: Shared engine for vendor assessment AND compliance assessment (GH #75)
+- **ASSESS-05**: Guest contributor portal for external assessment respondents (GH #75)
 
-Deferred to v2. Tracked but not in current roadmap.
+### Vendor Lifecycle
+- **VEND-03**: Vendor wizard onboarding with smart data enrichment from internet/trust centers (GH #76)
+- **VEND-04**: Tiered monitoring programs (assessment cadence, types per risk tier) (GH #76)
+- **VEND-05**: Vendor dependency mapping (4th party risk — sub-vendor chains) (GH #76)
+- **VEND-06**: Vendor offboarding workflow (GH #76)
 
-### Foresight Full
+### Signal Integrations
+- **SIG-01**: Signal source configuration and management in Settings (GH #77)
+- **SIG-02**: Email signal ingestion (GH #77)
+- **SIG-03**: Microsoft Sentinel SIEM integration (GH #77)
+- **SIG-04**: Shodan, CVE, Group-IB, MISP threat intel integrations (GH #77)
+- **SIG-05**: Finding-to-Risk pipeline with multi-select and LLM pre-population (GH #78)
 
-- **FORE-02**: Monte Carlo simulation for risk scenario modeling
-- **FORE-03**: OSINT/external data enrichment for risk horizon forecasting
-- **FORE-04**: Agent findings inbox with approve/dismiss workflow
-- **FORE-05**: LLM observability dashboard (token usage, cost analytics, model performance)
+### Compliance
+- **COMP-02**: Framework import from international standards + custom frameworks/controls (GH #79)
+- **COMP-03**: Compliance assessment workflow via shared Assessment Engine (GH #79)
+- **COMP-04**: Compliance thresholds (low/normal/strict) with smart defaults and advisory text (GH #79)
+- **COMP-05**: Low compliance findings auto-feed into signals pipeline (GH #79)
 
-### Advanced
+### Foresight v2
+- **FORE-02**: Monte Carlo simulation (GH #80)
+- **FORE-03**: OSINT risk horizon forecasting (GH #80)
+- **FORE-04**: Agent intelligence feed with approve/dismiss (GH #80)
+- **FORE-05**: What-if scenario builder (GH #80)
 
-- **ADV-01**: Cross-framework control mapping
-- **ADV-02**: Risk clustering via pgvector similarity
-- **ADV-03**: Board-ready PDF report generation
-- **ADV-04**: Automatic model failover on provider errors
+## Future Requirements (v2.1)
 
-## Out of Scope
+### i18n
+- **I18N-01**: Multi-language support — English, Spanish, Arabic (GH #81)
+- **I18N-02**: RTL layout support for Arabic (GH #81)
 
-| Feature | Reason |
-|---------|--------|
-| Automatic failover routing | Easy to misconfigure, confusing behavior — v2 |
-| LLM-as-judge quality scoring | Meta-call complexity, not needed for wizard benchmark |
-| Provider-specific fine-tuning UI | Out of scope for config wizard |
-| Cost tracking / billing | Deferred to LLM observability dashboard (v2) |
+### Auth
+- **AUTH-01**: Microsoft OAuth social login (GH #82)
+- **AUTH-02**: Google OAuth social login (GH #82)
+- **AUTH-03**: User self-registration workflow (GH #82)
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LLM-01 | Phase 5 | Complete |
-| LLM-02 | Phase 5 | Complete |
-| LLM-03 | Phase 5 | Complete |
-| LLM-04 | Phase 5 | Complete |
-| LLM-05 | Phase 5 | Complete |
-| LLM-06 | Phase 5 | Complete |
-| ROUTE-01 | Phase 5 | Complete |
-| ROUTE-02 | Phase 5 | Complete |
-| ROUTE-03 | Phase 5 | Complete |
-| ROUTE-04 | Phase 5 | Complete |
-| FIX-01 | Phase 6 | Complete |
-| FIX-02 | Phase 5 | Complete |
-| FIX-03 | Phase 6 | Complete |
-| FIX-04 | Phase 6 | Complete |
-| FIX-05 | Phase 6 | Complete |
-| FIX-06 | Phase 6 | Complete |
-| FIX-07 | Phase 6 | Complete |
-| FORE-01 | Phase 7 | Complete |
+| LOGIN-01 | Phase 8 | Pending |
+| LOGIN-02 | Phase 8 | Pending |
+| DASH-06 | Phase 8 | Pending |
+| MOB-01 | Phase 8 | Pending |
+| MOB-02 | Phase 8 | Pending |
+| MOB-03 | Phase 8 | Pending |
+| CLEAN-01 | Phase 8 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 18 total
-- Mapped to phases: 18
+- v1.2 requirements: 7 total
+- Mapped to phases: 7
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-03-18*
-*Last updated: 2026-03-18 — traceability filled after roadmap creation*
+*Requirements defined: 2026-03-19*

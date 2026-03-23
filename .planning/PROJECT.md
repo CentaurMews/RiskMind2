@@ -8,17 +8,32 @@ RiskMind is an AI-native multi-organization enterprise risk management platform 
 
 A working, demo-ready enterprise risk management platform that an internal organization can use to manage real risks, vendors, and compliance — powered by intelligent AI routing and accessible via https://app.riskmind.net.
 
-## Current Milestone: v1.1 — LLM Intelligence + Fixes + Polish
+## Current Milestone: v1.2 — Quick Fixes & Polish
 
-**Goal:** Intelligent LLM configuration with wizard-based onboarding, model auto-discovery, benchmarking, per-task routing, plus fixing audit bugs and polishing placeholder content.
+**Goal:** Login UX improvements, dashboard interactivity, mobile responsiveness, and Replit artifact cleanup.
 
 **Target features:**
-- LLM Config Wizard: provider dropdown, auto-fetch models, test/benchmark, smart per-task routing
-- Intelligent Model Router: 6 task types → optimal model assignment
-- Bug fixes: doc processor, agent findings persistence, duplicate enrichment, vendor AI errors
-- Vendor scorecard real data (no more placeholders)
-- Embeddings health check in Settings
-- Foresight teaser page (polished preview of v2 vision)
+- Login: remove tenant slug field, detect org from email domain
+- Login: social login button placeholders (Microsoft, Google)
+- Dashboard: clickable KPI cards navigating to list pages
+- Mobile: responsive heatmap, table scroll indicators, touch targets
+- Remove Replit tenant UUID from header
+
+**GitHub:** Milestone v1.2 (#70-#74)
+
+## Planned Milestones
+
+**v2.0 — Core Platform Features** (GitHub #75-#80)
+- Assessment Engine (AI-driven, non-deterministic questionnaires, shared by vendor + compliance)
+- Vendor lifecycle redesign (wizard onboarding, enrichment, monitoring, 4th party risk)
+- Compliance flow (framework import, assessment, thresholds)
+- Signal integrations (Sentinel, Shodan, CVE, MISP, email)
+- Foresight v2 (Monte Carlo, OSINT, scenario modeling)
+
+**v2.1 — i18n & Social Auth** (GitHub #81-#82)
+- Multi-language support (EN, ES, AR with RTL)
+- Social login implementation (Microsoft, Google OAuth)
+- User self-registration workflow
 
 ## Requirements
 
