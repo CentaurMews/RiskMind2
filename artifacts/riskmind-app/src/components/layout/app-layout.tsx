@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
-import { 
-  LayoutDashboard, ShieldAlert, Users, ShieldCheck, 
-  Bell, Settings, LogOut, Loader2, Menu, ChevronRight, Activity, Binoculars, PanelLeftClose, PanelLeft
+import {
+  LayoutDashboard, ShieldAlert, Users, ShieldCheck,
+  Bell, Settings, LogOut, Loader2, Menu, ChevronRight, Activity, Binoculars, PanelLeftClose, PanelLeft, ClipboardList
 } from "lucide-react";
 import logo from "@assets/risk_mind_1773670829732.png";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,14 @@ export function AppLayout({ children }: AppLayoutProps) {
       ]
     },
     { name: "Vendors", href: "/vendors", icon: Users },
+    {
+      name: "Assessments",
+      icon: ClipboardList,
+      children: [
+        { name: "Library", href: "/assessments/templates" },
+        { name: "Sessions", href: "/assessments" },
+      ]
+    },
     { 
       name: "Compliance", 
       icon: ShieldCheck,
