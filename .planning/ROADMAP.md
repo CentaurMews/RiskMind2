@@ -161,7 +161,7 @@ Plans:
 
 **Milestone Goal:** Transform RiskMind from a demo-ready platform into a full-featured enterprise risk management system with AI-driven assessments, redesigned vendor lifecycle, compliance workflows, real signal integrations, and predictive foresight capabilities.
 
-- [ ] **Phase 9: Schema Foundation** - Polymorphic assessment schema, integration config, foresight tables, signal deduplication column
+- [x] **Phase 9: Schema Foundation** - Polymorphic assessment schema, integration config, foresight tables, signal deduplication column (completed 2026-03-23)
 - [ ] **Phase 10: Assessment Engine** - AI-driven shared questionnaire engine with templates, scoring, and LLM follow-up
 - [ ] **Phase 11: Vendor Lifecycle Redesign** - Wizard onboarding, 4th party risk, continuous monitoring, AI enrichment
 - [ ] **Phase 12: Signal Integrations** - NVD, Shodan, Sentinel, MISP, email ingestion with per-tenant encrypted credentials
@@ -185,7 +185,7 @@ Plans:
 Plans:
 - [x] 09-01-PLAN.md -- Assessment engine + integration configs + foresight schema files
 - [x] 09-02-PLAN.md -- Vendor subprocessors, org dependencies, monitoring configs + column additions
-- [ ] 09-03-PLAN.md -- Barrel exports, Drizzle relations, compatibility view, drizzle-kit push
+- [x] 09-03-PLAN.md -- Barrel exports, Drizzle relations, compatibility view, drizzle-kit push
 
 ### Phase 10: Assessment Engine
 **Goal**: Users can create assessment templates, run assessment sessions against any subject (vendor or compliance framework), receive AI-generated follow-up questions mid-session, and see a computed risk score on completion
@@ -261,7 +261,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 6. Bug Fixes and Wizard UI | v1.1 | 2/2 | Complete | 2026-03-18 |
 | 7. Foresight Teaser | v1.1 | 1/1 | Complete | 2026-03-18 |
 | 8. Quick Fixes & Polish | v1.2 | 2/2 | Complete | 2026-03-23 |
-| 9. Schema Foundation | v2.0 | 2/3 | In Progress|  |
+| 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
 | 10. Assessment Engine | v2.0 | 0/? | Not started | - |
 | 11. Vendor Lifecycle Redesign | v2.0 | 0/? | Not started | - |
 | 12. Signal Integrations | v2.0 | 0/? | Not started | - |

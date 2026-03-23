@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to execute
-stopped_at: Completed 09-02-PLAN.md — vendor-subprocessors, org-dependencies, monitoring-configs schema + column additions to signals, vendors, frameworks
-last_updated: "2026-03-23T12:12:38.319Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 09-03-PLAN.md — schema wiring, relations.ts, questionnaires_v2 view, drizzle-kit push applied
+last_updated: "2026-03-23T12:18:31.765Z"
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -48,6 +48,7 @@ Plan: 3 of 3
 *Updated after each plan completion*
 | Phase 09-schema-foundation P01 | 2 | 2 tasks | 3 files |
 | Phase 09-schema-foundation P02 | 117s | 2 tasks | 6 files |
+| Phase 09-schema-foundation P03 | 217s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,9 @@ Recent decisions affecting current work:
 - [Phase 09-schema-foundation]: Signals deduplication uses partial unique index WHERE content_hash IS NOT NULL — allows nullable hash on existing rows while enforcing uniqueness when hash is present
 - [Phase 09-schema-foundation]: monitoring-configs reuses vendorTierEnum from vendors.ts rather than defining a new text column — maintains enum consistency across tables
 - [Phase 09-schema-foundation]: vendor-subprocessors uses dual FK to same vendorsTable — subprocessors are vendors in the system enabling 4th-party risk tracking without a separate concept
+- [Phase 09-schema-foundation]: questionnaires_v2 named with _v2 suffix to avoid conflict with existing questionnaires table — Phase 10 renames after old table drop
+- [Phase 09-schema-foundation]: bootstrap.ts guards view creation with table existence check so pnpm push works on first run without failing
+- [Phase 09-schema-foundation]: assessment_status is the DB column name (not 'status') — Drizzle uses pgEnum call argument as column name in raw SQL
 
 ### Pending Todos
 
@@ -86,7 +90,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T12:12:38.310Z
-Stopped at: Completed 09-02-PLAN.md — vendor-subprocessors, org-dependencies, monitoring-configs schema + column additions to signals, vendors, frameworks
+Last session: 2026-03-23T12:18:31.753Z
+Stopped at: Completed 09-03-PLAN.md — schema wiring, relations.ts, questionnaires_v2 view, drizzle-kit push applied
 Resume file: None
 Next step: `/gsd:plan-phase 9`
