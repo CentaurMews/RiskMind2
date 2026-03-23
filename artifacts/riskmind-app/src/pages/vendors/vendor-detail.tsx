@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   useGetVendor,
   useListQuestionnaires,
@@ -20,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/severity-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import {
   ArrowLeft,
@@ -41,6 +44,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  X,
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -54,6 +58,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 
 const FULL_FLOW: VendorStatus[] = [
   "identification",
@@ -409,10 +414,22 @@ function QuestionnaireDetail({
   );
 }
 
+interface Subprocessor {
+  id: string;
+  vendorId: string;
+  subprocessorId: string;
+  subprocessorName: string;
+  relationshipType: string;
+  criticality: string;
+  discoveredBy: string;
+  createdAt: string;
+}
+
 export default function VendorDetail() {
   const [, params] = useRoute("/vendors/:id");
   const id = params?.id || "";
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [docForm, setDocForm] = useState({ fileName: "", mimeType: "application/pdf" });
   const [summarizingDocs, setSummarizingDocs] = useState<Record<string, "pending" | "done">>({});
@@ -421,9 +438,41 @@ export default function VendorDetail() {
   const [creatingQ, setCreatingQ] = useState(false);
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
 
+  // Subprocessors state
+  const [subOpen, setSubOpen] = useState(false);
+  const [addSubOpen, setAddSubOpen] = useState(false);
+  const [addMode, setAddMode] = useState<"link" | "create">("link");
+  const [subLinkSearch, setSubLinkSearch] = useState("");
+  const [subLinkVendorId, setSubLinkVendorId] = useState("");
+  const [subLinkRelType, setSubLinkRelType] = useState("");
+  const [subLinkCriticality, setSubLinkCriticality] = useState("");
+  const [subCreateName, setSubCreateName] = useState("");
+  const [subCreateRelType, setSubCreateRelType] = useState("");
+  const [subCreateCriticality, setSubCreateCriticality] = useState("");
+  const [subSubmitting, setSubSubmitting] = useState(false);
+
   const { data: vendor, isLoading } = useGetVendor(id);
   const { data: questionnaires } = useListQuestionnaires(id);
   const { data: documents } = useListDocuments(id);
+
+  const { data: subprocessors, refetch: refetchSubs } = useQuery<Subprocessor[]>({
+    queryKey: ["/api/v1/vendors", id, "subprocessors"],
+    queryFn: () => fetch(`/api/v1/vendors/${id}/subprocessors`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!id,
+  });
+
+  const { data: vendorSearchResults } = useQuery<{ data: Array<{ id: string; name: string }> }>({
+    queryKey: ["/api/v1/vendors", "search", subLinkSearch],
+    queryFn: () => fetch(`/api/v1/vendors${subLinkSearch ? `?search=${encodeURIComponent(subLinkSearch)}` : "?limit=20"}`, { credentials: "include" }).then(r => r.json()),
+    enabled: addMode === "link" && addSubOpen,
+  });
+
+  // Auto-open subprocessors section when data has items
+  useEffect(() => {
+    if (subprocessors && subprocessors.length > 0) {
+      setSubOpen(true);
+    }
+  }, [subprocessors]);
 
   const calcMutation = useCalculateVendorRiskScore({
     mutation: {
@@ -479,6 +528,67 @@ export default function VendorDetail() {
 
   const effectiveTier = (vendor.overrideTier || vendor.tier) as VendorTier | undefined;
   const nextStatus = getNextStatus(effectiveTier, vendor.status as VendorStatus);
+
+  const handleAddSubprocessor = async () => {
+    setSubSubmitting(true);
+    try {
+      const body = addMode === "link"
+        ? { subprocessorId: subLinkVendorId, relationshipType: subLinkRelType, criticality: subLinkCriticality, discoveredBy: "manual" }
+        : { name: subCreateName, relationshipType: subCreateRelType, criticality: subCreateCriticality, discoveredBy: "manual" };
+
+      const res = await fetch(`/api/v1/vendors/${id}/subprocessors`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.status === 409) {
+        toast({ title: "This vendor is already linked as a subprocessor.", variant: "destructive" });
+        return;
+      }
+      if (!res.ok) {
+        toast({ title: "Something went wrong. Please try again.", variant: "destructive" });
+        return;
+      }
+
+      toast({ title: addMode === "link" ? "Subprocessor linked." : "Subprocessor added." });
+      setAddSubOpen(false);
+      setSubLinkVendorId("");
+      setSubLinkRelType("");
+      setSubLinkCriticality("");
+      setSubLinkSearch("");
+      setSubCreateName("");
+      setSubCreateRelType("");
+      setSubCreateCriticality("");
+      refetchSubs();
+    } finally {
+      setSubSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubprocessor = async (subId: string) => {
+    const res = await fetch(`/api/v1/vendors/${id}/subprocessors/${subId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok || res.status === 204) {
+      toast({ title: "Subprocessor removed." });
+      refetchSubs();
+    } else {
+      toast({ title: "Failed to remove subprocessor.", variant: "destructive" });
+    }
+  };
+
+  const getCriticalityColor = (criticality: string) => {
+    switch (criticality) {
+      case "critical": return "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400";
+      case "high": return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400";
+      case "medium": return "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "low": return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
 
   const riskScoreNum = vendor.riskScore ? parseFloat(String(vendor.riskScore)) : null;
   let riskTier = "";
@@ -766,7 +876,212 @@ export default function VendorDetail() {
             </TabsContent>
           </div>
         </Tabs>
+
+        {/* Subprocessors collapsible section */}
+        <Collapsible open={subOpen} onOpenChange={setSubOpen} className="mt-8 border rounded-lg">
+          <CollapsibleTrigger asChild>
+            <div
+              className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 rounded-t-lg"
+              aria-expanded={subOpen}
+            >
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Subprocessors</h3>
+                {subprocessors && subprocessors.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">{subprocessors.length}</Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); setAddSubOpen(true); }}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add Subprocessor
+                </Button>
+                {subOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </div>
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            {subprocessors && subprocessors.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vendor Name</TableHead>
+                    <TableHead>Relationship Type</TableHead>
+                    <TableHead>Criticality</TableHead>
+                    <TableHead>Discovered By</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subprocessors.map(sub => (
+                    <TableRow key={sub.id}>
+                      <TableCell className="font-medium">
+                        <a href={`/vendors/${sub.subprocessorId}`} className="hover:underline text-primary">
+                          {sub.subprocessorName}
+                        </a>
+                      </TableCell>
+                      <TableCell className="text-sm">{sub.relationshipType || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn("text-[10px] capitalize font-medium", getCriticalityColor(sub.criticality))}>
+                          {sub.criticality}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {sub.discoveredBy === "llm" ? (
+                          <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/20">
+                            AI
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">
+                            Manual
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDeleteSubprocessor(sub.id)}
+                          aria-label={`Remove ${sub.subprocessorName} as subprocessor`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
+                <Building2 className="h-8 w-8 text-muted-foreground/30" />
+                <p className="font-medium text-sm">No Subprocessors</p>
+                <p className="text-xs">Track fourth-party vendors that this vendor relies on.</p>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
       </div>
+
+      {/* Add Subprocessor Sheet */}
+      <Sheet open={addSubOpen} onOpenChange={setAddSubOpen}>
+        <SheetContent className="sm:max-w-md w-full border-l">
+          <SheetHeader>
+            <SheetTitle>Add Subprocessor</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6">
+            <div className="flex gap-2 mb-6 border-b pb-4">
+              <Button
+                variant={addMode === "link" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAddMode("link")}
+              >
+                Link Existing
+              </Button>
+              <Button
+                variant={addMode === "create" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAddMode("create")}
+              >
+                Create New
+              </Button>
+            </div>
+
+            {addMode === "link" ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Search Vendor</Label>
+                  <Input
+                    placeholder="Search by name..."
+                    value={subLinkSearch}
+                    onChange={e => setSubLinkSearch(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Select Vendor</Label>
+                  <Select value={subLinkVendorId} onValueChange={setSubLinkVendorId}>
+                    <SelectTrigger><SelectValue placeholder="Select vendor..." /></SelectTrigger>
+                    <SelectContent>
+                      {vendorSearchResults?.data?.filter(v => v.id !== id).map(v => (
+                        <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Relationship Type</Label>
+                  <Input
+                    placeholder="e.g. Cloud Infrastructure, Payment Processing..."
+                    value={subLinkRelType}
+                    onChange={e => setSubLinkRelType(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Criticality</Label>
+                  <Select value={subLinkCriticality} onValueChange={setSubLinkCriticality}>
+                    <SelectTrigger><SelectValue placeholder="Select criticality..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="critical">Critical</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={!subLinkVendorId || subSubmitting}
+                  onClick={handleAddSubprocessor}
+                >
+                  {subSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Link Subprocessor
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Vendor Name</Label>
+                  <Input
+                    placeholder="e.g. Amazon Web Services"
+                    value={subCreateName}
+                    onChange={e => setSubCreateName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Relationship Type</Label>
+                  <Input
+                    placeholder="e.g. Cloud Infrastructure, Payment Processing..."
+                    value={subCreateRelType}
+                    onChange={e => setSubCreateRelType(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Criticality</Label>
+                  <Select value={subCreateCriticality} onValueChange={setSubCreateCriticality}>
+                    <SelectTrigger><SelectValue placeholder="Select criticality..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="critical">Critical</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={!subCreateName || subSubmitting}
+                  onClick={handleAddSubprocessor}
+                >
+                  {subSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Add Subprocessor
+                </Button>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={uploadOpen} onOpenChange={setUploadOpen}>
         <SheetContent className="sm:max-w-md w-full border-l">
