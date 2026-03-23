@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to plan
-stopped_at: Phase 11 UI-SPEC approved
-last_updated: "2026-03-23T15:03:44.681Z"
+status: Ready to execute
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-03-23T15:31:49.147Z"
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 12
+  completed_plans: 8
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** A working, demo-ready enterprise risk management platform powered by intelligent AI routing at https://app.riskmind.net
-**Current focus:** Phase 10 — assessment-engine
+**Current focus:** Phase 11 — vendor-lifecycle-redesign
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 11 (vendor-lifecycle-redesign) — EXECUTING
+Plan: 2 of 5
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Plan: Not started
 | Phase 10-assessment-engine P02 | 720 | 3 tasks | 6 files |
 | Phase 10-assessment-engine P03 | 531 | 2 tasks | 7 files |
 | Phase 10-assessment-engine P04 | 561 | 3 tasks | 11 files |
+| Phase 11-vendor-lifecycle-redesign P01 | 162 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current work:
 - [Phase 10-assessment-engine]: types.ts created as shared module for frontend assessment types — mirrors assessment-engine.ts without importing backend, avoids cross-package import issues in Vite
 - [Phase 10-assessment-engine]: SectionScoreBar uses CSS transitions instead of recharts BarChart — simpler, more style control
 - [Phase 10-assessment-engine]: AI follow-up SSE read via fetch ReadableStream (not EventSource constructor) — POST required, EventSource only supports GET
+- [Phase 11-vendor-lifecycle-redesign]: Wizard step inferred from data completeness (assessment + documents existence) — no wizardCompletedAt column added to vendors schema
+- [Phase 11-vendor-lifecycle-redesign]: riskScore = 100 - assessment.overall (higher = worse risk) — inverts compliance score to risk score
+- [Phase 11-vendor-lifecycle-redesign]: overrideTier respected in risk score hook — tier auto-updated only when no manual override is set
 
 ### Pending Todos
 
@@ -110,7 +114,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T15:03:44.673Z
-Stopped at: Phase 11 UI-SPEC approved
-Resume file: .planning/phases/11-vendor-lifecycle-redesign/11-UI-SPEC.md
+Last session: 2026-03-23T15:31:49.140Z
+Stopped at: Completed 11-01-PLAN.md
+Resume file: None
 Next step: `/gsd:plan-phase 9`

@@ -19,11 +19,11 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 
 ### Vendor Lifecycle
 
-- [ ] **VNDR-01**: User can onboard a vendor through a 4-step wizard: identity+tier, questionnaire assignment, document upload, AI enrichment review
-- [ ] **VNDR-02**: AI enrichment triggers during onboarding wizard to auto-populate vendor profile with industry, risk indicators, and known breaches
+- [x] **VNDR-01**: User can onboard a vendor through a 4-step wizard: identity+tier, questionnaire assignment, document upload, AI enrichment review
+- [x] **VNDR-02**: AI enrichment triggers during onboarding wizard to auto-populate vendor profile with industry, risk indicators, and known breaches
 - [ ] **VNDR-03**: User can add and view 4th-party subprocessors per vendor, with LLM extraction from uploaded vendor documents
 - [ ] **VNDR-04**: User can configure per-tier continuous monitoring cadence (Critical: weekly, High: monthly, etc.) with scheduled re-assessments and alerts on score threshold breach
-- [ ] **VNDR-05**: Vendor risk score aggregates from latest assessment score, displayed on scorecard and kanban card
+- [x] **VNDR-05**: Vendor risk score aggregates from latest assessment score, displayed on scorecard and kanban card
 - [ ] **VNDR-06**: User can complete an org-level dependency interview identifying core vendor dependencies (email provider, cloud environment, CDN, etc.) to detect vendor concentration risk
 - [ ] **VNDR-07**: System cross-references org dependency data with signals (OSINT, Shodan, assessments, breach reports) to calibrate vendor risk and flag concentration risks
 
@@ -86,11 +86,11 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 | ASMT-05 | Phase 10 | Complete |
 | ASMT-06 | Phase 10 | Complete |
 | ASMT-07 | Phase 10 | Complete |
-| VNDR-01 | Phase 11 | Pending |
-| VNDR-02 | Phase 11 | Pending |
+| VNDR-01 | Phase 11 | Complete |
+| VNDR-02 | Phase 11 | Complete |
 | VNDR-03 | Phase 11 | Pending |
 | VNDR-04 | Phase 11 | Pending |
-| VNDR-05 | Phase 11 | Pending |
+| VNDR-05 | Phase 11 | Complete |
 | VNDR-06 | Phase 11 | Pending |
 | VNDR-07 | Phase 11 | Pending |
 | COMP-01 | Phase 13 | Pending |
