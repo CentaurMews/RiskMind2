@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "./schema";
+import * as relations from "./relations";
 
 const { Pool } = pg;
 
@@ -11,7 +12,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pool, { schema: { ...schema, ...relations } });
 
 export async function ensureExtensions() {
   const client = await pool.connect();

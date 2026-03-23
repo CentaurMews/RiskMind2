@@ -27,3 +27,11 @@ export * from "./interview-sessions";
 export * from "./agent";
 export * from "./llm-task-routing";
 export * from "./llm-benchmark-results";
+
+// v2.0 schema additions (Phase 9)
+export * from "./assessments";
+export * from "./integration-configs";
+export * from "./foresight";
+export * from "./vendor-subprocessors";
+export * from "./org-dependencies";
+export * from "./monitoring-configs";
