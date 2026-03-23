@@ -4,10 +4,11 @@
 
 import { adapters } from "./types.js";
 import { nvdAdapter } from "./nvd.js";
+import { shodanAdapter } from "./shodan.js";
 
 adapters["nvd"] = nvdAdapter;
+adapters["shodan"] = shodanAdapter;
 
-// Shodan adapter will be registered here after Plan 02 Task 2.
 // Sentinel, MISP, Email adapters registered in Plans 03 and 04.
 
 export { adapters };
