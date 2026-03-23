@@ -71,6 +71,10 @@ export interface SignalFeedAdapter {
 
 export const adapters: Record<string, SignalFeedAdapter> = {};
 
+// Adapters are registered by importing this barrel module.
+// Each concrete adapter file calls: adapters["<type>"] = <adapterInstance>
+// Do not import adapters here — use src/adapters/index.ts barrel instead.
+
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
 export function computeContentHash(content: string): string {
