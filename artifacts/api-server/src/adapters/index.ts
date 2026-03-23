@@ -5,10 +5,12 @@
 import { adapters } from "./types.js";
 import { nvdAdapter } from "./nvd.js";
 import { shodanAdapter } from "./shodan.js";
+import { sentinelAdapter } from "./sentinel.js";
 
 adapters["nvd"] = nvdAdapter;
 adapters["shodan"] = shodanAdapter;
+adapters["sentinel"] = sentinelAdapter;
 
-// Sentinel, MISP, Email adapters registered in Plans 03 and 04.
+// MISP and Email adapters registered in Plans 03 and 04.
 
 export { adapters };
