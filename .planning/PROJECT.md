@@ -8,29 +8,20 @@ RiskMind is an AI-native multi-organization enterprise risk management platform 
 
 A working, demo-ready enterprise risk management platform that an internal organization can use to manage real risks, vendors, and compliance — powered by intelligent AI routing and accessible via https://app.riskmind.net.
 
-## Current Milestone: v1.2 — Quick Fixes & Polish
+## Current Milestone: v2.0 — Core Platform Features
 
-**Goal:** Login UX improvements, dashboard interactivity, mobile responsiveness, and Replit artifact cleanup.
+**Goal:** Transform RiskMind from a demo-ready platform into a full-featured enterprise risk management system with AI-driven assessments, redesigned vendor lifecycle, compliance workflows, real signal integrations, and predictive foresight capabilities.
 
 **Target features:**
-- Login: remove tenant slug field, detect org from email domain
-- Login: social login button placeholders (Microsoft, Google)
-- Dashboard: clickable KPI cards navigating to list pages
-- Mobile: responsive heatmap, table scroll indicators, touch targets
-- Remove Replit tenant UUID from header
-
-**GitHub:** Milestone v1.2 (#70-#74)
+- Assessment Engine — AI-driven, non-deterministic questionnaires shared by vendor and compliance flows (foundation layer)
+- Vendor Lifecycle Redesign — wizard onboarding, enrichment, continuous monitoring, 4th party risk
+- Compliance Flow — framework import, assessment via shared engine, compliance thresholds
+- Signal Integrations — Sentinel (SIEM), Shodan, CVE/NVD, MISP, email ingestion (all real feeds)
+- Foresight v2 — Monte Carlo simulation, real OSINT data feeds, scenario modeling
 
 ## Planned Milestones
 
-**v2.0 — Core Platform Features** (GitHub #75-#80)
-- Assessment Engine (AI-driven, non-deterministic questionnaires, shared by vendor + compliance)
-- Vendor lifecycle redesign (wizard onboarding, enrichment, monitoring, 4th party risk)
-- Compliance flow (framework import, assessment, thresholds)
-- Signal integrations (Sentinel, Shodan, CVE, MISP, email)
-- Foresight v2 (Monte Carlo, OSINT, scenario modeling)
-
-**v2.1 — i18n & Social Auth** (GitHub #81-#82)
+**v2.1 — i18n & Social Auth**
 - Multi-language support (EN, ES, AR with RTL)
 - Social login implementation (Microsoft, Google OAuth)
 - User self-registration workflow
@@ -66,24 +57,32 @@ A working, demo-ready enterprise risk management platform that an internal organ
 - ✓ Autonomous risk intelligence agent with configurable policy tiers — existing
 - ✓ MCP endpoint for AI agent integrations — existing
 - ✓ PostgreSQL with pgvector for semantic search and clustering — existing
+- ✓ LLM Config Wizard — guided provider onboarding with auto-discovery — v1.1
+- ✓ Intelligent Model Router — per-task model assignment with benchmarks — v1.1
+- ✓ Bug fixes — doc processor, agent findings, enrichment stacking, vendor AI errors — v1.1
+- ✓ Vendor scorecard real data — computed from related tables — v1.1
+- ✓ Embeddings health check — Settings warning when not configured — v1.1
+- ✓ Model name validation — prevent invalid model IDs — v1.1
+- ✓ Foresight teaser page — polished "Coming Soon" preview — v1.1
+- ✓ 2-field login with email domain slug detection — v1.2
+- ✓ Social login button placeholders (Microsoft, Google) — v1.2
+- ✓ Clickable KPI cards navigating to list pages — v1.2
+- ✓ Mobile responsive heatmap, scroll shadows, touch targets — v1.2
+- ✓ Real tenant name in header (removed Replit UUID) — v1.2
 
 ### Active
 
-- [ ] LLM Config Wizard — guided provider onboarding with auto-discovery
-- [ ] Intelligent Model Router — per-task model assignment with benchmarks
-- [ ] Bug fixes — doc processor, agent findings, enrichment stacking, vendor AI errors
-- [ ] Vendor scorecard real data — computed from related tables
-- [ ] Embeddings health check — Settings warning when not configured
-- [ ] Model name validation — prevent invalid model IDs
-- [ ] Foresight teaser page — polished "Coming Soon" preview
+- [ ] Assessment Engine — AI-driven, non-deterministic questionnaires shared by vendor + compliance
+- [ ] Vendor Lifecycle Redesign — wizard onboarding, enrichment, monitoring, 4th party risk
+- [ ] Compliance Flow — framework import, assessment, thresholds
+- [ ] Signal Integrations — Sentinel, Shodan, CVE/NVD, MISP, email
+- [ ] Foresight v2 — Monte Carlo, OSINT, scenario modeling
 
 ### Out of Scope
 
 - Mobile native app — responsive web covers mobile
-- Foresight full implementation — Monte Carlo, OSINT, scenario modeling deferred to v2
-- LLM observability dashboard — token cost analytics deferred to v2
-- Risk clustering UI — pgvector similarity surfaced deferred to v2
-- Cross-framework control mapping — deferred to v2
+- LLM observability dashboard — token cost analytics deferred to future
+- Risk clustering UI — pgvector similarity surfaced deferred to future
 
 ## Context
 
@@ -112,8 +111,27 @@ A working, demo-ready enterprise risk management platform that an internal organ
 | Single Express port (4000) serves API + SPA | Simpler deployment, same-origin requests | ✓ Good |
 | PM2 with Node 20 --env-file | PM2 6.x env_file broken, Node native works | ✓ Good |
 | ⌘K command palette with pgvector semantic search | Differentiator, shows AI-native identity | ✓ Good |
-| Defer Foresight to v2 | Monte Carlo + OSINT needs deep planning | — Pending |
-| Intelligent model routing | Auto-discover + benchmark + per-task assignment | — Pending |
+| Defer Foresight to v2 | Monte Carlo + OSINT needs deep planning | ✓ Good — now building in v2.0 |
+| Intelligent model routing | Auto-discover + benchmark + per-task assignment | ✓ Good — shipped v1.1 |
+| Assessment Engine as shared foundation | Vendor + compliance both need questionnaires — build once | — Pending |
+| Real OSINT feeds for Foresight | Live API calls to threat intel sources, not simulated | — Pending |
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
-*Last updated: 2026-03-18 after v1.0 milestone complete, v1.1 started*
+*Last updated: 2026-03-23 after v2.0 milestone started*
