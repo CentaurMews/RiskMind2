@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to execute
-stopped_at: Completed 12-04-PLAN.md
-last_updated: "2026-03-23T17:05:56.629Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 12-05-PLAN.md (awaiting human verification at checkpoint)
+last_updated: "2026-03-23T17:12:44.931Z"
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 17
-  completed_plans: 16
+  completed_plans: 17
 ---
 
 # Project State
@@ -62,6 +62,7 @@ Plan: 5 of 5
 | Phase 12-signal-integrations P02 | 300 | 2 tasks | 4 files |
 | Phase 12-signal-integrations P03 | 191 | 2 tasks | 3 files |
 | Phase 12-signal-integrations P04 | 100 | 1 tasks | 4 files |
+| Phase 12-signal-integrations P05 | 265 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,8 @@ Recent decisions affecting current work:
 - [Phase 12-signal-integrations]: MISP IoC summary uses attribute counts (e.g., '3 IP(s)') not raw values — keeps signal content concise for LLM triage
 - [Phase 12-signal-integrations]: EmailConfig extended with optional tenantId (injected at poll time, not stored) so complete() can route LLM calls per-tenant without changing SignalFeedAdapter interface
 - [Phase 12-signal-integrations]: Email LLM fallback: if complete() throws or returns unparseable JSON, signal still created with subject as title and info severity — never silently drops emails
+- [Phase 12-signal-integrations]: IntegrationCard defined inline in settings.tsx for co-location — consistent with existing settings component patterns
+- [Phase 12-signal-integrations]: SignalDetailPanel fetches /api/v1/signals/:id on open — metadata not in Orval-generated Signal list response type
 
 ### Pending Todos
 
@@ -141,7 +144,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T17:05:56.615Z
-Stopped at: Completed 12-04-PLAN.md
+Last session: 2026-03-23T17:12:44.919Z
+Stopped at: Completed 12-05-PLAN.md (awaiting human verification at checkpoint)
 Resume file: None
 Next step: `/gsd:plan-phase 9`

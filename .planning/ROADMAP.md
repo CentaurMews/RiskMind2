@@ -164,7 +164,7 @@ Plans:
 - [x] **Phase 9: Schema Foundation** - Polymorphic assessment schema, integration config, foresight tables, signal deduplication column (completed 2026-03-23)
 - [x] **Phase 10: Assessment Engine** - AI-driven shared questionnaire engine with templates, scoring, and LLM follow-up (completed 2026-03-23)
 - [x] **Phase 11: Vendor Lifecycle Redesign** - Wizard onboarding, 4th party risk, continuous monitoring, AI enrichment (completed 2026-03-23)
-- [ ] **Phase 12: Signal Integrations** - NVD, Shodan, Sentinel, MISP, email ingestion with per-tenant encrypted credentials
+- [x] **Phase 12: Signal Integrations** - NVD, Shodan, Sentinel, MISP, email ingestion with per-tenant encrypted credentials (completed 2026-03-23)
 - [ ] **Phase 13: Compliance Flow** - Framework import, assessment-to-control linkage, per-framework thresholds
 - [ ] **Phase 14: Foresight v2** - Monte Carlo simulation, loss exceedance curve, OSINT calibration, named scenarios
 
@@ -242,7 +242,7 @@ Plans:
 - [x] 12-02-PLAN.md — NVD CVE adapter (pagination, rate limiting) + Shodan adapter (DNS resolve, host query)
 - [x] 12-03-PLAN.md — Sentinel adapter (Log Analytics KQL) + MISP adapter (REST API, IoC attributes)
 - [x] 12-04-PLAN.md — Email adapter (imapflow, mailparser, LLM extraction, prompt injection safety)
-- [ ] 12-05-PLAN.md — Settings Integrations tab UI + signal source badges
+- [x] 12-05-PLAN.md — Settings Integrations tab UI + signal source badges
 
 ### Phase 13: Compliance Flow
 **Goal**: Users can import compliance framework controls, run assessments that update control compliance status, and configure per-framework pass/fail thresholds that drive dashboard status
@@ -284,6 +284,6 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
 | 10. Assessment Engine | v2.0 | 4/4 | Complete    | 2026-03-23 |
 | 11. Vendor Lifecycle Redesign | v2.0 | 5/5 | Complete    | 2026-03-23 |
-| 12. Signal Integrations | v2.0 | 4/5 | In Progress|  |
+| 12. Signal Integrations | v2.0 | 5/5 | Complete   | 2026-03-23 |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
 | 14. Foresight v2 | v2.0 | 0/? | Not started | - |
