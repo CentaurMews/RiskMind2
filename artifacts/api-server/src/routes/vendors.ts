@@ -12,6 +12,9 @@ import {
   questionnairesTable,
   documentsTable,
   questionnaireQuestionsTable,
+  assessmentsTable,
+  vendorSubprocessorsTable,
+  jobsTable,
 } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit, recordAuditDirect } from "../lib/audit";
@@ -24,6 +27,7 @@ import {
 } from "../lib/allowed-transitions";
 import type { VendorStatus, VendorTier } from "../lib/allowed-transitions";
 import { complete, LLMUnavailableError } from "../lib/llm-service";
+import { enqueueJob } from "../lib/job-queue";
 
 const VALID_STATUSES: VendorStatus[] = ["identification", "due_diligence", "risk_assessment", "contracting", "onboarding", "monitoring", "offboarding"];
 const VALID_TIERS: VendorTier[] = ["critical", "high", "medium", "low"];
@@ -123,6 +127,319 @@ router.get("/v1/vendors/:id", async (req, res) => {
     serverError(res);
   }
 });
+
+// ─── Vendor Onboarding Wizard Endpoints ───────────────────────────────────────
+// Risk score convention: 0 = low risk (best), 100 = critical risk (worst)
+// Assessment Engine overall: 0-100 where 100 = perfect compliance
+// Conversion: riskScore = 100 - assessment.overall
+
+/**
+ * POST /v1/vendors/onboard — Create a vendor in identification status (step 1).
+ */
+router.post("/v1/vendors/onboard", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const { name, description, category, contactEmail, contactName, tier } = req.body;
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      badRequest(res, "name is required");
+      return;
+    }
+
+    const vendorTier: VendorTier = tier && isValidTier(tier) ? tier : "medium";
+
+    const [vendor] = await db.insert(vendorsTable).values({
+      tenantId,
+      name: name.trim(),
+      description: description ?? null,
+      category: category ?? null,
+      contactEmail: contactEmail ?? null,
+      contactName: contactName ?? null,
+      tier: vendorTier,
+      status: "identification",
+    }).returning();
+
+    await recordAudit(req, "start_onboarding", "vendor", vendor.id);
+    res.status(201).json({ ...vendor, wizardStep: 1 });
+  } catch (err) {
+    console.error("Create onboard vendor error:", err);
+    serverError(res);
+  }
+});
+
+/**
+ * GET /v1/vendors/onboard/:id — Get vendor wizard state with inferred step.
+ */
+router.get("/v1/vendors/onboard/:id", async (req, res) => {
+  try {
+    const vendorId = p(req, "id");
+    const tenantId = req.user!.tenantId;
+
+    if (!(await verifyVendorOwnership(vendorId, tenantId, res))) return;
+
+    const [vendor] = await db.select().from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId)))
+      .limit(1);
+
+    if (!vendor) { notFound(res, "Vendor not found"); return; }
+
+    // Check if assessment exists for this vendor
+    const [assessment] = await db.select({ id: assessmentsTable.id })
+      .from(assessmentsTable)
+      .where(and(
+        eq(assessmentsTable.contextType, "vendor"),
+        eq(assessmentsTable.contextId, vendorId),
+        eq(assessmentsTable.tenantId, tenantId),
+      ))
+      .limit(1);
+    const hasAssessment = !!assessment;
+
+    // Check if any document exists for this vendor
+    const [doc] = await db.select({ id: documentsTable.id })
+      .from(documentsTable)
+      .where(and(
+        eq(documentsTable.vendorId, vendorId),
+        eq(documentsTable.tenantId, tenantId),
+      ))
+      .limit(1);
+    const hasDocuments = !!doc;
+
+    // Infer wizard step from data completeness
+    let wizardStep: number;
+    if (vendor.status !== "identification") {
+      wizardStep = 4; // Completed — vendor has progressed beyond identification
+    } else if (hasDocuments) {
+      wizardStep = 3; // Has docs, ready for enrichment review
+    } else if (hasAssessment) {
+      wizardStep = 2; // Template assigned, no docs yet
+    } else {
+      wizardStep = 1; // Just created
+    }
+
+    res.json({ ...vendor, wizardStep, hasAssessment, hasDocuments });
+  } catch (err) {
+    console.error("Get onboard vendor error:", err);
+    serverError(res);
+  }
+});
+
+/**
+ * PATCH /v1/vendors/onboard/:id — Update vendor per wizard step.
+ */
+router.patch("/v1/vendors/onboard/:id", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "id");
+    const tenantId = req.user!.tenantId;
+
+    if (!(await verifyVendorOwnership(vendorId, tenantId, res))) return;
+
+    const [existingVendor] = await db.select().from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId)))
+      .limit(1);
+    if (!existingVendor) { notFound(res, "Vendor not found"); return; }
+
+    const { step, data } = req.body;
+    if (!step || typeof step !== "number") {
+      badRequest(res, "step (number) is required");
+      return;
+    }
+
+    let wizardStep = step;
+
+    if (step === 1) {
+      // Update basic vendor info
+      const { name, description, category, contactEmail, contactName, tier } = data ?? {};
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (category !== undefined) updates.category = category;
+      if (contactEmail !== undefined) updates.contactEmail = contactEmail;
+      if (contactName !== undefined) updates.contactName = contactName;
+      if (tier !== undefined && isValidTier(tier)) updates.tier = tier;
+
+      await db.update(vendorsTable).set(updates)
+        .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId)));
+
+      await recordAudit(req, "onboard_step1_update", "vendor", vendorId);
+      wizardStep = 2;
+    } else if (step === 2) {
+      // Assign assessment template — create assessment record
+      const { assessmentTemplateId } = data ?? {};
+      if (!assessmentTemplateId) {
+        badRequest(res, "assessmentTemplateId is required for step 2");
+        return;
+      }
+
+      // Check if assessment already exists
+      const [existingAssessment] = await db.select({ id: assessmentsTable.id })
+        .from(assessmentsTable)
+        .where(and(
+          eq(assessmentsTable.contextType, "vendor"),
+          eq(assessmentsTable.contextId, vendorId),
+          eq(assessmentsTable.tenantId, tenantId),
+        ))
+        .limit(1);
+
+      if (!existingAssessment) {
+        await db.insert(assessmentsTable).values({
+          tenantId,
+          templateId: assessmentTemplateId,
+          contextType: "vendor",
+          contextId: vendorId,
+          status: "active",
+        });
+      }
+
+      await recordAudit(req, "onboard_step2_assign_template", "vendor", vendorId, { assessmentTemplateId });
+      wizardStep = 3;
+    } else if (step === 3) {
+      // Step 3: documents are uploaded via document endpoint — just acknowledge
+      await recordAudit(req, "onboard_step3_docs_reviewed", "vendor", vendorId);
+      wizardStep = 4;
+    } else if (step === 4) {
+      // Step 4: confirm enrichment and advance to due_diligence
+      const { enrichmentData } = data ?? {};
+      const updates: Record<string, unknown> = {
+        status: "due_diligence" as VendorStatus,
+        updatedAt: new Date(),
+      };
+      if (enrichmentData?.description) updates.description = enrichmentData.description;
+      if (enrichmentData?.category) updates.category = enrichmentData.category;
+
+      await db.update(vendorsTable).set(updates)
+        .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId)));
+
+      await db.insert(vendorStatusEventsTable).values({
+        vendorId,
+        actorId: req.user!.id,
+        fromStatus: "identification",
+        toStatus: "due_diligence",
+        notes: "Wizard onboarding completed",
+      });
+
+      await recordAudit(req, "onboard_step4_complete", "vendor", vendorId);
+      wizardStep = 5; // completed
+    } else {
+      badRequest(res, `Invalid wizard step: ${step}`);
+      return;
+    }
+
+    const [updatedVendor] = await db.select().from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId)))
+      .limit(1);
+
+    res.json({ ...updatedVendor, wizardStep });
+  } catch (err) {
+    console.error("Update onboard vendor error:", err);
+    serverError(res);
+  }
+});
+
+/**
+ * POST /v1/vendors/onboard/:id/enrich — Trigger AI enrichment job.
+ */
+router.post("/v1/vendors/onboard/:id/enrich", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "id");
+    const tenantId = req.user!.tenantId;
+
+    if (!(await verifyVendorOwnership(vendorId, tenantId, res))) return;
+
+    // Check for an existing running enrichment job for this vendor
+    // Fetch pending/processing jobs and filter by vendorId payload in-memory
+    const runningEnrichJobs = await db.select({ id: jobsTable.id, payload: jobsTable.payload, status: jobsTable.status })
+      .from(jobsTable)
+      .where(and(
+        eq(jobsTable.queue, "ai-enrich"),
+        eq(jobsTable.tenantId, tenantId),
+      ));
+
+    const hasRunning = runningEnrichJobs.some(
+      (j) =>
+        (j.status === "pending" || j.status === "processing") &&
+        typeof j.payload === "object" &&
+        j.payload !== null &&
+        (j.payload as Record<string, unknown>).vendorId === vendorId,
+    );
+
+    if (hasRunning) {
+      conflict(res, "An enrichment job is already running for this vendor");
+      return;
+    }
+
+    const job = await enqueueJob("ai-enrich", "enrich_vendor", { vendorId, tenantId }, tenantId);
+
+    await recordAudit(req, "trigger_enrichment", "vendor", vendorId, { jobId: job.id });
+    res.status(202).json({ jobId: job.id, status: "queued" });
+  } catch (err) {
+    console.error("Enrich vendor error:", err);
+    serverError(res);
+  }
+});
+
+/**
+ * DELETE /v1/vendors/onboard/:id — Cancel onboarding (delete incomplete vendor).
+ */
+router.delete("/v1/vendors/onboard/:id", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const vendorId = p(req, "id");
+    const tenantId = req.user!.tenantId;
+
+    const [vendor] = await db.select().from(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId)))
+      .limit(1);
+
+    if (!vendor) { notFound(res, "Vendor not found"); return; }
+
+    if (vendor.status !== "identification") {
+      conflict(res, "Cannot cancel onboarding: vendor has already progressed beyond identification");
+      return;
+    }
+
+    // Check for linked assessments
+    const [linkedAssessment] = await db.select({ id: assessmentsTable.id })
+      .from(assessmentsTable)
+      .where(and(
+        eq(assessmentsTable.contextType, "vendor"),
+        eq(assessmentsTable.contextId, vendorId),
+        eq(assessmentsTable.tenantId, tenantId),
+      ))
+      .limit(1);
+
+    // Check for linked documents
+    const [linkedDoc] = await db.select({ id: documentsTable.id })
+      .from(documentsTable)
+      .where(and(
+        eq(documentsTable.vendorId, vendorId),
+        eq(documentsTable.tenantId, tenantId),
+      ))
+      .limit(1);
+
+    // Check for linked subprocessors
+    const [linkedSubprocessor] = await db.select({ id: vendorSubprocessorsTable.id })
+      .from(vendorSubprocessorsTable)
+      .where(and(
+        eq(vendorSubprocessorsTable.vendorId, vendorId),
+        eq(vendorSubprocessorsTable.tenantId, tenantId),
+      ))
+      .limit(1);
+
+    if (linkedAssessment || linkedDoc || linkedSubprocessor) {
+      conflict(res, "Cannot cancel onboarding: vendor has linked assessments, documents, or subprocessors. Remove them first.");
+      return;
+    }
+
+    await db.delete(vendorsTable)
+      .where(and(eq(vendorsTable.id, vendorId), eq(vendorsTable.tenantId, tenantId)));
+
+    await recordAudit(req, "cancel_onboarding", "vendor", vendorId);
+    res.status(204).send();
+  } catch (err) {
+    console.error("Cancel onboarding error:", err);
+    serverError(res);
+  }
+});
+
+// ─── Standard Vendor CRUD Endpoints ───────────────────────────────────────────
 
 router.post("/v1/vendors", requireRole("admin", "risk_manager"), async (req, res) => {
   try {
