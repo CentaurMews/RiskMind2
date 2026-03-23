@@ -208,7 +208,7 @@ export default function VendorList() {
         {viewMode === "table" ? (
           <>
             <Card className="flex-1 flex flex-col min-h-0 shadow-sm">
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto scroll-shadow-x">
                 <Table>
                   <TableHeader className="bg-muted/50 sticky top-0 z-10">
                     <TableRow>

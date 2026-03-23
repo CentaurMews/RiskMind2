@@ -104,7 +104,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => toast({ title: "Coming soon", description: "Microsoft login will be available in v2.1" })}
-              className="flex items-center justify-center gap-3 w-full border border-border rounded-md px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+              className="flex items-center justify-center gap-3 w-full border border-border rounded-md px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors"
             >
               {/* Microsoft SVG icon */}
               <svg width="18" height="18" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -118,7 +118,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => toast({ title: "Coming soon", description: "Google login will be available in v2.1" })}
-              className="flex items-center justify-center gap-3 w-full border border-border rounded-md px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+              className="flex items-center justify-center gap-3 w-full border border-border rounded-md px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors"
             >
               {/* Google SVG icon */}
               <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">

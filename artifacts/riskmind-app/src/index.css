@@ -170,3 +170,21 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Horizontal scroll shadow for mobile tables */
+.scroll-shadow-x {
+  position: relative;
+  overflow-x: auto;
+}
+
+.scroll-shadow-x::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 32px;
+  background: linear-gradient(to right, transparent, hsl(var(--background)));
+  pointer-events: none;
+  z-index: 1;
+}
