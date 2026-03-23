@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to execute
-stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-03-23T15:52:32.577Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 11-05-PLAN.md
+last_updated: "2026-03-23T15:58:00.909Z"
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -57,6 +57,7 @@ Plan: 5 of 5
 | Phase 11-vendor-lifecycle-redesign P02 | 283 | 3 tasks | 5 files |
 | Phase 11 P03 | 272 | 2 tasks | 3 files |
 | Phase 11-vendor-lifecycle-redesign P04 | 239 | 2 tasks | 2 files |
+| Phase 11-vendor-lifecycle-redesign P05 | 2 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Recent decisions affecting current work:
 - [Phase 11]: Step components defined as separate functions in same file for co-location without cross-file coupling in vendor-onboard.tsx
 - [Phase 11-vendor-lifecycle-redesign]: ScoreBadge uses e.preventDefault() + e.stopPropagation() to override Link wrapper navigation in kanban cards
 - [Phase 11-vendor-lifecycle-redesign]: In Progress badge shown for identification-stage vendors with null riskScore to distinguish wizard stubs from complete vendors
+- [Phase 11-vendor-lifecycle-redesign]: Both Organization and Monitoring tabs added to settings.tsx — co-location avoids new route/file, consistent with existing settings pattern
+- [Phase 11-vendor-lifecycle-redesign]: Timer icon used for Monitoring tab trigger — ShieldAlert already used for access-denied heading; TierBadge recreated inline in settings.tsx to avoid cross-package import
 
 ### Pending Todos
 
@@ -124,7 +127,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T15:52:32.570Z
-Stopped at: Completed 11-04-PLAN.md
+Last session: 2026-03-23T15:57:55.608Z
+Stopped at: Completed 11-05-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`

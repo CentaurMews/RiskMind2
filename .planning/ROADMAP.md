@@ -163,7 +163,7 @@ Plans:
 
 - [x] **Phase 9: Schema Foundation** - Polymorphic assessment schema, integration config, foresight tables, signal deduplication column (completed 2026-03-23)
 - [x] **Phase 10: Assessment Engine** - AI-driven shared questionnaire engine with templates, scoring, and LLM follow-up (completed 2026-03-23)
-- [ ] **Phase 11: Vendor Lifecycle Redesign** - Wizard onboarding, 4th party risk, continuous monitoring, AI enrichment
+- [x] **Phase 11: Vendor Lifecycle Redesign** - Wizard onboarding, 4th party risk, continuous monitoring, AI enrichment (completed 2026-03-23)
 - [ ] **Phase 12: Signal Integrations** - NVD, Shodan, Sentinel, MISP, email ingestion with per-tenant encrypted credentials
 - [ ] **Phase 13: Compliance Flow** - Framework import, assessment-to-control linkage, per-framework thresholds
 - [ ] **Phase 14: Foresight v2** - Monte Carlo simulation, loss exceedance curve, OSINT calibration, named scenarios
@@ -223,7 +223,7 @@ Plans:
 - [x] 11-02-PLAN.md -- Subprocessor, org-dependency, monitoring-config API routes + vendor-monitor worker
 - [x] 11-03-PLAN.md -- Wizard frontend page (vendor-onboard.tsx) + route registration
 - [x] 11-04-PLAN.md -- Vendor detail subprocessors section + kanban score badge
-- [ ] 11-05-PLAN.md -- Settings Organization tab (dependencies + concentration risk) + Monitoring tab
+- [x] 11-05-PLAN.md -- Settings Organization tab (dependencies + concentration risk) + Monitoring tab
 
 ### Phase 12: Signal Integrations
 **Goal**: All five external signal sources are live and polling — NVD CVE feeds, Shodan scan results, Microsoft Sentinel alerts, MISP threat events, and inbound email — each deduplicated by content hash and isolated per tenant with encrypted credentials
@@ -276,7 +276,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 8. Quick Fixes & Polish | v1.2 | 2/2 | Complete | 2026-03-23 |
 | 9. Schema Foundation | v2.0 | 3/3 | Complete   | 2026-03-23 |
 | 10. Assessment Engine | v2.0 | 4/4 | Complete    | 2026-03-23 |
-| 11. Vendor Lifecycle Redesign | v2.0 | 4/5 | In Progress|  |
+| 11. Vendor Lifecycle Redesign | v2.0 | 5/5 | Complete   | 2026-03-23 |
 | 12. Signal Integrations | v2.0 | 0/? | Not started | - |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
 | 14. Foresight v2 | v2.0 | 0/? | Not started | - |
