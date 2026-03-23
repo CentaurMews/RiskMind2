@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { useListVendors, useCreateVendor, useGetMe } from "@workspace/api-client-react";
+import { Link, useLocation } from "wouter";
+import { useListVendors, useGetMe } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia, EmptyContent } from "@/components/ui/empty";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { toast } from "@/hooks/use-toast";
-import { Plus, Search, Building2, Loader2, ArrowRight, LayoutGrid, List } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
+import { Plus, Search, Building2, ArrowRight, LayoutGrid, List } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -79,12 +76,7 @@ export default function VendorList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
-  const [isOpen, setIsOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "",
-    contactEmail: ""
-  });
+  const [, navigate] = useLocation();
 
   const queryClient = useQueryClient();
 
@@ -106,28 +98,6 @@ export default function VendorList() {
     vendors: allVendors?.data?.filter(v => v.status === stage.id) || [],
   }));
 
-  const createMutation = useCreateVendor({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/v1/vendors"] });
-        setIsOpen(false);
-        setFormData({ name: "", category: "", contactEmail: "" });
-      },
-      onError: (error) => {
-        toast({
-          variant: "destructive",
-          title: "Failed to create vendor",
-          description: error instanceof Error ? error.message : "An unexpected error occurred.",
-        });
-      },
-    }
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate({ data: formData });
-  };
-
   return (
     <AppLayout>
       <div className="p-8 max-w-7xl mx-auto space-y-6 h-full flex flex-col">
@@ -139,38 +109,10 @@ export default function VendorList() {
 
           <div className="flex items-center gap-2">
             {canEdit && (
-              <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                <SheetTrigger asChild>
-                  <Button className="shadow-md">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Vendor
-                  </Button>
-                </SheetTrigger>
-                <SheetContent className="sm:max-w-md w-full border-l">
-                  <SheetHeader>
-                    <SheetTitle>Register New Vendor</SheetTitle>
-                    <SheetDescription>Initiate TPRM onboarding process.</SheetDescription>
-                  </SheetHeader>
-                  <form onSubmit={handleSubmit} className="space-y-6 mt-6">
-                    <div className="space-y-2">
-                      <Label>Vendor Name</Label>
-                      <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Acme Corp" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <Input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} placeholder="Cloud Hosting" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Primary Contact Email</Label>
-                      <Input type="email" value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} placeholder="security@acme.com" />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                      {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : null}
-                      Register Vendor
-                    </Button>
-                  </form>
-                </SheetContent>
-              </Sheet>
+              <Button className="shadow-md" onClick={() => navigate("/vendors/onboard/new")}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Vendor
+              </Button>
             )}
           </div>
         </div>
@@ -245,7 +187,7 @@ export default function VendorList() {
                             </EmptyHeader>
                             {canEdit && (
                               <EmptyContent>
-                                <Button size="sm" onClick={() => setIsOpen(true)}><Plus className="h-4 w-4 mr-2" />Add Vendor</Button>
+                                <Button size="sm" onClick={() => navigate("/vendors/onboard/new")}><Plus className="h-4 w-4 mr-2" />Add Vendor</Button>
                               </EmptyContent>
                             )}
                           </Empty>

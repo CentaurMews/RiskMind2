@@ -16,6 +16,7 @@ import SignalList from "@/pages/signals/signal-list";
 import FindingList from "@/pages/signals/finding-list";
 import VendorList from "@/pages/vendors/vendor-list";
 import VendorDetail from "@/pages/vendors/vendor-detail";
+import VendorOnboard from "@/pages/vendors/vendor-onboard";
 import FrameworkList from "@/pages/compliance/framework-list";
 import FrameworkDetail from "@/pages/compliance/framework-detail";
 import ControlList from "@/pages/compliance/control-list";
@@ -55,6 +56,7 @@ function AppRouter() {
       <Route path="/risks">{() => <ProtectedPage Component={RiskList} />}</Route>
       <Route path="/signals/findings">{() => <ProtectedPage Component={FindingList} />}</Route>
       <Route path="/signals">{() => <ProtectedPage Component={SignalList} />}</Route>
+      <Route path="/vendors/onboard/:id">{() => <ProtectedPage Component={VendorOnboard} />}</Route>
       <Route path="/vendors/:id">{() => <ProtectedPage Component={VendorDetail} />}</Route>
       <Route path="/vendors">{() => <ProtectedPage Component={VendorList} />}</Route>
       <Route path="/compliance/:id">{() => <ProtectedPage Component={FrameworkDetail} />}</Route>
