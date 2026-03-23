@@ -72,6 +72,27 @@ function TierBadge({ tier }: { tier?: string }) {
   );
 }
 
+function ScoreBadge({ score, vendorId }: { score: number | null; vendorId: string }) {
+  const [, navigate] = useLocation();
+  if (score === null) return null;
+  const riskScore = Number(score);
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate(`/vendors/${vendorId}`); }}
+      className={cn(
+        "font-mono text-xs font-semibold px-1.5 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity",
+        riskScore >= 75 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+        riskScore >= 50 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+        riskScore >= 25 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+      )}
+      aria-label={`Risk score: ${riskScore} out of 100`}
+    >
+      {riskScore}/100
+    </button>
+  );
+}
+
 export default function VendorList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -206,12 +227,7 @@ export default function VendorList() {
                             </TableCell>
                             <TableCell>
                               {score != null ? (
-                                <span className={cn(
-                                  "font-mono text-sm font-bold",
-                                  score >= 8 ? "text-red-600" : score >= 5 ? "text-amber-600" : "text-emerald-600"
-                                )}>
-                                  {score}
-                                </span>
+                                <ScoreBadge score={score} vendorId={vendor.id} />
                               ) : (
                                 <span className="text-muted-foreground text-xs">—</span>
                               )}
@@ -283,6 +299,7 @@ export default function VendorList() {
                     ) : (
                       col.vendors.map(v => {
                         const score = v.riskScore != null ? Number(v.riskScore) : null;
+                        const isInProgress = v.status === "identification" && score === null;
                         return (
                           <Link key={v.id} href={`/vendors/${v.id}`}>
                             <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -294,17 +311,17 @@ export default function VendorList() {
                                       <p className="text-xs text-muted-foreground truncate">{v.category}</p>
                                     )}
                                   </div>
-                                  {score != null && (
-                                    <span className={cn(
-                                      "font-mono text-sm font-bold shrink-0",
-                                      score >= 8 ? "text-red-600" : score >= 5 ? "text-amber-600" : "text-emerald-600"
-                                    )}>
-                                      {score}
-                                    </span>
-                                  )}
+                                  <div className="shrink-0">
+                                    <ScoreBadge score={score} vendorId={v.id} />
+                                  </div>
                                 </div>
-                                <div className="mt-2">
+                                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                                   <TierBadge tier={v.tier} />
+                                  {isInProgress && (
+                                    <Badge className="text-[10px] bg-muted text-muted-foreground border-0 font-medium">
+                                      In Progress
+                                    </Badge>
+                                  )}
                                 </div>
                               </CardContent>
                             </Card>
