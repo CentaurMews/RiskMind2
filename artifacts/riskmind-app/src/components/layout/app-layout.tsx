@@ -81,7 +81,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   ];
 
   const currentPath = window.location.pathname;
-  const tenantName = user.tenantId.split('-')[0];
+  const tenantName = (user as any).tenantName || (user as any).tenantSlug || user.tenantId.split('-')[0];
   const userRoleLabel = user.role.replace('_', ' ');
 
   return (
@@ -107,7 +107,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           )}
           <button
             onClick={() => { setIsCollapsed(!isCollapsed); setIsMobileOpen(false); }}
-            className="text-sidebar-foreground/50 hover:text-white transition-colors hidden lg:block"
+            className="h-11 w-11 flex items-center justify-center text-sidebar-foreground/50 hover:text-white transition-colors hidden lg:flex"
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -190,7 +190,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-14 bg-background border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileOpen(true)}>
+            <Button variant="ghost" size="icon" className="h-11 w-11 lg:hidden" onClick={() => setIsMobileOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
             <span className="font-mono text-xs px-2 py-1 bg-secondary rounded-md capitalize">{tenantName}</span>
