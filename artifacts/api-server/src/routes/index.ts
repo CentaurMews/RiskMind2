@@ -16,6 +16,7 @@ import agentRouter from "./agent";
 import searchRouter from "./search";
 import assessmentTemplatesRouter from "./assessment-templates";
 import assessmentsRouter from "./assessments";
+import orgDependenciesRouter from "./org-dependencies";
 import { authMiddleware } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -44,5 +45,6 @@ router.use(agentRouter);
 router.use(searchRouter);
 router.use(assessmentTemplatesRouter);
 router.use(assessmentsRouter);
+router.use(orgDependenciesRouter);
 
 export default router;
