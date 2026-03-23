@@ -180,7 +180,12 @@ Plans:
   3. `signals` table has a `content_hash` column with a unique index per tenant and source — duplicate poll data can never insert
   4. `integration_configs` table exists with encrypted_config JSONB — no signal API key is stored in any environment variable
   5. All new tables export from the schema index and Drizzle relations are defined — TypeScript inference works without manual type casts
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md -- Assessment engine + integration configs + foresight schema files
+- [ ] 09-02-PLAN.md -- Vendor subprocessors, org dependencies, monitoring configs + column additions
+- [ ] 09-03-PLAN.md -- Barrel exports, Drizzle relations, compatibility view, drizzle-kit push
 
 ### Phase 10: Assessment Engine
 **Goal**: Users can create assessment templates, run assessment sessions against any subject (vendor or compliance framework), receive AI-generated follow-up questions mid-session, and see a computed risk score on completion
@@ -256,7 +261,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 6. Bug Fixes and Wizard UI | v1.1 | 2/2 | Complete | 2026-03-18 |
 | 7. Foresight Teaser | v1.1 | 1/1 | Complete | 2026-03-18 |
 | 8. Quick Fixes & Polish | v1.2 | 2/2 | Complete | 2026-03-23 |
-| 9. Schema Foundation | v2.0 | 0/? | Not started | - |
+| 9. Schema Foundation | v2.0 | 0/3 | Planning done | - |
 | 10. Assessment Engine | v2.0 | 0/? | Not started | - |
 | 11. Vendor Lifecycle Redesign | v2.0 | 0/? | Not started | - |
 | 12. Signal Integrations | v2.0 | 0/? | Not started | - |
