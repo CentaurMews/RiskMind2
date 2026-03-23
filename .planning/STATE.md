@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to execute
-stopped_at: Completed 12-03-PLAN.md
-last_updated: "2026-03-23T17:01:51.611Z"
+stopped_at: Completed 12-04-PLAN.md
+last_updated: "2026-03-23T17:05:56.629Z"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 12 (signal-integrations) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Plan: 4 of 5
 | Phase 12-signal-integrations P01 | 405 | 2 tasks | 7 files |
 | Phase 12-signal-integrations P02 | 300 | 2 tasks | 4 files |
 | Phase 12-signal-integrations P03 | 191 | 2 tasks | 3 files |
+| Phase 12-signal-integrations P04 | 100 | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,8 @@ Recent decisions affecting current work:
 - [Phase 12-signal-integrations]: Sentinel token scope is api.loganalytics.io/.default — required for Log Analytics workspace query, not management.azure.com
 - [Phase 12-signal-integrations]: Log Analytics row deserialization: zip columns[].name with rows[][] per table to produce Record<string,unknown>[] at parse time
 - [Phase 12-signal-integrations]: MISP IoC summary uses attribute counts (e.g., '3 IP(s)') not raw values — keeps signal content concise for LLM triage
+- [Phase 12-signal-integrations]: EmailConfig extended with optional tenantId (injected at poll time, not stored) so complete() can route LLM calls per-tenant without changing SignalFeedAdapter interface
+- [Phase 12-signal-integrations]: Email LLM fallback: if complete() throws or returns unparseable JSON, signal still created with subject as title and info severity — never silently drops emails
 
 ### Pending Todos
 
@@ -138,7 +141,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T17:01:51.599Z
-Stopped at: Completed 12-03-PLAN.md
+Last session: 2026-03-23T17:05:56.615Z
+Stopped at: Completed 12-04-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
