@@ -333,3 +333,14 @@ Plans:
 - [x] 18-01-PLAN.md — Expanded risks, treatments, KRIs, incidents, review cycles, vendors, subprocessors, org deps, monitoring and appetite configs
 - [x] 18-02-PLAN.md — Assessment templates + completed assessments, expanded signals with metadata, findings chain
 - [x] 18-03-PLAN.md — Historical risk snapshots (90 days) and final seed verification
+
+### Phase 19: Demo-Ready Seed Data
+
+**Goal:** Seed realistic demo data into the database for all pages that currently show empty states — popular vendors (Microsoft, AWS, Cloudflare, Salesforce, SAP Business One), a Vendor Security + Privacy (DPIA) assessment template adapted from real questionnaire, completed assessments with scores, real compliance frameworks (ISO 27001, SOC 2, NIST CSF) with controls, and compliance assessment linkage — all as actual DB records, not UI-level hardcoded data
+**Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16, D-17, D-18, D-19
+**Depends on:** Phase 18
+**Plans:** 2 plans
+
+Plans:
+- [ ] 19-01-PLAN.md — DPIA template (7 sections, ~80 questions), 5 real-named vendors, compliance thresholds
+- [ ] 19-02-PLAN.md — Security controls + ISO 27001 mappings + control tests, completed assessments (DPIA + compliance)
