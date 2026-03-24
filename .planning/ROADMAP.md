@@ -327,9 +327,9 @@ Plans:
 **Goal:** Every page in the application has meaningful, realistic demo data — 25-30 risks across all categories, treatments, KRIs with threshold breaches, incidents, review cycles, expanded vendor ecosystem with subprocessors, completed assessments with scores, signals across all 5 source types with full metadata, findings completing the signal-to-risk chain, and 90 days of historical risk snapshots for dashboard trends
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16, D-17, D-18, D-19, D-20
 **Depends on:** Phase 17
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 18-01-PLAN.md — Expanded risks, treatments, KRIs, incidents, review cycles, vendors, subprocessors, org deps, monitoring and appetite configs
+- [x] 18-01-PLAN.md — Expanded risks, treatments, KRIs, incidents, review cycles, vendors, subprocessors, org deps, monitoring and appetite configs
 - [ ] 18-02-PLAN.md — Assessment templates + completed assessments, expanded signals with metadata, findings chain
 - [ ] 18-03-PLAN.md — Historical risk snapshots (90 days) and final seed verification

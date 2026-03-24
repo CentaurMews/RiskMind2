@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Milestone complete
-stopped_at: Checkpoint 17-02 task 2 — awaiting human verify of Risk Explorer in browser
-last_updated: "2026-03-24T10:49:51.065Z"
+status: Ready to execute
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-03-24T11:41:45.028Z"
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 7
-  total_plans: 24
-  completed_plans: 24
+  total_plans: 27
+  completed_plans: 25
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** A working, demo-ready enterprise risk management platform powered by intelligent AI routing at https://app.riskmind.net
-**Current focus:** Phase 16 — risk-heatmap-dashboard-redesign
+**Current focus:** Phase 18 — comprehensive-demo-seed-data
 
 ## Current Position
 
-Phase: 17
-Plan: Not started
+Phase: 18 (comprehensive-demo-seed-data) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Plan: Not started
 | Phase 16-risk-heatmap-dashboard-redesign P02 | 269 | 2 tasks | 4 files |
 | Phase 17-parallel-coordinates-risk-explorer P01 | 3508 | 1 tasks | 1 files |
 | Phase 17-parallel-coordinates-risk-explorer P02 | 438 | 1 tasks | 1 files |
+| Phase 18-comprehensive-demo-seed-data P01 | 434 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,8 @@ Recent decisions affecting current work:
 - [Phase 17-parallel-coordinates-risk-explorer]: fontWeight must be numeric (600 not '600') for ECharts ZRFontWeight type compatibility
 - [Phase 17-parallel-coordinates-risk-explorer]: viewMode state in risk-heatmap.tsx — ephemeral toggle, no URL param needed
 - [Phase 17-parallel-coordinates-risk-explorer]: allRisks derived from filteredCells so domain card and above-appetite filters flow to Explorer automatically without extra wiring
+- [Phase 18-comprehensive-demo-seed-data]: Modular per-table seed functions with add-if-empty guards (count > N) allow base data + extended data separation in idempotent seeding pattern
+- [Phase 18-comprehensive-demo-seed-data]: Akamai CDN Services added as vendor row to satisfy vendorSubprocessors dual-FK constraint — all subprocessors must be full vendor records
 
 ### Roadmap Evolution
 
@@ -170,7 +173,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T10:40:12.841Z
-Stopped at: Checkpoint 17-02 task 2 — awaiting human verify of Risk Explorer in browser
+Last session: 2026-03-24T11:41:45.020Z
+Stopped at: Completed 18-01-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
