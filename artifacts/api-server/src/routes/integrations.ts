@@ -31,7 +31,9 @@ async function getDecryptedConfig(
 
   if (!row || !row.encryptedConfig) return null;
 
-  const config = JSON.parse(decrypt(row.encryptedConfig)) as DecryptedConfig;
+  const raw = JSON.parse(decrypt(row.encryptedConfig));
+  // Inject discriminator type from the DB row so adapters can narrow the union
+  const config = { ...raw, type: row.sourceType } as DecryptedConfig;
   return { row, config };
 }
 

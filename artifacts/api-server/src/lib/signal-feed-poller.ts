@@ -78,7 +78,8 @@ async function pollSingleConfig(config: IntegrationConfig): Promise<void> {
     return;
   }
 
-  const decryptedConfig = JSON.parse(decrypt(config.encryptedConfig)) as DecryptedConfig;
+  const raw = JSON.parse(decrypt(config.encryptedConfig));
+  const decryptedConfig = { ...raw, type: config.sourceType } as DecryptedConfig;
   // Inject tenantId for adapters that need it for LLM calls (e.g., email)
   if (decryptedConfig.type === "email") {
     (decryptedConfig as import("../adapters/types.js").EmailConfig).tenantId = config.tenantId;
