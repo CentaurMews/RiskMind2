@@ -18,8 +18,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [, setLocation] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedNav, setExpandedNav] = useState<string | null>("Risks");
-  
+  const [expandedNav, setExpandedNav] = useState<string | null>(null);
+
   const { data: user, isLoading, error } = useGetMe({
     query: {
       queryKey: ["/api/v1/auth/me"],
@@ -88,7 +88,20 @@ export function AppLayout({ children }: AppLayoutProps) {
     ...(user.role === "admin" ? [{ name: "Settings", href: "/settings", icon: Settings }] : []),
   ];
 
-  const currentPath = window.location.pathname;
+  const [location] = useLocation();
+  const currentPath = location;
+
+  // Auto-expand the nav section matching the current route
+  useEffect(() => {
+    const match = navItems.find(
+      (item) =>
+        item.children?.some(
+          (child) => currentPath === child.href || currentPath.startsWith(child.href + "/")
+        )
+    );
+    setExpandedNav(match ? match.name : null);
+  }, [currentPath]);
+
   const tenantName = (user as any).tenantName || (user as any).tenantSlug || user.tenantId.split('-')[0];
   const userRoleLabel = user.role.replace('_', ' ');
 
