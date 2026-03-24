@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { eq, and, sql, ilike, inArray } from "drizzle-orm";
+import { eq, and, sql, ilike, inArray, gte, lte, desc } from "drizzle-orm";
 
 function p(req: Request, name: string): string {
   return String(req.params[name]);
@@ -8,6 +8,8 @@ import {
   db,
   risksTable,
   riskSourcesTable,
+  riskSnapshotsTable,
+  riskAppetiteConfigsTable,
   treatmentsTable,
   treatmentStatusEventsTable,
   usersTable,
@@ -16,6 +18,7 @@ import {
   reviewCyclesTable,
   acceptanceMemorandaTable,
 } from "@workspace/db";
+import { captureSnapshotForTenant } from "../lib/risk-snapshot-scheduler";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError } from "../lib/errors";
@@ -151,6 +154,332 @@ router.get("/v1/risks/heatmap", async (req, res) => {
     serverError(res);
   }
 });
+
+// ─── Phase 16: Dashboard, snapshots, and appetite endpoints ──────────────────
+// NOTE: All new routes MUST remain BEFORE /:id to avoid Express path conflict.
+
+const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
+  technology: "Cyber",
+  operational: "Ops",
+  compliance: "Compliance",
+  financial: "Financial",
+  strategic: "Strategic",
+  reputational: "Reputational",
+};
+
+const VALID_CATEGORIES = [
+  "operational",
+  "financial",
+  "compliance",
+  "strategic",
+  "technology",
+  "reputational",
+] as const;
+
+// GET /v1/risks/dashboard
+router.get("/v1/risks/dashboard", async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const { category } = req.query;
+
+    // Query active risks
+    const conditions: ReturnType<typeof eq>[] = [
+      eq(risksTable.tenantId, tenantId),
+      inArray(risksTable.status, ["open", "mitigated"]),
+    ];
+    if (category && typeof category === "string") {
+      conditions.push(eq(risksTable.category, category as "operational" | "financial" | "compliance" | "strategic" | "technology" | "reputational"));
+    }
+
+    const activeRisks = await db
+      .select({
+        id: risksTable.id,
+        title: risksTable.title,
+        likelihood: risksTable.likelihood,
+        impact: risksTable.impact,
+        category: risksTable.category,
+        status: risksTable.status,
+      })
+      .from(risksTable)
+      .where(and(...conditions));
+
+    // Query latest two snapshots for delta computation
+    const snapshots = await db
+      .select()
+      .from(riskSnapshotsTable)
+      .where(eq(riskSnapshotsTable.tenantId, tenantId))
+      .orderBy(desc(riskSnapshotsTable.snapshotDate))
+      .limit(2);
+
+    const latestSnapshot = snapshots[0] ?? null;
+    const previousSnapshot = snapshots[1] ?? null;
+
+    // Query appetite configs
+    const appetiteConfigs = await db
+      .select()
+      .from(riskAppetiteConfigsTable)
+      .where(eq(riskAppetiteConfigsTable.tenantId, tenantId));
+
+    const appetiteMap: Record<string, number> = {};
+    for (const config of appetiteConfigs) {
+      appetiteMap[config.category] = config.threshold;
+    }
+
+    // Compute live posture values (used when no snapshot exists)
+    function liveCompositeScore(risks: typeof activeRisks): number {
+      if (risks.length === 0) return 0;
+      let weightedSum = 0;
+      let weightTotal = 0;
+      for (const r of risks) {
+        const raw = r.likelihood * r.impact;
+        const normalized = (raw / 25) * 100;
+        const weight = raw >= 15 ? 2 : 1;
+        weightedSum += normalized * weight;
+        weightTotal += weight;
+      }
+      return Math.round(weightedSum / weightTotal);
+    }
+
+    // Derive posture score
+    const postureScore =
+      latestSnapshot != null
+        ? Number(latestSnapshot.compositeScore)
+        : liveCompositeScore(activeRisks);
+
+    // Derive above-appetite count
+    let aboveAppetiteCount: number;
+    if (latestSnapshot != null) {
+      aboveAppetiteCount = latestSnapshot.aboveAppetiteCount;
+    } else {
+      // compute live per-category
+      aboveAppetiteCount = 0;
+      for (const cat of VALID_CATEGORIES) {
+        const catRisks = activeRisks.filter((r) => r.category === cat);
+        if (catRisks.length > 0) {
+          const score = liveCompositeScore(catRisks);
+          const threshold = appetiteMap[cat] ?? 60;
+          if (score > threshold) aboveAppetiteCount++;
+        }
+      }
+    }
+
+    // Delta from previous snapshot
+    const aboveAppetiteDelta =
+      latestSnapshot != null && previousSnapshot != null
+        ? latestSnapshot.aboveAppetiteCount - previousSnapshot.aboveAppetiteCount
+        : null;
+
+    // Cell deltas (diff between latest and previous snapshot cellCounts)
+    const cellDeltas: Record<string, number> = {};
+    if (latestSnapshot != null && previousSnapshot != null) {
+      const latestCells = (latestSnapshot.cellCounts as Record<string, number>) ?? {};
+      const prevCells = (previousSnapshot.cellCounts as Record<string, number>) ?? {};
+      const allKeys = new Set([...Object.keys(latestCells), ...Object.keys(prevCells)]);
+      for (const key of allKeys) {
+        const diff = (latestCells[key] ?? 0) - (prevCells[key] ?? 0);
+        if (diff !== 0) cellDeltas[key] = diff;
+      }
+    }
+
+    // Cells (same as heatmap endpoint)
+    const cellsMap: Record<string, { likelihood: number; impact: number; risks: typeof activeRisks }> = {};
+    for (const r of activeRisks) {
+      const key = `${r.likelihood}-${r.impact}`;
+      if (!cellsMap[key]) cellsMap[key] = { likelihood: r.likelihood, impact: r.impact, risks: [] };
+      cellsMap[key].risks.push(r);
+    }
+    const cells = Object.values(cellsMap);
+
+    // Above-appetite cells
+    const aboveAppetiteCells: string[] = [];
+    for (const cell of cells) {
+      const raw = cell.likelihood * cell.impact;
+      const score = Math.round((raw / 25) * 100);
+      // A cell is above appetite if any risk in it would push the category over threshold
+      // Simplified: mark cell if score >= average appetite threshold
+      const avgThreshold =
+        Object.values(appetiteMap).length > 0
+          ? Object.values(appetiteMap).reduce((a, b) => a + b, 0) / Object.values(appetiteMap).length
+          : 60;
+      if (score > avgThreshold) {
+        aboveAppetiteCells.push(`${cell.likelihood}-${cell.impact}`);
+      }
+    }
+
+    // Domain summaries with last 6 months sparkline data
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const sparklineSnapshots = await db
+      .select()
+      .from(riskSnapshotsTable)
+      .where(
+        and(
+          eq(riskSnapshotsTable.tenantId, tenantId),
+          gte(riskSnapshotsTable.snapshotDate, sixMonthsAgo.toISOString().split("T")[0]!)
+        )
+      )
+      .orderBy(riskSnapshotsTable.snapshotDate);
+
+    const domainSummaries = VALID_CATEGORIES.map((cat) => {
+      const catRisks = activeRisks.filter((r) => r.category === cat);
+      const latestCatCounts = latestSnapshot?.categoryCounts as Record<string, { score: number; count: number; highCriticalCount: number }> ?? {};
+      const catData = latestCatCounts[cat];
+
+      const score = catData?.score ?? liveCompositeScore(catRisks);
+      const count = catData?.count ?? catRisks.length;
+      const highCriticalCount = catData?.highCriticalCount ?? catRisks.filter((r) => r.likelihood * r.impact >= 15).length;
+
+      // Sparkline: last 6 months of scores for this category
+      const sparklineData = sparklineSnapshots.map((snap) => {
+        const catCounts = snap.categoryCounts as Record<string, { score: number }>;
+        return { date: snap.snapshotDate, score: catCounts[cat]?.score ?? 0 };
+      });
+
+      return {
+        category: cat,
+        displayName: CATEGORY_DISPLAY_NAMES[cat] ?? cat,
+        score,
+        count,
+        highCriticalCount,
+        sparklineData,
+      };
+    });
+
+    const collecting = latestSnapshot === null;
+
+    res.json({
+      collecting,
+      postureScore,
+      aboveAppetiteCount,
+      aboveAppetiteDelta,
+      cellDeltas,
+      aboveAppetiteCells,
+      domainSummaries,
+      cells,
+      appetiteConfigs,
+    });
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    serverError(res);
+  }
+});
+
+// GET /v1/risks/snapshots
+router.get("/v1/risks/snapshots", async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const { range = "6M" } = req.query;
+
+    const monthMap: Record<string, number> = { "3M": 3, "6M": 6, "12M": 12 };
+    const months = monthMap[String(range)] ?? 6;
+
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+    const startDateStr = startDate.toISOString().split("T")[0]!;
+
+    const snapshots = await db
+      .select({
+        snapshotDate: riskSnapshotsTable.snapshotDate,
+        compositeScore: riskSnapshotsTable.compositeScore,
+        aboveAppetiteCount: riskSnapshotsTable.aboveAppetiteCount,
+        totalRisks: riskSnapshotsTable.totalRisks,
+      })
+      .from(riskSnapshotsTable)
+      .where(
+        and(
+          eq(riskSnapshotsTable.tenantId, tenantId),
+          gte(riskSnapshotsTable.snapshotDate, startDateStr)
+        )
+      )
+      .orderBy(riskSnapshotsTable.snapshotDate);
+
+    res.json({
+      snapshots: snapshots.map((s) => ({
+        date: s.snapshotDate,
+        compositeScore: Number(s.compositeScore),
+        aboveAppetiteCount: s.aboveAppetiteCount,
+        totalRisks: s.totalRisks,
+      })),
+    });
+  } catch (err) {
+    console.error("Snapshots error:", err);
+    serverError(res);
+  }
+});
+
+// GET /v1/risks/appetite
+router.get("/v1/risks/appetite", async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+
+    const configs = await db
+      .select({
+        category: riskAppetiteConfigsTable.category,
+        threshold: riskAppetiteConfigsTable.threshold,
+      })
+      .from(riskAppetiteConfigsTable)
+      .where(eq(riskAppetiteConfigsTable.tenantId, tenantId));
+
+    res.json({ configs });
+  } catch (err) {
+    console.error("Appetite get error:", err);
+    serverError(res);
+  }
+});
+
+// PUT /v1/risks/appetite/:category
+router.put(
+  "/v1/risks/appetite/:category",
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const tenantId = req.user!.tenantId;
+      const category = p(req, "category");
+      const { threshold } = req.body;
+
+      if (!(VALID_CATEGORIES as readonly string[]).includes(category)) {
+        badRequest(res, `Invalid category: ${category}`);
+        return;
+      }
+
+      if (
+        threshold === undefined ||
+        typeof threshold !== "number" ||
+        !Number.isInteger(threshold) ||
+        threshold < 0 ||
+        threshold > 100
+      ) {
+        badRequest(res, "threshold must be an integer between 0 and 100");
+        return;
+      }
+
+      const [updated] = await db
+        .insert(riskAppetiteConfigsTable)
+        .values({
+          tenantId,
+          category: category as typeof VALID_CATEGORIES[number],
+          threshold,
+        })
+        .onConflictDoUpdate({
+          target: [riskAppetiteConfigsTable.tenantId, riskAppetiteConfigsTable.category],
+          set: { threshold, updatedAt: new Date() },
+        })
+        .returning();
+
+      // Trigger snapshot recapture for tenant (non-blocking)
+      captureSnapshotForTenant(tenantId).catch((err) =>
+        console.error("[Appetite] Snapshot recapture failed:", err)
+      );
+
+      res.json(updated);
+    } catch (err) {
+      console.error("Appetite put error:", err);
+      serverError(res);
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 router.get("/v1/risks/:id", async (req, res) => {
   try {
