@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
 import {
@@ -9,13 +9,15 @@ import logo from "@assets/risk_mind_1773670829732.png";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AlertBell } from "@/components/dashboard/alert-bell";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface AppLayoutProps {
   children: React.ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const [, setLocation] = useLocation();
+  // All hooks MUST be before any early returns
+  const [location, setLocation] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedNav, setExpandedNav] = useState<string | null>(null);
@@ -26,6 +28,52 @@ export function AppLayout({ children }: AppLayoutProps) {
       retry: false,
     },
   });
+
+  const navItems = useMemo(() => [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    {
+      name: "Risks",
+      icon: ShieldAlert,
+      children: [
+        { name: "Register", href: "/risks" },
+        { name: "Dashboard", href: "/risks/heatmap" },
+      ]
+    },
+    { name: "Signals", href: "/signals", icon: Activity },
+    { name: "Vendors", href: "/vendors", icon: Users },
+    {
+      name: "Assessments",
+      icon: ClipboardList,
+      children: [
+        { name: "Library", href: "/assessments/templates" },
+        { name: "Sessions", href: "/assessments" },
+      ]
+    },
+    {
+      name: "Compliance",
+      icon: ShieldCheck,
+      children: [
+        { name: "Frameworks", href: "/compliance" },
+        { name: "Controls", href: "/controls" },
+      ]
+    },
+    { name: "Alerts", href: "/alerts", icon: Bell },
+    { name: "Foresight", href: "/foresight", icon: Binoculars },
+    ...(user?.role === "admin" ? [{ name: "Settings", href: "/settings", icon: Settings }] : []),
+  ], [user?.role]);
+
+  const currentPath = location;
+
+  // Auto-expand the nav section matching the current route
+  useEffect(() => {
+    const match = navItems.find(
+      (item) =>
+        item.children?.some(
+          (child) => currentPath === child.href || currentPath.startsWith(child.href + "/")
+        )
+    );
+    setExpandedNav(match ? match.name : null);
+  }, [currentPath, navItems]);
 
   useEffect(() => {
     if (error) {
@@ -48,67 +96,13 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   if (!user) return null;
 
-  const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { 
-      name: "Risks", 
-      icon: ShieldAlert,
-      children: [
-        { name: "Register", href: "/risks" },
-        { name: "Heatmap", href: "/risks/heatmap" },
-      ]
-    },
-    { 
-      name: "Signals", 
-      icon: Activity,
-      children: [
-        { name: "Feed", href: "/signals" },
-        { name: "Findings", href: "/signals/findings" },
-      ]
-    },
-    { name: "Vendors", href: "/vendors", icon: Users },
-    {
-      name: "Assessments",
-      icon: ClipboardList,
-      children: [
-        { name: "Library", href: "/assessments/templates" },
-        { name: "Sessions", href: "/assessments" },
-      ]
-    },
-    { 
-      name: "Compliance", 
-      icon: ShieldCheck,
-      children: [
-        { name: "Frameworks", href: "/compliance" },
-        { name: "Controls", href: "/controls" },
-      ]
-    },
-    { name: "Alerts", href: "/alerts", icon: Bell },
-    { name: "Foresight", href: "/foresight", icon: Binoculars },
-    ...(user.role === "admin" ? [{ name: "Settings", href: "/settings", icon: Settings }] : []),
-  ];
-
-  const [location] = useLocation();
-  const currentPath = location;
-
-  // Auto-expand the nav section matching the current route
-  useEffect(() => {
-    const match = navItems.find(
-      (item) =>
-        item.children?.some(
-          (child) => currentPath === child.href || currentPath.startsWith(child.href + "/")
-        )
-    );
-    setExpandedNav(match ? match.name : null);
-  }, [currentPath]);
-
   const tenantName = (user as any).tenantName || (user as any).tenantSlug || user.tenantId.split('-')[0];
   const userRoleLabel = user.role.replace('_', ' ');
 
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans">
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
@@ -143,11 +137,12 @@ export function AppLayout({ children }: AppLayoutProps) {
             <div key={item.name}>
               {item.children ? (
                 <>
-                  <button 
+                  <button
                     onClick={() => setExpandedNav(expandedNav === item.name ? null : item.name)}
                     className={cn(
                       "w-full flex items-center justify-between py-2 text-sm font-medium rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
-                      isCollapsed && !isMobileOpen ? "px-2 justify-center" : "px-3"
+                      isCollapsed && !isMobileOpen ? "px-2 justify-center" : "px-3",
+                      expandedNav === item.name && "text-sidebar-accent-foreground"
                     )}
                     title={isCollapsed ? item.name : undefined}
                   >
@@ -178,7 +173,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   )}
                 </>
               ) : (
-                <Link href={item.href} className={cn(
+                <Link href={item.href!} className={cn(
                   "flex items-center py-2 text-sm font-medium rounded-md transition-colors",
                   isCollapsed && !isMobileOpen ? "px-2 justify-center" : "px-3",
                   currentPath === item.href || currentPath.startsWith(item.href + '/')
@@ -195,38 +190,45 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {(!isCollapsed || isMobileOpen) && (
           <div className="p-4 border-t border-sidebar-border shrink-0">
-            <div className="flex items-center px-3 py-2">
-              <div className="h-8 w-8 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-bold mr-3 shrink-0">
-                {user.email.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user.email}</p>
-                <p className="text-xs text-sidebar-foreground/50 capitalize">{userRoleLabel}</p>
-              </div>
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="w-full flex items-center px-3 py-2 rounded-md hover:bg-sidebar-accent/50 transition-colors text-left">
+                  <div className="h-8 w-8 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-bold mr-3 shrink-0">
+                    {user.email.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{user.email}</p>
+                    <p className="text-xs text-sidebar-foreground/50 capitalize">{userRoleLabel}</p>
+                  </div>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start" className="w-56 p-2">
+                <div className="px-3 py-2 border-b mb-2">
+                  <p className="text-sm font-medium truncate">{user.email}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{userRoleLabel} · {tenantName}</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center px-3 py-2 text-sm rounded-md text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Log out
+                </button>
+              </PopoverContent>
+            </Popover>
           </div>
         )}
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-14 bg-background border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
+        <header className="h-12 bg-background border-b border-border flex items-center justify-between px-4 lg:px-6 shrink-0">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-11 w-11 lg:hidden" onClick={() => setIsMobileOpen(true)}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 lg:hidden" onClick={() => setIsMobileOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
             <span className="font-mono text-xs px-2 py-1 bg-secondary rounded-md capitalize">{tenantName}</span>
           </div>
-          <div className="flex items-center gap-4">
-            <AlertBell />
-            <div className="text-sm text-muted-foreground hidden sm:flex items-center gap-2">
-              <span className="truncate max-w-[200px]">{user.email}</span>
-              <span className="text-xs px-1.5 py-0.5 bg-secondary rounded capitalize">{userRoleLabel}</span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
-              <LogOut className="h-4 w-4 mr-1.5" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
-          </div>
+          <AlertBell />
         </header>
 
         <div className="flex-1 overflow-auto bg-muted/20 relative">

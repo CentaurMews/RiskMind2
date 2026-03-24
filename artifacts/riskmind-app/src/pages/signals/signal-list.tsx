@@ -491,7 +491,7 @@ const PAGE_SIZE = 20;
 
 export default function SignalList() {
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"pending" | "triaged" | "finding">("pending");
+  const [tab, setTab] = useState<"pending" | "triaged" | "finding">("triaged");
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const [retriggering, setRetriggering] = useState<Record<string, boolean>>({});
