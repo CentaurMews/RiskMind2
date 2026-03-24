@@ -287,3 +287,13 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 12. Signal Integrations | v2.0 | 5/5 | Complete   | 2026-03-23 |
 | 13. Compliance Flow | v2.0 | 0/? | Not started | - |
 | 14. Foresight v2 | v2.0 | 0/? | Not started | - |
+
+### Phase 15: Migrate Risk Heatmap from CSS Grid to Apache ECharts
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 14
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 15 to break down)

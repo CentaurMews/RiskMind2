@@ -125,6 +125,10 @@ Recent decisions affecting current work:
 - [Phase 12-signal-integrations]: IntegrationCard defined inline in settings.tsx for co-location — consistent with existing settings component patterns
 - [Phase 12-signal-integrations]: SignalDetailPanel fetches /api/v1/signals/:id on open — metadata not in Orval-generated Signal list response type
 
+### Roadmap Evolution
+
+- Phase 15 added: Migrate Risk Heatmap from CSS Grid to Apache ECharts (GH #83)
+
 ### Pending Todos
 
 - Verify `p-ratelimit ^1.2.0` version on npm registry before Phase 12 install
