@@ -25,7 +25,7 @@ import {
   controlRequirementMapsTable,
   controlTestsTable,
 } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
 import { seedPrebuiltTemplates } from "@workspace/db/seed/prebuilt-templates";
 
@@ -1966,7 +1966,12 @@ async function seedRealVendors(tenantId: string) {
 
   if (allVendors.some((v) => v.name === "Microsoft")) {
     console.log(`[Seed] Real vendors already seeded for tenant ${tenantId}, skipping`);
-    return [];
+    // Return existing real vendors so downstream functions (e.g. seedCompletedAssessments) can use them
+    const existing = await db
+      .select({ id: vendorsTable.id, name: vendorsTable.name })
+      .from(vendorsTable)
+      .where(and(eq(vendorsTable.tenantId, tenantId), inArray(vendorsTable.name, ["Microsoft", "Amazon Web Services", "Cloudflare", "Salesforce", "SAP Business One"])));
+    return existing;
   }
 
   const realVendorDefs = [

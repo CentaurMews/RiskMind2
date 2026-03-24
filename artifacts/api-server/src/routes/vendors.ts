@@ -83,13 +83,13 @@ router.get("/v1/vendors", async (req, res) => {
         openFindingsCount: sql<number>`COALESCE((
           SELECT count(*)::int FROM findings
           WHERE findings.vendor_id = ${vendorsTable.id}
-          AND findings.status = 'open'
+          AND findings.finding_status = 'open'
           AND findings.tenant_id = ${tenantId}
         ), 0)`,
         lastAssessmentDate: sql<string | null>`(
           SELECT max(q.updated_at)::text FROM questionnaires q
           WHERE q.vendor_id = ${vendorsTable.id}
-          AND q.status = 'completed'
+          AND q.questionnaire_status = 'completed'
           AND q.tenant_id = ${tenantId}
         )`,
       }).from(vendorsTable).where(and(...conditions)).limit(Number(limit)).offset(offset).orderBy(vendorsTable.createdAt),

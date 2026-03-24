@@ -49,22 +49,7 @@ interface AssessmentTemplateQuestions {
  * Uses idempotent upsert: skips if template with same title + [PREBUILT] already exists.
  */
 export async function seedPrebuiltTemplates(tenantId: string) {
-  // Check if templates are already seeded
-  const existing = await db
-    .select({ id: assessmentTemplatesTable.id })
-    .from(assessmentTemplatesTable)
-    .where(
-      and(
-        eq(assessmentTemplatesTable.tenantId, tenantId),
-        like(assessmentTemplatesTable.description, "[PREBUILT]%"),
-      ),
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    console.log(`[Seed] Pre-built templates already seeded for tenant ${tenantId}, skipping`);
-    return;
-  }
+  // Per-template upsert below handles idempotency — no early return needed
 
   // ─── Template 1: Vendor Security Assessment ─────────────────────────────────
   const vendorSecurityTemplate: AssessmentTemplateQuestions = {
