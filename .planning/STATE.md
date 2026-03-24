@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to execute
-stopped_at: Completed 18-02-PLAN.md
-last_updated: "2026-03-24T11:53:23.636Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 18-03-PLAN.md
+last_updated: "2026-03-24T11:59:38.123Z"
 progress:
   total_phases: 10
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 27
-  completed_plans: 26
+  completed_plans: 27
 ---
 
 # Project State
@@ -71,6 +71,7 @@ Plan: 3 of 3
 | Phase 17-parallel-coordinates-risk-explorer P02 | 438 | 1 tasks | 1 files |
 | Phase 18-comprehensive-demo-seed-data P01 | 434 | 2 tasks | 1 files |
 | Phase 18 P02 | 540 | 2 tasks | 2 files |
+| Phase 18-comprehensive-demo-seed-data P03 | 300 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,8 @@ Recent decisions affecting current work:
 - [Phase 18]: seedAssessments() calls seedPrebuiltTemplates() first to ensure templates exist before inserting assessment records with FK templateId
 - [Phase 18]: seedExpandedSignals() returns externalId->id map so seedFindings() can resolve signalId FKs without extra DB queries
 - [Phase 18]: lib/db package.json exports extended with ./seed/prebuilt-templates entry to satisfy bundler module resolution
+- [Phase 18-comprehensive-demo-seed-data]: Deterministic sine-wave noise formula for risk snapshot seed: baseScore + 2 * Math.sin(dayIndex * 0.7) — reproducible across runs
+- [Phase 18-comprehensive-demo-seed-data]: riskSnapshotsTable batch insert (90 rows in single db.insert() call) with count(*) === 0 idempotency guard — called last in seedDemoDataIfEmpty()
 
 ### Roadmap Evolution
 
@@ -177,7 +180,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T11:53:23.621Z
-Stopped at: Completed 18-02-PLAN.md
+Last session: 2026-03-24T11:59:38.109Z
+Stopped at: Completed 18-03-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
