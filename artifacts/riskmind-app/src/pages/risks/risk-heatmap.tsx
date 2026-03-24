@@ -103,7 +103,7 @@ export default function RiskHeatmap() {
       const url = activeDomain
         ? `/api/v1/risks/dashboard?category=${activeDomain}`
         : `/api/v1/risks/dashboard`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}` } });
       if (res.ok) {
         const data = await res.json();
         setDashboardData(data);
@@ -123,7 +123,7 @@ export default function RiskHeatmap() {
   useEffect(() => {
     async function fetchSnapshots() {
       try {
-        const res = await fetch(`/api/v1/risks/snapshots?range=${selectedRange}`, { credentials: "include" });
+        const res = await fetch(`/api/v1/risks/snapshots?range=${selectedRange}`, { headers: { Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}` } });
         if (res.ok) {
           const data = await res.json();
           setSnapshotData(data.snapshots || []);

@@ -562,7 +562,7 @@ function AppetiteTab() {
     async function fetchAppetite() {
       setAppetiteLoading(true);
       try {
-        const res = await fetch("/api/v1/risks/appetite", { credentials: "include" });
+        const res = await fetch("/api/v1/risks/appetite", { headers: { Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}` } });
         if (res.ok) {
           const data = await res.json();
           const configs: AppetiteConfig[] = data.configs || [];
@@ -599,8 +599,7 @@ function AppetiteTab() {
     try {
       const res = await fetch(`/api/v1/risks/appetite/${category}`, {
         method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}` },
         body: JSON.stringify({ threshold }),
       });
       if (res.ok) {
