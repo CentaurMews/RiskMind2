@@ -304,9 +304,19 @@ Plans:
 **Goal:** The `/risks/heatmap` page is a full risk command center dashboard with 4 sections: KPI strip (posture bar + above-appetite pill), split layout (ECharts heatmap with micro-trends left, KRI composite risk index trend right), domain cards strip with per-category sparklines and interactive filtering, backed by daily snapshot system and per-category risk appetite thresholds configurable in Settings
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16, D-17, D-18, D-19, D-20, D-21, D-22, D-23, D-24, D-25, D-26, D-27, D-28, D-29
 **Depends on:** Phase 15
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 16-01-PLAN.md — Backend: schema tables (risk_snapshots, risk_appetite_configs), snapshot scheduler, dashboard/appetite API endpoints
 - [x] 16-02-PLAN.md — Frontend components: enhanced heatmap chart, KRI trend panel, posture bar, domain cards
 - [ ] 16-03-PLAN.md — Dashboard page redesign (risk-heatmap.tsx wiring), Settings Risk Appetite tab, human verification
+
+### Phase 17: Parallel Coordinates Risk Explorer
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 16
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 17 to break down)
