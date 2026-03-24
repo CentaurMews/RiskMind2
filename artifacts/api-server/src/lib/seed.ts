@@ -8,8 +8,17 @@ import {
   alertsTable,
   frameworksTable,
   frameworkRequirementsTable,
+  treatmentsTable,
+  treatmentStatusEventsTable,
+  krisTable,
+  incidentsTable,
+  reviewCyclesTable,
+  vendorSubprocessorsTable,
+  orgDependenciesTable,
+  monitoringConfigsTable,
+  riskAppetiteConfigsTable,
 } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
 
 // Framework requirement data inlined from scripts/src/framework-data/
@@ -352,6 +361,893 @@ async function seedRequirements(
   return Object.keys(codeToId).length;
 }
 
+// Helper to offset current date by N days
+function daysFromNow(days: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+// --------------------------------------------------------------------------
+// Task 1 seed functions
+// --------------------------------------------------------------------------
+
+type User = { id: string; role: string };
+type Risk = { id: string };
+type Vendor = { id: string };
+
+async function seedExpandedRisks(
+  tenantId: string,
+  adminUser: User,
+  rmUser: User,
+  roUser: User
+): Promise<Risk[]> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM risks WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 10) {
+    // Already seeded beyond the base 10
+    return [];
+  }
+
+  const owners = [adminUser, rmUser, roUser];
+  const expandedRiskDefs = [
+    // technology
+    {
+      title: "API Gateway Rate Limiting Failure",
+      category: "technology" as const,
+      status: "open" as const,
+      likelihood: 3,
+      impact: 4,
+      ownerId: roUser.id,
+    },
+    {
+      title: "Legacy System End-of-Life",
+      category: "technology" as const,
+      status: "open" as const,
+      likelihood: 4,
+      impact: 3,
+      ownerId: rmUser.id,
+    },
+    {
+      title: "Shadow IT Proliferation",
+      category: "technology" as const,
+      status: "draft" as const,
+      likelihood: 3,
+      impact: 3,
+      ownerId: roUser.id,
+    },
+    {
+      title: "DNS Hijacking Attack",
+      category: "technology" as const,
+      status: "mitigated" as const,
+      likelihood: 2,
+      impact: 4,
+      ownerId: adminUser.id,
+      residualLikelihood: 1,
+      residualImpact: 3,
+    },
+    {
+      title: "Database Credential Exposure",
+      category: "technology" as const,
+      status: "open" as const,
+      likelihood: 3,
+      impact: 5,
+      ownerId: rmUser.id,
+    },
+    // operational
+    {
+      title: "Business Continuity Plan Gaps",
+      category: "operational" as const,
+      status: "open" as const,
+      likelihood: 3,
+      impact: 4,
+      ownerId: roUser.id,
+    },
+    {
+      title: "Inadequate Change Management",
+      category: "operational" as const,
+      status: "draft" as const,
+      likelihood: 2,
+      impact: 3,
+      ownerId: adminUser.id,
+    },
+    {
+      title: "Third-Party SLA Violations",
+      category: "operational" as const,
+      status: "open" as const,
+      likelihood: 4,
+      impact: 3,
+      ownerId: rmUser.id,
+    },
+    // compliance
+    {
+      title: "GDPR Data Subject Rights Violations",
+      category: "compliance" as const,
+      status: "open" as const,
+      likelihood: 3,
+      impact: 5,
+      ownerId: rmUser.id,
+    },
+    {
+      title: "SOX Internal Controls Weakness",
+      category: "compliance" as const,
+      status: "mitigated" as const,
+      likelihood: 2,
+      impact: 4,
+      ownerId: adminUser.id,
+      residualLikelihood: 1,
+      residualImpact: 3,
+    },
+    {
+      title: "Cross-Border Data Transfer Risk",
+      category: "compliance" as const,
+      status: "draft" as const,
+      likelihood: 3,
+      impact: 4,
+      ownerId: roUser.id,
+    },
+    // financial
+    {
+      title: "Foreign Exchange Exposure",
+      category: "financial" as const,
+      status: "open" as const,
+      likelihood: 3,
+      impact: 3,
+      ownerId: adminUser.id,
+    },
+    {
+      title: "Credit Counterparty Default",
+      category: "financial" as const,
+      status: "accepted" as const,
+      likelihood: 2,
+      impact: 4,
+      ownerId: adminUser.id,
+    },
+    {
+      title: "Insurance Coverage Gaps",
+      category: "financial" as const,
+      status: "open" as const,
+      likelihood: 3,
+      impact: 3,
+      ownerId: rmUser.id,
+    },
+    // strategic
+    {
+      title: "Digital Transformation Delays",
+      category: "strategic" as const,
+      status: "open" as const,
+      likelihood: 3,
+      impact: 3,
+      ownerId: roUser.id,
+    },
+    {
+      title: "Competitor IP Litigation",
+      category: "strategic" as const,
+      status: "draft" as const,
+      likelihood: 2,
+      impact: 5,
+      ownerId: adminUser.id,
+    },
+    // reputational
+    {
+      title: "Customer Data Privacy Concerns",
+      category: "reputational" as const,
+      status: "open" as const,
+      likelihood: 4,
+      impact: 4,
+      ownerId: rmUser.id,
+    },
+    {
+      title: "Regulatory Investigation Publicity",
+      category: "reputational" as const,
+      status: "mitigated" as const,
+      likelihood: 2,
+      impact: 5,
+      ownerId: roUser.id,
+      residualLikelihood: 1,
+      residualImpact: 4,
+    },
+  ];
+
+  const newRisks = await db.insert(risksTable).values(
+    expandedRiskDefs.map((r) => ({
+      tenantId,
+      title: r.title,
+      description: `Risk scenario: ${r.title}. This risk requires continuous monitoring and mitigation efforts aligned with Acme Corp's financial services risk framework.`,
+      category: r.category,
+      status: r.status,
+      likelihood: r.likelihood,
+      impact: r.impact,
+      ownerId: r.ownerId,
+      residualLikelihood: "residualLikelihood" in r ? r.residualLikelihood : null,
+      residualImpact: "residualImpact" in r ? r.residualImpact : null,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${newRisks.length} expanded risks`);
+  return newRisks;
+}
+
+async function seedTreatments(
+  tenantId: string,
+  adminUser: User,
+  rmUser: User,
+  roUser: User,
+  baseRisks: Risk[],
+  expandedRisks: Risk[]
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM treatments WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    return;
+  }
+
+  // Base risks by index: 0=Cloud Provider, 1=Data Breach, 2=Regulatory, 7=Ransomware, 8=Market Expansion, 9=Vendor Lock-in
+  // Expanded risks by index (0-based):
+  //   0=API Gateway Rate Limiting, 1=Legacy System, 7=Third-Party SLA Violations
+  //   8=GDPR, 9=SOX, 10=Cross-Border, 11=Foreign Exchange
+  const cloudRisk = baseRisks[0];
+  const ransomwareRisk = baseRisks[7];
+  const marketRisk = baseRisks[8];
+  const regulatoryRisk = baseRisks[2];
+  const apiGatewayRisk = expandedRisks[0];
+  const legacySystemRisk = expandedRisks[1];
+  const slaViolationsRisk = expandedRisks[7];
+  const gdprRisk = expandedRisks[8];
+  const soxRisk = expandedRisks[9];
+  const fxRisk = expandedRisks[11];
+
+  const treatmentDefs = [
+    {
+      riskId: cloudRisk.id,
+      strategy: "treat" as const,
+      description: "Implement multi-cloud failover architecture with automated failover to secondary provider within 15 minutes",
+      status: "in_progress" as const,
+      cost: "250000",
+      dueDate: daysFromNow(60),
+      ownerId: rmUser.id,
+    },
+    {
+      riskId: ransomwareRisk.id,
+      strategy: "transfer" as const,
+      description: "Procure comprehensive cyber insurance policy covering ransomware, data breach, and business interruption",
+      status: "completed" as const,
+      cost: "85000",
+      ownerId: adminUser.id,
+    },
+    {
+      riskId: marketRisk.id,
+      strategy: "tolerate" as const,
+      description: "Accept market expansion risk with documented risk tolerance and quarterly board review",
+      status: "completed" as const,
+      ownerId: adminUser.id,
+    },
+    {
+      riskId: regulatoryRisk.id,
+      strategy: "terminate" as const,
+      description: "Retire legacy payment gateway and migrate to PCI-DSS compliant modern platform",
+      status: "planned" as const,
+      dueDate: daysFromNow(90),
+      ownerId: rmUser.id,
+    },
+    {
+      riskId: apiGatewayRisk?.id ?? cloudRisk.id,
+      strategy: "treat" as const,
+      description: "Deploy Web Application Firewall (WAF) and DDoS protection layer in front of API gateway",
+      status: "in_progress" as const,
+      cost: "120000",
+      ownerId: roUser.id,
+    },
+    {
+      riskId: slaViolationsRisk?.id ?? cloudRisk.id,
+      strategy: "treat" as const,
+      description: "Vendor SLA renegotiation program with enhanced penalty clauses and monthly performance reviews",
+      status: "planned" as const,
+      dueDate: daysFromNow(45),
+      ownerId: rmUser.id,
+    },
+    {
+      riskId: gdprRisk?.id ?? regulatoryRisk.id,
+      strategy: "treat" as const,
+      description: "GDPR remediation project: subject rights portal, DPA updates, and consent management platform",
+      status: "in_progress" as const,
+      cost: "180000",
+      ownerId: rmUser.id,
+    },
+    {
+      riskId: soxRisk?.id ?? regulatoryRisk.id,
+      strategy: "treat" as const,
+      description: "SOX controls improvement: segregation of duties matrix, automated monitoring, and quarterly attestation",
+      status: "completed" as const,
+      cost: "95000",
+      ownerId: adminUser.id,
+    },
+    {
+      riskId: fxRisk?.id ?? cloudRisk.id,
+      strategy: "transfer" as const,
+      description: "Implement FX hedging strategy using forward contracts to cover 80% of USD/EUR exposure",
+      status: "in_progress" as const,
+      cost: "50000",
+      ownerId: adminUser.id,
+    },
+    {
+      riskId: legacySystemRisk?.id ?? cloudRisk.id,
+      strategy: "terminate" as const,
+      description: "Legacy system migration plan: full decommission and data migration to cloud-native replacement",
+      status: "planned" as const,
+      dueDate: daysFromNow(180),
+      ownerId: roUser.id,
+    },
+  ];
+
+  const treatments = await db.insert(treatmentsTable).values(
+    treatmentDefs.map((t) => ({
+      tenantId,
+      riskId: t.riskId,
+      strategy: t.strategy,
+      description: t.description,
+      status: t.status,
+      cost: t.cost ?? null,
+      dueDate: t.dueDate ?? null,
+      ownerId: t.ownerId,
+    }))
+  ).returning();
+
+  // Insert status events for each treatment
+  await db.insert(treatmentStatusEventsTable).values(
+    treatments.map((t) => ({
+      tenantId,
+      treatmentId: t.id,
+      fromStatus: null,
+      toStatus: t.status,
+      changedBy: adminUser.id,
+      note: "Initial status set during seeding",
+    }))
+  );
+
+  console.log(`[Seed] Created ${treatments.length} treatments with status events`);
+}
+
+async function seedKRIs(
+  tenantId: string,
+  baseRisks: Risk[],
+  expandedRisks: Risk[]
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM kris WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    return;
+  }
+
+  // Base risks: 0=Cloud Provider, 1=Data Breach, 2=Regulatory, 7=Ransomware, 9=Vendor Lock-in
+  // Expanded: 1=Legacy System End-of-Life, 3=DNS Hijacking, 8=GDPR
+  const cloudRisk = baseRisks[0];
+  const dataBreachRisk = baseRisks[1];
+  const regulatoryRisk = baseRisks[2];
+  const ransomwareRisk = baseRisks[7];
+  const vendorLockRisk = baseRisks[9];
+  const legacyRisk = expandedRisks[1];
+  const dnsRisk = expandedRisks[3];
+  const gdprRisk = expandedRisks[8];
+
+  const kriDefs = [
+    {
+      riskId: cloudRisk.id,
+      name: "System Uptime SLA",
+      description: "Percentage uptime across all production systems measured monthly",
+      warningThreshold: "99.5",
+      criticalThreshold: "99.0",
+      currentValue: "99.2",
+      unit: "%",
+    },
+    {
+      riskId: ransomwareRisk.id,
+      name: "Mean Time to Detect (MTTD)",
+      description: "Average time in hours from threat introduction to detection",
+      warningThreshold: "4",
+      criticalThreshold: "8",
+      currentValue: "6.5",
+      unit: "hours",
+    },
+    {
+      riskId: dataBreachRisk.id,
+      name: "Open Critical Vulnerabilities",
+      description: "Count of CVSS 9.0+ vulnerabilities open more than 30 days",
+      warningThreshold: "5",
+      criticalThreshold: "10",
+      currentValue: "12",
+      unit: "count",
+    },
+    {
+      riskId: vendorLockRisk.id,
+      name: "Vendor Risk Score Average",
+      description: "Average risk score across all critical and high tier vendors",
+      warningThreshold: "60",
+      criticalThreshold: "75",
+      currentValue: "58",
+      unit: "score",
+    },
+    {
+      riskId: legacyRisk?.id ?? dataBreachRisk.id,
+      name: "Patch Compliance Rate",
+      description: "Percentage of systems with current security patches applied within SLA",
+      warningThreshold: "95",
+      criticalThreshold: "90",
+      currentValue: "87",
+      unit: "%",
+    },
+    {
+      riskId: dnsRisk?.id ?? dataBreachRisk.id,
+      name: "Failed Login Attempts (24h)",
+      description: "Total failed authentication attempts across all production systems in 24 hours",
+      warningThreshold: "100",
+      criticalThreshold: "500",
+      currentValue: "245",
+      unit: "count",
+    },
+    {
+      riskId: gdprRisk?.id ?? regulatoryRisk.id,
+      name: "Data Loss Events (Monthly)",
+      description: "Count of confirmed or suspected data loss/exfiltration events per month",
+      warningThreshold: "2",
+      criticalThreshold: "5",
+      currentValue: "1",
+      unit: "count",
+    },
+    {
+      riskId: regulatoryRisk.id,
+      name: "Regulatory Findings Open",
+      description: "Count of open regulatory audit findings not yet remediated",
+      warningThreshold: "3",
+      criticalThreshold: "7",
+      currentValue: "4",
+      unit: "count",
+    },
+  ];
+
+  const kris = await db.insert(krisTable).values(
+    kriDefs.map((k) => ({
+      tenantId,
+      riskId: k.riskId,
+      name: k.name,
+      description: k.description,
+      warningThreshold: k.warningThreshold,
+      criticalThreshold: k.criticalThreshold,
+      currentValue: k.currentValue,
+      unit: k.unit,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${kris.length} KRIs`);
+}
+
+async function seedIncidents(
+  tenantId: string,
+  adminUser: User,
+  rmUser: User,
+  roUser: User,
+  baseRisks: Risk[],
+  expandedRisks: Risk[]
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM incidents WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    return;
+  }
+
+  const cloudRisk = baseRisks[0];
+  const dataBreachRisk = baseRisks[1];
+  const ransomwareRisk = baseRisks[7];
+  const soxRisk = expandedRisks[9];
+
+  const incidentDefs = [
+    {
+      riskId: ransomwareRisk.id,
+      title: "Phishing Campaign Targeting Finance Team",
+      description: "A coordinated spear-phishing campaign targeted 12 finance team members. Three employees clicked malicious links. No credentials were compromised after rapid IR response.",
+      severity: "high" as const,
+      reportedBy: rmUser.id,
+      occurredAt: daysFromNow(-45),
+      resolvedAt: daysFromNow(-42),
+    },
+    {
+      riskId: cloudRisk.id,
+      title: "CloudScale Regional Outage",
+      description: "CloudScale us-east-1 suffered a 4-hour regional outage due to network equipment failure. Acme Corp experienced degraded service affecting 2,400 end users.",
+      severity: "critical" as const,
+      reportedBy: roUser.id,
+      occurredAt: daysFromNow(-30),
+      resolvedAt: daysFromNow(-29),
+    },
+    {
+      riskId: dataBreachRisk.id,
+      title: "Unauthorized Data Export Attempt",
+      description: "SIEM detected an anomalous large data export from a customer database by an internal service account. Investigation confirmed no exfiltration occurred; account compromised via credential stuffing.",
+      severity: "medium" as const,
+      reportedBy: adminUser.id,
+      occurredAt: daysFromNow(-15),
+      resolvedAt: daysFromNow(-12),
+    },
+    {
+      riskId: soxRisk?.id ?? dataBreachRisk.id,
+      title: "SOX Audit Finding — Segregation of Duties",
+      description: "External auditors identified that two developers had conflicting access rights allowing them to both develop and deploy code changes to production without peer review.",
+      severity: "low" as const,
+      reportedBy: rmUser.id,
+      occurredAt: daysFromNow(-60),
+      resolvedAt: daysFromNow(-50),
+    },
+  ];
+
+  const incidents = await db.insert(incidentsTable).values(
+    incidentDefs.map((i) => ({
+      tenantId,
+      riskId: i.riskId,
+      title: i.title,
+      description: i.description,
+      severity: i.severity,
+      reportedBy: i.reportedBy,
+      occurredAt: i.occurredAt,
+      resolvedAt: i.resolvedAt,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${incidents.length} incidents`);
+}
+
+async function seedReviewCycles(
+  tenantId: string,
+  adminUser: User,
+  rmUser: User,
+  roUser: User,
+  baseRisks: Risk[]
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM review_cycles WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    return;
+  }
+
+  const cloudRisk = baseRisks[0];
+  const dataBreachRisk = baseRisks[1];
+  const regulatoryRisk = baseRisks[2];
+  const supplyChainRisk = baseRisks[4];
+  const ransomwareRisk = baseRisks[7];
+
+  const reviewDefs = [
+    {
+      riskId: cloudRisk.id,
+      status: "scheduled" as const,
+      dueDate: daysFromNow(10),
+      reviewerId: rmUser.id,
+      notes: "Quarterly review scheduled following CloudScale outage incident",
+    },
+    {
+      riskId: dataBreachRisk.id,
+      status: "overdue" as const,
+      dueDate: daysFromNow(-5),
+      reviewerId: rmUser.id,
+      notes: "Review overdue — awaiting updated vendor security questionnaire response",
+    },
+    {
+      riskId: ransomwareRisk.id,
+      status: "completed" as const,
+      dueDate: daysFromNow(-20),
+      completedAt: daysFromNow(-18),
+      reviewerId: adminUser.id,
+      notes: "Review completed following phishing incident. Risk score updated, insurance confirmed adequate.",
+    },
+    {
+      riskId: regulatoryRisk.id,
+      status: "overdue" as const,
+      dueDate: daysFromNow(-15),
+      reviewerId: roUser.id,
+      notes: "Review delayed pending legal counsel guidance on new regulatory guidance",
+    },
+    {
+      riskId: supplyChainRisk.id,
+      status: "scheduled" as const,
+      dueDate: daysFromNow(30),
+      reviewerId: roUser.id,
+      notes: "Annual supply chain risk review with procurement team",
+    },
+  ];
+
+  const reviews = await db.insert(reviewCyclesTable).values(
+    reviewDefs.map((r) => ({
+      tenantId,
+      riskId: r.riskId,
+      reviewerId: r.reviewerId,
+      status: r.status,
+      dueDate: r.dueDate,
+      completedAt: "completedAt" in r ? r.completedAt : null,
+      notes: r.notes,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${reviews.length} review cycles`);
+}
+
+// --------------------------------------------------------------------------
+// Task 2 seed functions
+// --------------------------------------------------------------------------
+
+async function seedExpandedVendors(
+  tenantId: string
+): Promise<Vendor[]> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM vendors WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 5) {
+    // Already seeded beyond the base 5
+    return [];
+  }
+
+  const expandedVendorDefs = [
+    {
+      name: "CyberVault Security",
+      tier: "critical" as const,
+      status: "risk_assessment" as const,
+      category: "Security",
+      contactEmail: "security@cybervault.io",
+      riskScore: "72",
+    },
+    {
+      name: "ComplianceIQ",
+      tier: "high" as const,
+      status: "due_diligence" as const,
+      category: "Compliance",
+      contactEmail: "contact@complianceiq.com",
+      riskScore: "45",
+    },
+    {
+      name: "NetWatch Monitoring",
+      tier: "medium" as const,
+      status: "contracting" as const,
+      category: "Infrastructure",
+      contactEmail: "sales@netwatch.net",
+      riskScore: "38",
+    },
+    {
+      name: "TalentStream HR",
+      tier: "low" as const,
+      status: "onboarding" as const,
+      category: "HR",
+      contactEmail: "vendor@talentstream.co",
+      riskScore: "25",
+    },
+    {
+      name: "LegacyPay Services",
+      tier: "high" as const,
+      status: "offboarding" as const,
+      category: "Payments",
+      contactEmail: "admin@legacypay.com",
+      riskScore: "81",
+    },
+    // Akamai CDN Services — needed as subprocessor for CloudScale
+    {
+      name: "Akamai CDN Services",
+      tier: "medium" as const,
+      status: "monitoring" as const,
+      category: "Infrastructure",
+      contactEmail: "enterprise@akamai.com",
+      riskScore: "30",
+    },
+  ];
+
+  const newVendors = await db.insert(vendorsTable).values(
+    expandedVendorDefs.map((v) => ({
+      tenantId,
+      name: v.name,
+      description: `Third-party vendor: ${v.name}`,
+      tier: v.tier,
+      status: v.status,
+      category: v.category,
+      contactEmail: v.contactEmail,
+      riskScore: v.riskScore,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${newVendors.length} expanded vendors`);
+  return newVendors;
+}
+
+async function seedSubprocessors(
+  tenantId: string,
+  baseVendors: Vendor[],
+  expandedVendors: Vendor[]
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM vendor_subprocessors WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    return;
+  }
+
+  // Base vendors: 0=CloudScale, 2=PayFlow
+  // Expanded vendors: 2=NetWatch Monitoring, 5=Akamai CDN Services, 4=LegacyPay Services
+  const cloudScaleVendor = baseVendors[0];
+  const payFlowVendor = baseVendors[2];
+  const netWatchVendor = expandedVendors[2];
+  const akamaiVendor = expandedVendors[5];
+  const legacyPayVendor = expandedVendors[4];
+
+  if (!cloudScaleVendor || !payFlowVendor || !netWatchVendor || !akamaiVendor || !legacyPayVendor) {
+    console.log("[Seed] Skipping subprocessors — required vendors not found");
+    return;
+  }
+
+  const subprocessorDefs = [
+    {
+      vendorId: cloudScaleVendor.id,
+      subprocessorId: netWatchVendor.id,
+      criticality: "critical" as const,
+      discoveredBy: "manual" as const,
+      relationshipType: "Infrastructure hosting",
+    },
+    {
+      vendorId: cloudScaleVendor.id,
+      subprocessorId: akamaiVendor.id,
+      criticality: "medium" as const,
+      discoveredBy: "llm" as const,
+      relationshipType: "Content delivery",
+    },
+    {
+      vendorId: payFlowVendor.id,
+      subprocessorId: legacyPayVendor.id,
+      criticality: "high" as const,
+      discoveredBy: "manual" as const,
+      relationshipType: "Payment processing fallback",
+    },
+  ];
+
+  const subprocessors = await db.insert(vendorSubprocessorsTable).values(
+    subprocessorDefs.map((s) => ({
+      tenantId,
+      vendorId: s.vendorId,
+      subprocessorId: s.subprocessorId,
+      criticality: s.criticality,
+      discoveredBy: s.discoveredBy,
+      relationshipType: s.relationshipType,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${subprocessors.length} vendor subprocessor relationships`);
+}
+
+async function seedOrgDependencies(
+  tenantId: string
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM org_dependencies WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    return;
+  }
+
+  const orgDepDefs = [
+    {
+      category: "email" as const,
+      providerName: "Microsoft 365",
+      vendorId: null,
+      criticality: "critical",
+      notes: "Primary email and collaboration platform used by all 450+ employees",
+    },
+    {
+      category: "cloud" as const,
+      providerName: "Amazon Web Services",
+      vendorId: null,
+      criticality: "critical",
+      notes: "Primary cloud infrastructure provider hosting all production workloads",
+    },
+    {
+      category: "cdn" as const,
+      providerName: "Cloudflare",
+      vendorId: null,
+      criticality: "high",
+      notes: "Content delivery and DDoS protection for customer-facing applications",
+    },
+    {
+      category: "identity" as const,
+      providerName: "Okta",
+      vendorId: null,
+      criticality: "critical",
+      notes: "Identity provider for SSO and MFA across all internal applications",
+    },
+  ];
+
+  const deps = await db.insert(orgDependenciesTable).values(
+    orgDepDefs.map((d) => ({
+      tenantId,
+      category: d.category,
+      providerName: d.providerName,
+      vendorId: d.vendorId,
+      criticality: d.criticality,
+      notes: d.notes,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${deps.length} org dependencies`);
+}
+
+async function seedMonitoringConfigs(
+  tenantId: string
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM monitoring_configs WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    return;
+  }
+
+  const monitoringDefs = [
+    { tier: "critical" as const, cadenceDays: 7, scoreThreshold: 70 },
+    { tier: "high" as const, cadenceDays: 30, scoreThreshold: 60 },
+    { tier: "medium" as const, cadenceDays: 90, scoreThreshold: 50 },
+    { tier: "low" as const, cadenceDays: 180, scoreThreshold: null },
+  ];
+
+  const configs = await db.insert(monitoringConfigsTable).values(
+    monitoringDefs.map((m) => ({
+      tenantId,
+      tier: m.tier,
+      cadenceDays: m.cadenceDays,
+      scoreThreshold: m.scoreThreshold,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${configs.length} monitoring configs`);
+}
+
+async function seedRiskAppetiteConfigs(
+  tenantId: string
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM risk_appetite_configs WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    return;
+  }
+
+  const appetiteDefs = [
+    { category: "technology" as const, threshold: 65 },
+    { category: "operational" as const, threshold: 60 },
+    { category: "compliance" as const, threshold: 50 },
+    { category: "financial" as const, threshold: 55 },
+    { category: "strategic" as const, threshold: 70 },
+    { category: "reputational" as const, threshold: 60 },
+  ];
+
+  const appetiteConfigs = await db.insert(riskAppetiteConfigsTable).values(
+    appetiteDefs.map((a) => ({
+      tenantId,
+      category: a.category,
+      threshold: a.threshold,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${appetiteConfigs.length} risk appetite configs`);
+}
+
+// --------------------------------------------------------------------------
+// Main seed entry point
+// --------------------------------------------------------------------------
+
 export async function seedDemoDataIfEmpty(): Promise<void> {
   try {
     const existing = await db.select().from(tenantsTable).where(eq(tenantsTable.slug, "acme")).limit(1);
@@ -520,6 +1416,22 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
 
     const nistCount = await seedRequirements(tenant.id, nistFramework.id, nistCsfRequirements, "NIST CSF 2.0");
     console.log(`[Seed] Created NIST CSF 2.0 framework with ${nistCount} requirements`);
+
+    // ---------- Expanded data (Task 1 + Task 2) ----------
+
+    // Task 1: Risks, treatments, KRIs, incidents, review cycles
+    const expandedRisks = await seedExpandedRisks(tenant.id, adminUser, rmUser, roUser);
+    await seedTreatments(tenant.id, adminUser, rmUser, roUser, risks, expandedRisks);
+    await seedKRIs(tenant.id, risks, expandedRisks);
+    await seedIncidents(tenant.id, adminUser, rmUser, roUser, risks, expandedRisks);
+    await seedReviewCycles(tenant.id, adminUser, rmUser, roUser, risks);
+
+    // Task 2: Expanded vendors, subprocessors, org deps, monitoring, appetite
+    const expandedVendors = await seedExpandedVendors(tenant.id);
+    await seedSubprocessors(tenant.id, vendors, expandedVendors);
+    await seedOrgDependencies(tenant.id);
+    await seedMonitoringConfigs(tenant.id);
+    await seedRiskAppetiteConfigs(tenant.id);
 
     console.log(`[Seed] Done — Acme Corp demo dataset created. Login: any-user@acme.com / Ballpen-Kiosk-0!`);
   } catch (err) {
