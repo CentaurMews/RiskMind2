@@ -321,3 +321,13 @@ Plans:
 Plans:
 - [x] 17-01-PLAN.md — Create RiskParallelChart ECharts component with 6-axis parallel coordinates, severity colors, brushing, tooltips, click navigation
 - [x] 17-02-PLAN.md — Integrate into dashboard page with Heatmap/Explorer toggle, shared filters, mobile fallback, human verification
+
+### Phase 18: Comprehensive Demo Seed Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 17
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 18 to break down)
