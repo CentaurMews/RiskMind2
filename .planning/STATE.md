@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to execute
-stopped_at: Completed 19-demo-ready-seed-data 19-01-PLAN.md
-last_updated: "2026-03-24T14:51:17.735Z"
+status: Milestone complete
+stopped_at: Completed 19-demo-ready-seed-data 19-02-PLAN.md
+last_updated: "2026-03-24T15:05:20.475Z"
 progress:
   total_phases: 11
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 29
-  completed_plans: 28
+  completed_plans: 29
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 
 ## Current Position
 
-Phase: 19 (demo-ready-seed-data) — EXECUTING
-Plan: 2 of 2
+Phase: 19
+Plan: Not started
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Plan: 2 of 2
 | Phase 18 P02 | 540 | 2 tasks | 2 files |
 | Phase 18-comprehensive-demo-seed-data P03 | 300 | 2 tasks | 1 files |
 | Phase 19-demo-ready-seed-data P01 | 4 | 2 tasks | 2 files |
+| Phase 19-demo-ready-seed-data P02 | 8 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,8 @@ Recent decisions affecting current work:
 - [Phase 19-demo-ready-seed-data]: DPIA template uses sec-dp-xxx/q-dp-xxx ID convention matching existing templates
 - [Phase 19-demo-ready-seed-data]: seedRealVendors idempotency guard checks for Microsoft vendor name presence
 - [Phase 19-demo-ready-seed-data]: complianceThreshold only set when value is null to avoid overwriting existing thresholds
+- [Phase 19-demo-ready-seed-data]: controlDefs defined at module level so both seedControls and seedControlRequirementMaps share isoCode without parameter duplication
+- [Phase 19-demo-ready-seed-data]: seedCompletedAssessments calls seedPrebuiltTemplates internally to ensure DPIA template exists before querying
 
 ### Roadmap Evolution
 
@@ -185,7 +188,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T14:51:17.720Z
-Stopped at: Completed 19-demo-ready-seed-data 19-01-PLAN.md
+Last session: 2026-03-24T15:00:24.694Z
+Stopped at: Completed 19-demo-ready-seed-data 19-02-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
