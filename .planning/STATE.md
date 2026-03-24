@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Phase complete — ready for verification
-stopped_at: Phase 19 context gathered
-last_updated: "2026-03-24T13:13:26.177Z"
+status: Ready to execute
+stopped_at: Completed 19-demo-ready-seed-data 19-01-PLAN.md
+last_updated: "2026-03-24T14:51:17.735Z"
 progress:
   total_phases: 11
   completed_phases: 8
-  total_plans: 27
-  completed_plans: 27
+  total_plans: 29
+  completed_plans: 28
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** A working, demo-ready enterprise risk management platform powered by intelligent AI routing at https://app.riskmind.net
-**Current focus:** Phase 18 — comprehensive-demo-seed-data
+**Current focus:** Phase 19 — demo-ready-seed-data
 
 ## Current Position
 
-Phase: 18 (comprehensive-demo-seed-data) — EXECUTING
-Plan: 3 of 3
+Phase: 19 (demo-ready-seed-data) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Plan: 3 of 3
 | Phase 18-comprehensive-demo-seed-data P01 | 434 | 2 tasks | 1 files |
 | Phase 18 P02 | 540 | 2 tasks | 2 files |
 | Phase 18-comprehensive-demo-seed-data P03 | 300 | 2 tasks | 1 files |
+| Phase 19-demo-ready-seed-data P01 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,9 @@ Recent decisions affecting current work:
 - [Phase 18]: lib/db package.json exports extended with ./seed/prebuilt-templates entry to satisfy bundler module resolution
 - [Phase 18-comprehensive-demo-seed-data]: Deterministic sine-wave noise formula for risk snapshot seed: baseScore + 2 * Math.sin(dayIndex * 0.7) — reproducible across runs
 - [Phase 18-comprehensive-demo-seed-data]: riskSnapshotsTable batch insert (90 rows in single db.insert() call) with count(*) === 0 idempotency guard — called last in seedDemoDataIfEmpty()
+- [Phase 19-demo-ready-seed-data]: DPIA template uses sec-dp-xxx/q-dp-xxx ID convention matching existing templates
+- [Phase 19-demo-ready-seed-data]: seedRealVendors idempotency guard checks for Microsoft vendor name presence
+- [Phase 19-demo-ready-seed-data]: complianceThreshold only set when value is null to avoid overwriting existing thresholds
 
 ### Roadmap Evolution
 
@@ -181,7 +185,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T13:13:26.160Z
-Stopped at: Phase 19 context gathered
-Resume file: .planning/phases/19-demo-ready-seed-data/19-CONTEXT.md
+Last session: 2026-03-24T14:51:17.720Z
+Stopped at: Completed 19-demo-ready-seed-data 19-01-PLAN.md
+Resume file: None
 Next step: `/gsd:plan-phase 9`
