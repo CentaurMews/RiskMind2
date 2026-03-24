@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to plan
-stopped_at: Completed 17-01-PLAN.md — RiskParallelChart component
-last_updated: "2026-03-24T10:25:00.621Z"
+stopped_at: Checkpoint 17-02 task 2 — awaiting human verify of Risk Explorer in browser
+last_updated: "2026-03-24T10:40:12.849Z"
 progress:
   total_phases: 9
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 24
-  completed_plans: 23
+  completed_plans: 24
 ---
 
 # Project State
@@ -68,6 +68,7 @@ Plan: Not started
 | Phase 16-risk-heatmap-dashboard-redesign P01 | 392 | 3 tasks | 7 files |
 | Phase 16-risk-heatmap-dashboard-redesign P02 | 269 | 2 tasks | 4 files |
 | Phase 17-parallel-coordinates-risk-explorer P01 | 3508 | 1 tasks | 1 files |
+| Phase 17-parallel-coordinates-risk-explorer P02 | 438 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,8 @@ Recent decisions affecting current work:
 - [Phase 17-parallel-coordinates-risk-explorer]: inactiveOpacity/activeOpacity on parallel series for vivid brush-selected vs near-invisible unselected lines — no custom event handling needed
 - [Phase 17-parallel-coordinates-risk-explorer]: riskIdMap array maintained parallel to seriesData rows for O(1) dataIndex -> risk.id lookup on click
 - [Phase 17-parallel-coordinates-risk-explorer]: fontWeight must be numeric (600 not '600') for ECharts ZRFontWeight type compatibility
+- [Phase 17-parallel-coordinates-risk-explorer]: viewMode state in risk-heatmap.tsx — ephemeral toggle, no URL param needed
+- [Phase 17-parallel-coordinates-risk-explorer]: allRisks derived from filteredCells so domain card and above-appetite filters flow to Explorer automatically without extra wiring
 
 ### Roadmap Evolution
 
@@ -167,7 +170,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T10:25:00.608Z
-Stopped at: Completed 17-01-PLAN.md — RiskParallelChart component
+Last session: 2026-03-24T10:40:12.841Z
+Stopped at: Checkpoint 17-02 task 2 — awaiting human verify of Risk Explorer in browser
 Resume file: None
 Next step: `/gsd:plan-phase 9`
