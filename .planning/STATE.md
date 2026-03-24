@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Phase complete — ready for verification
-stopped_at: Completed 12-05-PLAN.md (awaiting human verification at checkpoint)
-last_updated: "2026-03-23T17:12:44.931Z"
+status: Ready to execute
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-03-24T05:03:31.245Z"
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 4
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 19
+  completed_plans: 18
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** A working, demo-ready enterprise risk management platform powered by intelligent AI routing at https://app.riskmind.net
-**Current focus:** Phase 12 — signal-integrations
+**Current focus:** Phase 15 — migrate-risk-heatmap-from-css-grid-to-apache-echarts
 
 ## Current Position
 
-Phase: 12 (signal-integrations) — EXECUTING
-Plan: 5 of 5
+Phase: 15 (migrate-risk-heatmap-from-css-grid-to-apache-echarts) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Plan: 5 of 5
 | Phase 12-signal-integrations P03 | 191 | 2 tasks | 3 files |
 | Phase 12-signal-integrations P04 | 100 | 1 tasks | 4 files |
 | Phase 12-signal-integrations P05 | 265 | 3 tasks | 3 files |
+| Phase 15-migrate-risk-heatmap-from-css-grid-to-apache-echarts P01 | 120 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,9 @@ Recent decisions affecting current work:
 - [Phase 12-signal-integrations]: Email LLM fallback: if complete() throws or returns unparseable JSON, signal still created with subject as title and info severity — never silently drops emails
 - [Phase 12-signal-integrations]: IntegrationCard defined inline in settings.tsx for co-location — consistent with existing settings component patterns
 - [Phase 12-signal-integrations]: SignalDetailPanel fetches /api/v1/signals/:id on open — metadata not in Orval-generated Signal list response type
+- [Phase Phase 15-01]: Position-based severity coloring via itemStyle.color callback (L*I score from indices) — no visualMap
+- [Phase Phase 15-01]: MutationObserver on documentElement.class triggers useMemo recompute for CSS variable extraction on dark mode toggle
+- [Phase Phase 15-01]: heatmapData format is [impactIndex, likelihoodIndex, count] — x-axis=Impact, y-axis=Likelihood per ECharts convention
 
 ### Roadmap Evolution
 
@@ -148,7 +152,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-23T17:12:44.919Z
-Stopped at: Completed 12-05-PLAN.md (awaiting human verification at checkpoint)
+Last session: 2026-03-24T05:03:31.231Z
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
