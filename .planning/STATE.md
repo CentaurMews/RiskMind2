@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to execute
-stopped_at: Completed 16-01-PLAN.md — backend risk dashboard foundation
-last_updated: "2026-03-24T06:48:31.028Z"
+stopped_at: Completed 16-02-PLAN.md — frontend dashboard components
+last_updated: "2026-03-24T06:55:08.242Z"
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 22
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 16 (risk-heatmap-dashboard-redesign) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Plan: 2 of 3
 | Phase 15-migrate-risk-heatmap-from-css-grid-to-apache-echarts P01 | 120 | 2 tasks | 3 files |
 | Phase 15-migrate-risk-heatmap-from-css-grid-to-apache-echarts P02 | 300 | 1 tasks | 1 files |
 | Phase 16-risk-heatmap-dashboard-redesign P01 | 392 | 3 tasks | 7 files |
+| Phase 16-risk-heatmap-dashboard-redesign P02 | 269 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,9 @@ Recent decisions affecting current work:
 - [Phase 16-risk-heatmap-dashboard-redesign]: computeCompositeScore and buildCellCounts exported as pure functions for unit testing without DB dependency
 - [Phase 16-risk-heatmap-dashboard-redesign]: Dashboard endpoint returns collecting:true with live-computed values when no snapshot rows exist yet
 - [Phase 16-risk-heatmap-dashboard-redesign]: Appetite PUT triggers non-blocking async snapshot recapture via .catch() to avoid blocking HTTP response
+- [Phase 16-risk-heatmap-dashboard-redesign]: RiskHeatmapChart backward-compatible — cellDeltas and aboveAppetiteCells are optional props; label font 14→11 with overflow:truncate prevents cell label overflow at 60% width
+- [Phase 16-risk-heatmap-dashboard-redesign]: CSS posture bar chosen over ECharts gauge for RiskPostureBar — simpler, responsive, theme-compatible
+- [Phase 16-risk-heatmap-dashboard-redesign]: KriTrendPanel annotation markPoints require name field per EChartsOption MarkPointDataItemOption type — added name:a.label
 
 ### Roadmap Evolution
 
@@ -159,7 +163,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T06:48:31.014Z
-Stopped at: Completed 16-01-PLAN.md — backend risk dashboard foundation
+Last session: 2026-03-24T06:55:08.228Z
+Stopped at: Completed 16-02-PLAN.md — frontend dashboard components
 Resume file: None
 Next step: `/gsd:plan-phase 9`
