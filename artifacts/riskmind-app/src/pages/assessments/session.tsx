@@ -307,7 +307,7 @@ export default function AssessmentSession() {
       setAiLoadingForQuestion(questionId);
       try {
         const token = localStorage.getItem("accessToken");
-        const res = await fetch(`/v1/assessments/${assessmentId}/follow-up`, {
+        const res = await fetch(`/api/v1/assessments/${assessmentId}/follow-up`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

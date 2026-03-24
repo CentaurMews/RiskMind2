@@ -208,7 +208,7 @@ export default function TemplateBuilder() {
     const loadTemplate = async () => {
       try {
         const token = localStorage.getItem("accessToken");
-        const res = await fetch(`/v1/assessment-templates/${templateId}`, {
+        const res = await fetch(`/api/v1/assessment-templates/${templateId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Failed to load template");
@@ -290,8 +290,8 @@ export default function TemplateBuilder() {
       };
 
       const url = isEditMode
-        ? `/v1/assessment-templates/${templateId}`
-        : "/v1/assessment-templates";
+        ? `/api/v1/assessment-templates/${templateId}`
+        : "/api/v1/assessment-templates";
       const method = isEditMode ? "PATCH" : "POST";
 
       const res = await fetch(url, {

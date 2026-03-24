@@ -119,7 +119,7 @@ export default function TemplateLibrary() {
     try {
       const params = filter !== "all" ? `?contextType=${filter}` : "";
       const token = localStorage.getItem("accessToken");
-      const res = await fetch(`/v1/assessment-templates${params}`, {
+      const res = await fetch(`/api/v1/assessment-templates${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to fetch templates");
@@ -144,7 +144,7 @@ export default function TemplateLibrary() {
   const handleClone = async (id: string) => {
     try {
       const token = localStorage.getItem("accessToken");
-      const res = await fetch(`/v1/assessment-templates/${id}/clone`, {
+      const res = await fetch(`/api/v1/assessment-templates/${id}/clone`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -165,7 +165,7 @@ export default function TemplateLibrary() {
     setDeletingId(id);
     try {
       const token = localStorage.getItem("accessToken");
-      const res = await fetch(`/v1/assessment-templates/${id}`, {
+      const res = await fetch(`/api/v1/assessment-templates/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
