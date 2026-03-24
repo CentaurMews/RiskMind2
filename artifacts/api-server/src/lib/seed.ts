@@ -5,9 +5,12 @@ import {
   risksTable,
   vendorsTable,
   signalsTable,
+  findingsTable,
   alertsTable,
   frameworksTable,
   frameworkRequirementsTable,
+  assessmentsTable,
+  assessmentTemplatesTable,
   treatmentsTable,
   treatmentStatusEventsTable,
   krisTable,
@@ -20,6 +23,7 @@ import {
 } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
+import { seedPrebuiltTemplates } from "@workspace/db/seed/prebuilt-templates";
 
 // Framework requirement data inlined from scripts/src/framework-data/
 
@@ -1245,6 +1249,556 @@ async function seedRiskAppetiteConfigs(
 }
 
 // --------------------------------------------------------------------------
+// Task 3 seed functions (Plan 18-02)
+// --------------------------------------------------------------------------
+
+async function seedAssessments(
+  tenantId: string,
+  vendors: Vendor[],
+  isoFrameworkId: string
+): Promise<void> {
+  // Step 1: Ensure pre-built templates exist
+  await seedPrebuiltTemplates(tenantId);
+
+  // Step 2: Check if assessments already seeded
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM assessments WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    console.log("[Seed] Assessments already seeded, skipping");
+    return;
+  }
+
+  // Step 3: Look up "Vendor Security Assessment" template
+  const [vsTemplate] = await db
+    .select({ id: assessmentTemplatesTable.id })
+    .from(assessmentTemplatesTable)
+    .where(
+      sql`tenant_id = ${tenantId} AND title = 'Vendor Security Assessment'`
+    )
+    .limit(1);
+
+  if (!vsTemplate) {
+    console.log("[Seed] Vendor Security Assessment template not found, skipping assessments");
+    return;
+  }
+
+  // Base vendors: 0=CloudScale, 1=DataGuard Pro, 2=PayFlow Systems
+  const cloudScale = vendors[0];
+  const dataGuard = vendors[1];
+  const payFlow = vendors[2];
+
+  if (!cloudScale || !dataGuard || !payFlow) {
+    console.log("[Seed] Required vendors not found, skipping assessments");
+    return;
+  }
+
+  // CloudScale assessment — score 72.50
+  const cloudScaleResponses = {
+    "q-vs-001": { value: "true", score: 1.0 },
+    "q-vs-002": { value: "16", score: 0.5 },
+    "q-vs-003": { value: "quarterly", score: 0.75 },
+    "q-vs-006": { value: "true", score: 1.0 },
+    "q-vs-007": { value: "AES-256", score: 1.0 },
+    "q-vs-008": { value: "true", score: 1.0 },
+    "q-vs-011": { value: "true", score: 1.0 },
+    "q-vs-013": { value: "6", score: 0.75 },
+    "q-vs-014": { value: "48hrs", score: 0.75 },
+    "q-vs-016": { value: "true", score: 1.0 },
+    "q-vs-017": { value: "4", score: 0.85 },
+    "q-vs-018": { value: "8", score: 0.7 },
+    "q-vs-019": { value: "quarterly", score: 0.75 },
+    "q-vs-020": { value: "true", score: 1.0 },
+    "q-vs-021": { value: "true", score: 1.0 },
+    "q-vs-022": { value: "in-progress", score: 0.5 },
+    "q-vs-023": { value: "true", score: 1.0 },
+    "q-vs-025": { value: "true", score: 1.0 },
+  };
+
+  // DataGuard Pro assessment — score 55.30 (weaker posture in business continuity)
+  const dataGuardResponses = {
+    "q-vs-001": { value: "true", score: 1.0 },
+    "q-vs-002": { value: "12", score: 0.4 },
+    "q-vs-003": { value: "annually", score: 0.5 },
+    "q-vs-006": { value: "true", score: 1.0 },
+    "q-vs-007": { value: "AES-128", score: 0.75 },
+    "q-vs-008": { value: "true", score: 1.0 },
+    "q-vs-011": { value: "true", score: 1.0 },
+    "q-vs-013": { value: "24", score: 0.4 },
+    "q-vs-014": { value: "72hrs", score: 0.5 },
+    "q-vs-016": { value: "false", score: 0.0 },
+    "q-vs-017": { value: "24", score: 0.3 },
+    "q-vs-018": { value: "48", score: 0.2 },
+    "q-vs-019": { value: "annually", score: 0.25 },
+    "q-vs-020": { value: "false", score: 0.0 },
+    "q-vs-021": { value: "true", score: 1.0 },
+    "q-vs-022": { value: "in-progress", score: 0.5 },
+    "q-vs-023": { value: "true", score: 1.0 },
+    "q-vs-025": { value: "false", score: 0.0 },
+  };
+
+  // PayFlow Systems assessment — score 81.20 (strong across all sections)
+  const payFlowResponses = {
+    "q-vs-001": { value: "true", score: 1.0 },
+    "q-vs-002": { value: "20", score: 1.0 },
+    "q-vs-003": { value: "monthly", score: 1.0 },
+    "q-vs-006": { value: "true", score: 1.0 },
+    "q-vs-007": { value: "AES-256", score: 1.0 },
+    "q-vs-008": { value: "true", score: 1.0 },
+    "q-vs-011": { value: "true", score: 1.0 },
+    "q-vs-013": { value: "2", score: 1.0 },
+    "q-vs-014": { value: "24hrs", score: 1.0 },
+    "q-vs-016": { value: "true", score: 1.0 },
+    "q-vs-017": { value: "1", score: 1.0 },
+    "q-vs-018": { value: "4", score: 0.9 },
+    "q-vs-019": { value: "quarterly", score: 0.75 },
+    "q-vs-020": { value: "true", score: 1.0 },
+    "q-vs-021": { value: "true", score: 1.0 },
+    "q-vs-022": { value: "compliant", score: 1.0 },
+    "q-vs-023": { value: "true", score: 1.0 },
+    "q-vs-025": { value: "true", score: 1.0 },
+  };
+
+  // Step 4: Insert 3 completed vendor assessments
+  await db.insert(assessmentsTable).values([
+    {
+      tenantId,
+      templateId: vsTemplate.id,
+      contextType: "vendor" as const,
+      contextId: cloudScale.id,
+      status: "completed" as const,
+      score: "72.50",
+      responses: cloudScaleResponses,
+      aiSummary: "CloudScale demonstrates strong encryption practices (AES-256) and has a documented incident response plan tested within 12 months. Key concerns include quarterly-only privileged access reviews and 48-hour breach notification timeline. Business continuity RPO of 4 hours meets requirements. GDPR compliance is in progress. Overall vendor risk is moderate-high due to access control cadence gaps.",
+    },
+    {
+      tenantId,
+      templateId: vsTemplate.id,
+      contextType: "vendor" as const,
+      contextId: dataGuard.id,
+      status: "completed" as const,
+      score: "55.30",
+      responses: dataGuardResponses,
+      aiSummary: "DataGuard Pro shows adequate logical access controls but exhibits significant gaps in business continuity planning. No geographically redundant infrastructure is in place, and disaster recovery is tested annually only. Breach notification timeline of 72 hours is below best practice. Password policy minimum of 12 characters is below the recommended 16. Overall vendor risk is elevated with immediate remediation recommended for BCP gaps.",
+    },
+    {
+      tenantId,
+      templateId: vsTemplate.id,
+      contextType: "vendor" as const,
+      contextId: payFlow.id,
+      status: "completed" as const,
+      score: "81.20",
+      responses: payFlowResponses,
+      aiSummary: "PayFlow Systems demonstrates an exemplary security posture across all assessment domains. MFA is enforced, encryption uses AES-256, and the incident response plan is actively maintained with monthly privileged access reviews. Business continuity planning is robust with a 1-hour RPO and 4-hour RTO. GDPR compliance is fully achieved. Minor improvement areas include semi-annual DR testing cadence. Overall vendor risk is low.",
+    },
+  ]);
+
+  // Step 5: Update vendor riskScores based on assessment results
+  // riskScore = 100 - assessment score (higher score = lower risk)
+  await db.update(vendorsTable).set({ riskScore: "27.50" }).where(eq(vendorsTable.id, cloudScale.id));
+  await db.update(vendorsTable).set({ riskScore: "44.70" }).where(eq(vendorsTable.id, dataGuard.id));
+  await db.update(vendorsTable).set({ riskScore: "18.80" }).where(eq(vendorsTable.id, payFlow.id));
+
+  // Step 6: Look up "Compliance Control Assessment" template
+  const [ccTemplate] = await db
+    .select({ id: assessmentTemplatesTable.id })
+    .from(assessmentTemplatesTable)
+    .where(
+      sql`tenant_id = ${tenantId} AND title = 'Compliance Control Assessment'`
+    )
+    .limit(1);
+
+  if (!ccTemplate) {
+    console.log("[Seed] Compliance Control Assessment template not found, skipping compliance assessment");
+    return;
+  }
+
+  // ISO 27001 compliance control assessment responses
+  const isoComplianceResponses = {
+    "q-cc-001": { value: "true", score: 1.0 },
+    "q-cc-002": { value: "true", score: 1.0 },
+    "q-cc-003": { value: "weekly", score: 0.75 },
+    "q-cc-004": { value: "preventive", score: 1.0 },
+    "q-cc-005": { value: "partially-automated", score: 0.6 },
+    "q-cc-006": { value: "7", score: 0.7 },
+    "q-cc-007": { value: "true", score: 1.0 },
+    "q-cc-008": { value: "2024-03-15", score: 1.0 },
+    "q-cc-009": { value: "2024-09-01", score: 1.0 },
+    "q-cc-010": { value: "6", score: 0.6 },
+    "q-cc-011": { value: "false", score: 0.0 },
+    "q-cc-012": { value: "true", score: 1.0 },
+    "q-cc-013": { value: "within-90-days", score: 0.75 },
+    "q-cc-014": { value: "true", score: 1.0 },
+    "q-cc-015": { value: "true", score: 1.0 },
+    "q-cc-017": { value: "true", score: 0.0 },
+    "q-cc-018": { value: "medium", score: 0.5 },
+    "q-cc-019": { value: "true", score: 1.0 },
+    "q-cc-020": { value: "60-days", score: 0.75 },
+    "q-cc-021": { value: "false", score: 0.0 },
+    "q-cc-022": { value: "Two medium-severity gaps identified in access management controls. Remediation plans targeting 60-day resolution are in progress.", score: 1.0 },
+  };
+
+  // Step 6: Create compliance assessment for ISO 27001
+  await db.insert(assessmentsTable).values({
+    tenantId,
+    templateId: ccTemplate.id,
+    contextType: "framework" as const,
+    contextId: isoFrameworkId,
+    status: "completed" as const,
+    score: "68.40",
+    responses: isoComplianceResponses,
+    aiSummary: "ISO 27001 control assessment reveals strong control design with documented objectives and assigned owners. Control automation is partial across most areas. Evidence currency needs improvement — 35% of controls have evidence older than 90 days. Two medium-severity gaps identified in access management controls with remediation plans targeting 60-day resolution.",
+  });
+
+  console.log("[Seed] Created 3 vendor assessments + 1 compliance assessment, updated vendor riskScores");
+}
+
+async function seedExpandedSignals(
+  tenantId: string,
+  vendors: Vendor[]
+): Promise<Record<string, string>> {
+  // Check if any signals with contentHash exist (expanded signals guard)
+  const hashCountResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM signals WHERE tenant_id = ${tenantId} AND content_hash IS NOT NULL`
+  );
+  const existingWithHash = (hashCountResult.rows[0] as { cnt: number }).cnt;
+  if (existingWithHash > 0) {
+    console.log("[Seed] Expanded signals already seeded, skipping");
+    // Return a mapping so seedFindings can use the externalIds
+    const existing = await db
+      .select({ id: signalsTable.id, externalId: signalsTable.externalId })
+      .from(signalsTable)
+      .where(sql`tenant_id = ${tenantId} AND external_id IS NOT NULL`);
+    return Object.fromEntries(existing.filter((s) => s.externalId).map((s) => [s.externalId!, s.id]));
+  }
+
+  // Base vendors: 0=CloudScale, 1=DataGuard Pro, 2=PayFlow Systems
+  const cloudScale = vendors[0];
+  const dataGuard = vendors[1];
+  const payFlow = vendors[2];
+
+  const signalDefs = [
+    // NVD CVE signals
+    {
+      source: "nvd",
+      content: "CVE-2024-21762: FortiOS out-of-bounds write vulnerability in SSL VPN. CVSS 9.8. Allows remote code execution via crafted HTTP requests.",
+      status: "triaged" as const,
+      classification: "technology",
+      confidence: "0.9500",
+      externalId: "CVE-2024-21762",
+      vendorId: null as string | null,
+      contentHash: "0001000100010001000100010001000100010001000100010001000100010001",
+      metadata: { cvssScore: 9.8, cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", cweId: "CWE-787", publishedDate: "2024-02-09", affectedProducts: ["FortiOS 7.4.0-7.4.2"] },
+    },
+    {
+      source: "nvd",
+      content: "CVE-2024-3400: Palo Alto PAN-OS command injection in GlobalProtect gateway. CVSS 10.0.",
+      status: "finding" as const,
+      classification: "technology",
+      confidence: "0.9800",
+      externalId: "CVE-2024-3400",
+      vendorId: null as string | null,
+      contentHash: "0002000200020002000200020002000200020002000200020002000200020002",
+      metadata: { cvssScore: 10.0, cweId: "CWE-77", publishedDate: "2024-04-12" },
+    },
+    {
+      source: "nvd",
+      content: "CVE-2024-1709: ConnectWise ScreenConnect authentication bypass. CVSS 10.0.",
+      status: "triaged" as const,
+      classification: "technology",
+      confidence: "0.9500",
+      externalId: "CVE-2024-1709",
+      vendorId: null as string | null,
+      contentHash: "0003000300030003000300030003000300030003000300030003000300030003",
+      metadata: { cvssScore: 10.0, cweId: "CWE-288" },
+    },
+    {
+      source: "nvd",
+      content: "CVE-2024-27198: JetBrains TeamCity authentication bypass allowing admin access. CVSS 9.8.",
+      status: "dismissed" as const,
+      classification: "technology",
+      confidence: "0.9200",
+      externalId: "CVE-2024-27198",
+      vendorId: null as string | null,
+      contentHash: "0004000400040004000400040004000400040004000400040004000400040004",
+      metadata: { cvssScore: 9.8, cweId: "CWE-288" },
+    },
+    // Shodan signals
+    {
+      source: "shodan",
+      content: "Open port 3389 (RDP) detected on cloudscale.io infrastructure. Service: Microsoft Terminal Services.",
+      status: "finding" as const,
+      classification: "technology",
+      confidence: "0.9000",
+      externalId: "shodan-rdp-cloudscale",
+      vendorId: cloudScale?.id ?? null,
+      contentHash: "0005000500050005000500050005000500050005000500050005000500050005",
+      metadata: { ip: "198.51.100.42", port: 3389, service: "Microsoft Terminal Services", transport: "tcp", timestamp: "2024-11-15T08:30:00Z" },
+    },
+    {
+      source: "shodan",
+      content: "Exposed MongoDB instance on port 27017 without authentication detected for dataguard.com.",
+      status: "triaged" as const,
+      classification: "technology",
+      confidence: "0.8800",
+      externalId: "shodan-mongo-dataguard",
+      vendorId: dataGuard?.id ?? null,
+      contentHash: "0006000600060006000600060006000600060006000600060006000600060006",
+      metadata: { ip: "203.0.113.15", port: 27017, service: "MongoDB", vulns: ["CVE-2023-44487"] },
+    },
+    {
+      source: "shodan",
+      content: "SSL certificate expired on payflow.io payment gateway endpoint.",
+      status: "pending" as const,
+      classification: "technology",
+      confidence: "0.8500",
+      externalId: "shodan-ssl-payflow",
+      vendorId: payFlow?.id ?? null,
+      contentHash: "0007000700070007000700070007000700070007000700070007000700070007",
+      metadata: { ip: "192.0.2.88", port: 443, certExpiry: "2024-10-01" },
+    },
+    // Sentinel signals
+    {
+      source: "sentinel",
+      content: "Multiple failed authentication attempts detected from IP 185.220.101.x targeting Azure AD. Potential brute force attack.",
+      status: "triaged" as const,
+      classification: "technology",
+      confidence: "0.9200",
+      externalId: "sentinel-bf-20241115",
+      vendorId: null as string | null,
+      contentHash: "0008000800080008000800080008000800080008000800080008000800080008",
+      metadata: { ruleId: "BruteForceAttack", severity: "High", alertCount: 47, sourceIps: ["185.220.101.42", "185.220.101.55"], targetService: "Azure AD" },
+    },
+    {
+      source: "sentinel",
+      content: "Anomalous outbound data transfer of 2.4GB detected from finance-app-server to external IP during off-hours.",
+      status: "finding" as const,
+      classification: "operational",
+      confidence: "0.9700",
+      externalId: "sentinel-exfil-20241118",
+      vendorId: null as string | null,
+      contentHash: "0009000900090009000900090009000900090009000900090009000900090009",
+      metadata: { ruleId: "DataExfiltration", severity: "Critical", bytesTransferred: 2400000000, destinationIp: "45.33.32.156" },
+    },
+    {
+      source: "sentinel",
+      content: "Privilege escalation detected: service account granted Global Admin role outside change window.",
+      status: "triaged" as const,
+      classification: "technology",
+      confidence: "0.9300",
+      externalId: "sentinel-privesc-20241120",
+      vendorId: null as string | null,
+      contentHash: "000a000a000a000a000a000a000a000a000a000a000a000a000a000a000a000a",
+      metadata: { ruleId: "PrivilegeEscalation", severity: "High", account: "svc-backup@acme.com" },
+    },
+    {
+      source: "sentinel",
+      content: "Impossible travel alert: user login from New York then London within 15 minutes.",
+      status: "dismissed" as const,
+      classification: "technology",
+      confidence: "0.7500",
+      externalId: "sentinel-travel-20241122",
+      vendorId: null as string | null,
+      contentHash: "000b000b000b000b000b000b000b000b000b000b000b000b000b000b000b000b",
+      metadata: { ruleId: "ImpossibleTravel", severity: "Medium" },
+    },
+    // MISP signals
+    {
+      source: "misp",
+      content: "MISP Event #45821: APT28 campaign targeting financial services sector. 3 IP(s), 5 domain(s), 2 hash(es) shared.",
+      status: "triaged" as const,
+      classification: "technology",
+      confidence: "0.9400",
+      externalId: "misp-45821",
+      vendorId: null as string | null,
+      contentHash: "000c000c000c000c000c000c000c000c000c000c000c000c000c000c000c000c",
+      metadata: { eventId: 45821, threatLevel: "high", orgSource: "CIRCL", tlp: "amber", attributeCount: { ip: 3, domain: 5, hash: 2 } },
+    },
+    {
+      source: "misp",
+      content: "MISP Event #45903: New ransomware variant LockBit 4.0 indicators of compromise. 8 hash(es), 2 URL(s).",
+      status: "pending" as const,
+      classification: "technology",
+      confidence: "0.8800",
+      externalId: "misp-45903",
+      vendorId: null as string | null,
+      contentHash: "000d000d000d000d000d000d000d000d000d000d000d000d000d000d000d000d",
+      metadata: { eventId: 45903, threatLevel: "high", orgSource: "FIRST", tlp: "green", attributeCount: { hash: 8, url: 2 } },
+    },
+    {
+      source: "misp",
+      content: "MISP Event #46012: Supply chain compromise indicators for npm packages. 4 domain(s), 12 hash(es).",
+      status: "triaged" as const,
+      classification: "technology",
+      confidence: "0.8600",
+      externalId: "misp-46012",
+      vendorId: null as string | null,
+      contentHash: "000e000e000e000e000e000e000e000e000e000e000e000e000e000e000e000e",
+      metadata: { eventId: 46012, threatLevel: "medium", attributeCount: { domain: 4, hash: 12 } },
+    },
+    // Email signals
+    {
+      source: "email",
+      content: "Report from external auditor: Identified gaps in privileged access management controls during quarterly review.",
+      status: "finding" as const,
+      classification: "compliance",
+      confidence: "0.9100",
+      externalId: "email-audit-20241125",
+      vendorId: null as string | null,
+      contentHash: "000f000f000f000f000f000f000f000f000f000f000f000f000f000f000f000f",
+      metadata: { from: "auditor@kpmg.com", subject: "Q4 Access Management Review Findings", receivedAt: "2024-11-25T09:15:00Z" },
+    },
+    {
+      source: "email",
+      content: "Vendor notification: DataGuard Pro experienced a 4-hour service disruption affecting EU data centers.",
+      status: "triaged" as const,
+      classification: "third_party",
+      confidence: "0.8900",
+      externalId: "email-vendor-20241201",
+      vendorId: dataGuard?.id ?? null,
+      contentHash: "0010001000100010001000100010001000100010001000100010001000100010",
+      metadata: { from: "incidents@dataguard.com", subject: "Service Disruption Notification - EU DC", receivedAt: "2024-12-01T14:30:00Z" },
+    },
+    {
+      source: "email",
+      content: "Anonymous tip: Potential insider threat activity observed in finance department file shares.",
+      status: "pending" as const,
+      classification: "operational",
+      confidence: "0.6000",
+      externalId: "email-tip-20241205",
+      vendorId: null as string | null,
+      contentHash: "0011001100110011001100110011001100110011001100110011001100110011",
+      metadata: { from: "anonymous@protonmail.com", subject: "Security Concern Report", receivedAt: "2024-12-05T22:00:00Z" },
+    },
+  ];
+
+  const insertedSignals = await db.insert(signalsTable).values(
+    signalDefs.map((s) => ({
+      tenantId,
+      source: s.source,
+      content: s.content,
+      status: s.status,
+      classification: s.classification ?? null,
+      confidence: s.confidence,
+      externalId: s.externalId,
+      vendorId: s.vendorId,
+      contentHash: s.contentHash,
+      metadata: s.metadata,
+    }))
+  ).returning();
+
+  console.log(`[Seed] Created ${insertedSignals.length} expanded signals`);
+
+  return Object.fromEntries(
+    insertedSignals
+      .filter((s) => s.externalId)
+      .map((s) => [s.externalId!, s.id])
+  );
+}
+
+async function seedFindings(
+  tenantId: string,
+  signalIdMap: Record<string, string>,
+  risks: { id: string }[],
+  vendors: Vendor[]
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM findings WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    console.log("[Seed] Findings already seeded, skipping");
+    return;
+  }
+
+  // Base risks by index:
+  // 1 = Data Breach via Third-Party
+  // 2 = Regulatory Non-Compliance Fine
+  // 4 = Supply Chain Disruption
+  // 7 = Cyber Ransomware Attack
+  const dataBreachRisk = risks[1];
+  const regulatoryRisk = risks[2];
+  const supplyChainRisk = risks[4];
+  const ransomwareRisk = risks[7];
+
+  if (!dataBreachRisk || !regulatoryRisk || !supplyChainRisk || !ransomwareRisk) {
+    console.log("[Seed] Required risks not found for findings, skipping");
+    return;
+  }
+
+  // Base vendors: 0=CloudScale, 1=DataGuard Pro
+  const cloudScale = vendors[0];
+  const dataGuard = vendors[1];
+
+  const findingDefs = [
+    {
+      title: "Critical RDP Exposure on CloudScale Infrastructure",
+      description: "Shodan scan detected an open RDP port (3389) on CloudScale's internet-facing infrastructure. This creates a direct remote access attack vector that could be exploited for unauthorized access or ransomware deployment.",
+      signalExternalId: "shodan-rdp-cloudscale",
+      riskId: dataBreachRisk.id,
+      vendorId: cloudScale?.id ?? null,
+      status: "open" as const,
+    },
+    {
+      title: "FortiOS RCE Vulnerability Requires Immediate Patching",
+      description: "CVE-2024-21762 affects FortiOS SSL VPN with a CVSS score of 9.8. Active exploitation has been observed in the wild. All FortiOS 7.4.x deployments require immediate patching to 7.4.3 or later.",
+      signalExternalId: "CVE-2024-21762",
+      riskId: ransomwareRisk.id,
+      vendorId: null as string | null,
+      status: "investigating" as const,
+    },
+    {
+      title: "Anomalous Data Exfiltration from Finance Server",
+      description: "Microsoft Sentinel detected 2.4GB of outbound data transfer from the finance application server to an unrecognized external IP (45.33.32.156) during off-hours. This pattern is consistent with data exfiltration behavior and warrants immediate investigation.",
+      signalExternalId: "sentinel-exfil-20241118",
+      riskId: dataBreachRisk.id,
+      vendorId: null as string | null,
+      status: "open" as const,
+    },
+    {
+      title: "APT28 Campaign Indicators Match Internal Network Traffic",
+      description: "MISP threat intelligence for APT28 (Fancy Bear) campaign targeting financial services shows IP and domain indicators matching patterns observed in internal network logs. Further forensic analysis required to determine scope of potential compromise.",
+      signalExternalId: "misp-45821",
+      riskId: ransomwareRisk.id,
+      vendorId: null as string | null,
+      status: "investigating" as const,
+    },
+    {
+      title: "Privileged Access Management Gaps (External Audit)",
+      description: "External auditors from KPMG identified material gaps in privileged access management controls during Q4 review. Specific gaps include inadequate just-in-time (JIT) provisioning and missing quarterly access certification cycles for admin accounts.",
+      signalExternalId: "email-audit-20241125",
+      riskId: regulatoryRisk.id,
+      vendorId: null as string | null,
+      status: "resolved" as const,
+    },
+    {
+      title: "DataGuard Service Disruption Impact Assessment",
+      description: "DataGuard Pro reported a 4-hour service disruption affecting EU data centers on December 1st. This disruption impacted availability of security data processing services. SLA violation assessment pending confirmation from vendor.",
+      signalExternalId: "email-vendor-20241201",
+      riskId: supplyChainRisk.id,
+      vendorId: dataGuard?.id ?? null,
+      status: "open" as const,
+    },
+  ];
+
+  // Each finding links to a signal via signalId (from signalIdMap) and a risk via riskId
+  const findingValues = findingDefs.map((f) => ({
+    tenantId,
+    title: f.title,
+    description: f.description,
+    signalId: signalIdMap[f.signalExternalId] ?? null,
+    riskId: f.riskId,
+    vendorId: f.vendorId,
+    status: f.status,
+  }));
+
+  const insertedFindings = await db.insert(findingsTable).values(findingValues).returning();
+
+  console.log(`[Seed] Created ${insertedFindings.length} findings linked to signals and risks`);
+}
+
+// --------------------------------------------------------------------------
 // Main seed entry point
 // --------------------------------------------------------------------------
 
@@ -1432,6 +1986,11 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
     await seedOrgDependencies(tenant.id);
     await seedMonitoringConfigs(tenant.id);
     await seedRiskAppetiteConfigs(tenant.id);
+
+    // Task 3 (Plan 18-02): Assessments, expanded signals, findings
+    await seedAssessments(tenant.id, vendors, isoFramework.id);
+    const signalIdMap = await seedExpandedSignals(tenant.id, vendors);
+    await seedFindings(tenant.id, signalIdMap, risks, vendors);
 
     console.log(`[Seed] Done — Acme Corp demo dataset created. Login: any-user@acme.com / Ballpen-Kiosk-0!`);
   } catch (err) {
