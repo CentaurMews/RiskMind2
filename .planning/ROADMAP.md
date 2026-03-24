@@ -293,8 +293,8 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 **Goal:** The full-page risk heatmap renders via Apache ECharts with position-based severity colors, rich tooltips, dark mode support, and click-to-drill-down -- replacing CSS Grid while preserving Sheet sidebar, URL deep linking, and mobile fallback exactly as-is
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14
 **Depends on:** Phase 8
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 15-01-PLAN.md — Install echarts deps + create RiskHeatmapChart ECharts component
-- [ ] 15-02-PLAN.md — Rewire risk-heatmap.tsx to use ECharts + human verification
+- [x] 15-02-PLAN.md — Rewire risk-heatmap.tsx to use ECharts + human verification

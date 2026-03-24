@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to execute
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-03-24T05:03:31.245Z"
+status: Phase complete — ready for verification
+stopped_at: "Completed 15-02-PLAN.md — awaiting checkpoint:human-verify (Task 2)"
+last_updated: "2026-03-24T05:07:55.938Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 19
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 # Project State
@@ -64,6 +64,7 @@ Plan: 2 of 2
 | Phase 12-signal-integrations P04 | 100 | 1 tasks | 4 files |
 | Phase 12-signal-integrations P05 | 265 | 3 tasks | 3 files |
 | Phase 15-migrate-risk-heatmap-from-css-grid-to-apache-echarts P01 | 120 | 2 tasks | 3 files |
+| Phase 15-migrate-risk-heatmap-from-css-grid-to-apache-echarts P02 | 300 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Recent decisions affecting current work:
 - [Phase Phase 15-01]: Position-based severity coloring via itemStyle.color callback (L*I score from indices) — no visualMap
 - [Phase Phase 15-01]: MutationObserver on documentElement.class triggers useMemo recompute for CSS variable extraction on dark mode toggle
 - [Phase Phase 15-01]: heatmapData format is [impactIndex, likelihoodIndex, count] — x-axis=Impact, y-axis=Likelihood per ECharts convention
+- [Phase 15-02]: Manual axis labels and getCellColor removed from risk-heatmap.tsx — ECharts handles axis labels natively via RiskHeatmapChart
+- [Phase 15-02]: Mobile severity summary inlined in risk-heatmap.tsx — keeps full-page and compact widget fully independent
 
 ### Roadmap Evolution
 
@@ -152,7 +155,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T05:03:31.231Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-03-24T05:07:55.927Z
+Stopped at: Completed 15-02-PLAN.md — awaiting checkpoint:human-verify (Task 2)
 Resume file: None
 Next step: `/gsd:plan-phase 9`
