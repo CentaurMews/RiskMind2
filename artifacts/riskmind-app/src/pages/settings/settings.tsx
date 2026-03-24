@@ -208,6 +208,7 @@ const INTEGRATION_SOURCES: IntegrationSource[] = [
     icon: ShieldCheck,
     description: "NIST National Vulnerability Database",
     fields: [
+      { key: "baseUrl", label: "API Base URL", type: "text", placeholder: "https://services.nvd.nist.gov/rest/json/cves/2.0" },
       { key: "apiKey", label: "API Key (optional)", type: "password", placeholder: "NVD API key for higher rate limits" },
       { key: "keywords", label: "Product Keywords", type: "text", placeholder: "e.g. microsoft, apache, linux (comma-separated)" },
     ],
@@ -218,6 +219,7 @@ const INTEGRATION_SOURCES: IntegrationSource[] = [
     icon: Globe,
     description: "Internet-connected device search engine",
     fields: [
+      { key: "baseUrl", label: "API Base URL", type: "text", placeholder: "https://api.shodan.io" },
       { key: "apiKey", label: "API Key", type: "password", placeholder: "Shodan API key", required: true },
     ],
   },
@@ -227,6 +229,7 @@ const INTEGRATION_SOURCES: IntegrationSource[] = [
     icon: Cloud,
     description: "Azure SIEM via Log Analytics API",
     fields: [
+      { key: "baseUrl", label: "Log Analytics URL", type: "text", placeholder: "https://api.loganalytics.io/v1" },
       { key: "azureTenantId", label: "Azure Tenant ID", type: "text", placeholder: "Azure AD tenant ID (not RiskMind tenant)", required: true },
       { key: "clientId", label: "Client ID", type: "text", placeholder: "App registration client ID", required: true },
       { key: "clientSecret", label: "Client Secret", type: "password", placeholder: "App registration client secret", required: true },
@@ -386,9 +389,18 @@ function IntegrationCard({
             <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
               <Icon className="h-5 w-5 text-muted-foreground" />
             </div>
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-base">{source.label}</CardTitle>
               <CardDescription className="text-xs mt-0.5">{source.description}</CardDescription>
+              {(() => {
+                const urlField = source.fields.find((f) => f.key === "baseUrl" || f.key === "host");
+                if (!urlField) return null;
+                return (
+                  <span className="text-[10px] font-mono text-muted-foreground/60 truncate block mt-0.5">
+                    {urlField.placeholder}
+                  </span>
+                );
+              })()}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -480,17 +492,18 @@ function IntegrationCard({
               {saving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
               Save
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={isConfigured ? handleTest : handleSave}
+              disabled={testing || saving}
+              title={isConfigured ? "Test connection with saved credentials" : "Save first, then test"}
+            >
+              {testing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Play className="h-3 w-3 mr-1" />}
+              Test Connection
+            </Button>
             {isConfigured && (
               <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleTest}
-                  disabled={testing}
-                >
-                  {testing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Play className="h-3 w-3 mr-1" />}
-                  Test Connection
-                </Button>
                 <Button
                   size="sm"
                   variant="outline"
