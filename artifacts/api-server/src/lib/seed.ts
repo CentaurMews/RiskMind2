@@ -1952,10 +1952,51 @@ async function seedRiskSnapshots(tenantId: string): Promise<void> {
 // Main seed entry point
 // --------------------------------------------------------------------------
 
+async function seedExpandedDataForExistingTenant(tenantId: string): Promise<void> {
+  try {
+    // Load existing entities for FK references
+    const users = await db.select().from(usersTable).where(eq(usersTable.tenantId, tenantId));
+    const adminUser = users.find((u) => u.role === "admin") || users[0];
+    const rmUser = users.find((u) => u.role === "risk_manager") || adminUser;
+    const roUser = users.find((u) => u.role === "risk_owner") || adminUser;
+    if (!adminUser) return;
+
+    const risks = await db.select().from(risksTable).where(eq(risksTable.tenantId, tenantId));
+    const vendors = await db.select().from(vendorsTable).where(eq(vendorsTable.tenantId, tenantId));
+    const frameworks = await db.select().from(frameworksTable).where(eq(frameworksTable.tenantId, tenantId));
+    const isoFramework = frameworks.find((f) => f.type === "iso") || frameworks[0];
+
+    console.log("[Seed] Checking expanded data for existing tenant...");
+
+    const expandedRisks = await seedExpandedRisks(tenantId, adminUser, rmUser, roUser);
+    await seedTreatments(tenantId, adminUser, rmUser, roUser, risks, expandedRisks);
+    await seedKRIs(tenantId, risks, expandedRisks);
+    await seedIncidents(tenantId, adminUser, rmUser, roUser, risks, expandedRisks);
+    await seedReviewCycles(tenantId, adminUser, rmUser, roUser, risks);
+
+    const expandedVendors = await seedExpandedVendors(tenantId);
+    await seedSubprocessors(tenantId, vendors, expandedVendors);
+    await seedOrgDependencies(tenantId);
+    await seedMonitoringConfigs(tenantId);
+    await seedRiskAppetiteConfigs(tenantId);
+
+    if (isoFramework) {
+      await seedAssessments(tenantId, vendors, isoFramework.id);
+    }
+    const signalIdMap = await seedExpandedSignals(tenantId, vendors);
+    await seedFindings(tenantId, signalIdMap, risks, vendors);
+    await seedRiskSnapshots(tenantId);
+  } catch (err) {
+    console.error("[Seed] Expanded seed failed:", err);
+  }
+}
+
 export async function seedDemoDataIfEmpty(): Promise<void> {
   try {
     const existing = await db.select().from(tenantsTable).where(eq(tenantsTable.slug, "acme")).limit(1);
     if (existing.length > 0) {
+      // Tenant exists — run expanded seed for any empty tables
+      await seedExpandedDataForExistingTenant(existing[0].id);
       return;
     }
 
