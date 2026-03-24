@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to execute
-stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-03-24T11:41:45.028Z"
+stopped_at: Completed 18-02-PLAN.md
+last_updated: "2026-03-24T11:53:23.636Z"
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 27
-  completed_plans: 25
+  completed_plans: 26
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 18 (comprehensive-demo-seed-data) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Plan: 2 of 3
 | Phase 17-parallel-coordinates-risk-explorer P01 | 3508 | 1 tasks | 1 files |
 | Phase 17-parallel-coordinates-risk-explorer P02 | 438 | 1 tasks | 1 files |
 | Phase 18-comprehensive-demo-seed-data P01 | 434 | 2 tasks | 1 files |
+| Phase 18 P02 | 540 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,9 @@ Recent decisions affecting current work:
 - [Phase 17-parallel-coordinates-risk-explorer]: allRisks derived from filteredCells so domain card and above-appetite filters flow to Explorer automatically without extra wiring
 - [Phase 18-comprehensive-demo-seed-data]: Modular per-table seed functions with add-if-empty guards (count > N) allow base data + extended data separation in idempotent seeding pattern
 - [Phase 18-comprehensive-demo-seed-data]: Akamai CDN Services added as vendor row to satisfy vendorSubprocessors dual-FK constraint — all subprocessors must be full vendor records
+- [Phase 18]: seedAssessments() calls seedPrebuiltTemplates() first to ensure templates exist before inserting assessment records with FK templateId
+- [Phase 18]: seedExpandedSignals() returns externalId->id map so seedFindings() can resolve signalId FKs without extra DB queries
+- [Phase 18]: lib/db package.json exports extended with ./seed/prebuilt-templates entry to satisfy bundler module resolution
 
 ### Roadmap Evolution
 
@@ -173,7 +177,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T11:41:45.020Z
-Stopped at: Completed 18-01-PLAN.md
+Last session: 2026-03-24T11:53:23.621Z
+Stopped at: Completed 18-02-PLAN.md
 Resume file: None
 Next step: `/gsd:plan-phase 9`
