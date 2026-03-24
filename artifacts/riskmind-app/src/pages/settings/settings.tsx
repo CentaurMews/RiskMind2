@@ -36,7 +36,7 @@ import {
   Plus, Pencil, Trash2, CheckCircle2, XCircle,
   Play, RefreshCw, Clock, AlertTriangle, Eye,
   Link2, Zap, TrendingUp, Search, Lightbulb, Ban, X,
-  Building2, Timer, Plug, Globe, Cloud, Bug, Mail, ShieldCheck,
+  Building2, Timer, Plug, Globe, Cloud, Bug, Mail, ShieldCheck, Target,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -535,6 +535,160 @@ function IntegrationCard({
   );
 }
 
+// ── Risk Appetite Tab ─────────────────────────────────────────────────────────
+
+const APPETITE_CATEGORY_MAP: Record<string, string> = {
+  technology: "Cyber",
+  operational: "Ops",
+  compliance: "Compliance",
+  financial: "Financial",
+  strategic: "Strategic",
+  reputational: "Reputational",
+};
+
+const DEFAULT_CATEGORIES = Object.keys(APPETITE_CATEGORY_MAP);
+
+type AppetiteConfig = {
+  category: string;
+  threshold: number;
+};
+
+function AppetiteTab() {
+  const [appetiteConfigs, setAppetiteConfigs] = useState<AppetiteConfig[]>([]);
+  const [appetiteLoading, setAppetiteLoading] = useState(true);
+  const [pendingThresholds, setPendingThresholds] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    async function fetchAppetite() {
+      setAppetiteLoading(true);
+      try {
+        const res = await fetch("/api/v1/risks/appetite", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          const configs: AppetiteConfig[] = data.configs || [];
+          if (configs.length === 0) {
+            // Initialize defaults
+            const defaults = DEFAULT_CATEGORIES.map((cat) => ({ category: cat, threshold: 60 }));
+            setAppetiteConfigs(defaults);
+          } else {
+            // Fill in any missing categories with 60 default
+            const merged = DEFAULT_CATEGORIES.map((cat) => {
+              const found = configs.find((c) => c.category === cat);
+              return found ?? { category: cat, threshold: 60 };
+            });
+            setAppetiteConfigs(merged);
+          }
+        }
+      } catch (_err) {
+        const defaults = DEFAULT_CATEGORIES.map((cat) => ({ category: cat, threshold: 60 }));
+        setAppetiteConfigs(defaults);
+      } finally {
+        setAppetiteLoading(false);
+      }
+    }
+    fetchAppetite();
+  }, []);
+
+  const handleThresholdChange = (category: string, value: number) => {
+    setPendingThresholds((prev) => ({ ...prev, [category]: value }));
+  };
+
+  const handleSave = async (category: string) => {
+    const threshold = pendingThresholds[category] ?? appetiteConfigs.find((c) => c.category === category)?.threshold ?? 60;
+    const displayName = APPETITE_CATEGORY_MAP[category] ?? category;
+    try {
+      const res = await fetch(`/api/v1/risks/appetite/${category}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threshold }),
+      });
+      if (res.ok) {
+        setAppetiteConfigs((prev) =>
+          prev.map((c) => (c.category === category ? { ...c, threshold } : c))
+        );
+        setPendingThresholds((prev) => {
+          const next = { ...prev };
+          delete next[category];
+          return next;
+        });
+        toast({ title: "Saved", description: `${displayName} appetite threshold updated to ${threshold}` });
+      } else {
+        toast({ title: "Error", description: "Failed to update threshold", variant: "destructive" });
+      }
+    } catch (_err) {
+      toast({ title: "Error", description: "Failed to update threshold", variant: "destructive" });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Target className="h-5 w-5" /> Risk Appetite Thresholds
+        </CardTitle>
+        <CardDescription>
+          Set the composite risk score threshold for each category. Risks above the threshold are flagged as over appetite.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {appetiteLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="animate-spin h-6 w-6 text-muted-foreground" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead>Category</TableHead>
+                <TableHead>Display Name</TableHead>
+                <TableHead className="w-40">Threshold (0–100)</TableHead>
+                <TableHead className="w-24">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {appetiteConfigs.map((cfg) => {
+                const displayName = APPETITE_CATEGORY_MAP[cfg.category] ?? cfg.category;
+                const current = pendingThresholds[cfg.category] ?? cfg.threshold;
+                const isDirty = cfg.category in pendingThresholds;
+                return (
+                  <TableRow key={cfg.category} className="hover:bg-muted/30">
+                    <TableCell className="font-mono text-sm">{cfg.category}</TableCell>
+                    <TableCell className="font-medium text-sm">{displayName}</TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={current}
+                        className="w-24 h-8 text-sm"
+                        onChange={(e) => handleThresholdChange(cfg.category, Number(e.target.value))}
+                        onBlur={() => { if (isDirty) handleSave(cfg.category); }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant={isDirty ? "default" : "outline"}
+                        className="h-8"
+                        onClick={() => handleSave(cfg.category)}
+                        disabled={!isDirty}
+                      >
+                        Save
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const { data: user, isLoading: userLoading } = useGetMe();
   const { data: providers, isLoading: providersLoading } = useListLlmProviders();
@@ -947,6 +1101,11 @@ export default function Settings() {
             {user?.role === "admin" && (
               <TabsTrigger value="integrations" className="data-[state=active]:shadow-sm rounded-md">
                 <Plug className="h-4 w-4 mr-2" />Integrations
+              </TabsTrigger>
+            )}
+            {user?.role === "admin" && (
+              <TabsTrigger value="appetite" className="data-[state=active]:shadow-sm rounded-md">
+                <Target className="h-4 w-4 mr-2" /> Risk Appetite
               </TabsTrigger>
             )}
           </TabsList>
@@ -1562,6 +1721,13 @@ export default function Settings() {
                     })}
                   </div>
                 )}
+              </TabsContent>
+            )}
+
+            {/* RISK APPETITE TAB */}
+            {user?.role === "admin" && (
+              <TabsContent value="appetite" className="m-0 space-y-4">
+                <AppetiteTab />
               </TabsContent>
             )}
 
