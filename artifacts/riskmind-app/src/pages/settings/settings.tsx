@@ -550,20 +550,26 @@ export default function Settings() {
   });
   const [embeddingsBannerDismissed, setEmbeddingsBannerDismissed] = useState(false);
 
+  // ── Auth helper for raw fetch calls ─────────────────────────────────────────
+  const authHeaders = (): HeadersInit => {
+    const token = localStorage.getItem("accessToken");
+    return token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+  };
+
   // ── Org Dependencies queries ────────────────────────────────────────────────
   const { data: dependencies, refetch: refetchDeps } = useQuery<OrgDependency[]>({
     queryKey: ["/api/v1/org-dependencies"],
-    queryFn: () => fetch("/api/v1/org-dependencies", { credentials: "include" }).then((r) => r.json()),
+    queryFn: () => fetch("/api/v1/org-dependencies", { headers: authHeaders() }).then((r) => r.json()).then((d) => d.data ?? d),
   });
 
   const { data: concentrationRisks } = useQuery<ConcentrationRisk[]>({
     queryKey: ["/api/v1/org-dependencies/concentration-risk"],
-    queryFn: () => fetch("/api/v1/org-dependencies/concentration-risk", { credentials: "include" }).then((r) => r.json()),
+    queryFn: () => fetch("/api/v1/org-dependencies/concentration-risk", { headers: authHeaders() }).then((r) => r.json()),
   });
 
   const { data: allVendors } = useQuery<Vendor[]>({
-    queryKey: ["/api/v1/vendors"],
-    queryFn: () => fetch("/api/v1/vendors", { credentials: "include" }).then((r) => r.json()),
+    queryKey: ["/api/v1/vendors-all"],
+    queryFn: () => fetch("/api/v1/vendors?limit=500", { headers: authHeaders() }).then((r) => r.json()).then((d) => d.data ?? d),
   });
 
   // ── Org dependency edit state ───────────────────────────────────────────────
@@ -594,15 +600,13 @@ export default function Settings() {
       if (existing) {
         await fetch(`/api/v1/org-dependencies/${existing.id}`, {
           method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify(body),
         });
       } else if (entry.providerName.trim()) {
         await fetch("/api/v1/org-dependencies", {
           method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify(body),
         });
       }
@@ -616,13 +620,13 @@ export default function Settings() {
   // ── Monitoring config queries & state ───────────────────────────────────────
   const { data: monitoringConfigs, refetch: refetchMonitoring } = useQuery<MonitoringConfig[]>({
     queryKey: ["/api/v1/monitoring-configs"],
-    queryFn: () => fetch("/api/v1/monitoring-configs", { credentials: "include" }).then((r) => r.json()),
+    queryFn: () => fetch("/api/v1/monitoring-configs", { headers: authHeaders() }).then((r) => r.json()).then((d) => d.data ?? d),
     enabled: user?.role === "admin",
   });
 
   const { data: templates } = useQuery<Template[]>({
     queryKey: ["/api/v1/assessment-templates"],
-    queryFn: () => fetch("/api/v1/assessment-templates", { credentials: "include" }).then((r) => r.json()),
+    queryFn: () => fetch("/api/v1/assessment-templates", { headers: authHeaders() }).then((r) => r.json()).then((d) => d.data ?? d),
     enabled: user?.role === "admin",
   });
 
@@ -668,8 +672,7 @@ export default function Settings() {
       if (!entry || entry.cadenceDays <= 0) return Promise.resolve();
       return fetch(`/api/v1/monitoring-configs/${tier}`, {
         method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({
           cadenceDays: entry.cadenceDays,
           assessmentTemplateId: entry.assessmentTemplateId || undefined,
