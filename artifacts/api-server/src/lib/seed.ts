@@ -1952,6 +1952,118 @@ async function seedRiskSnapshots(tenantId: string): Promise<void> {
 // Main seed entry point
 // --------------------------------------------------------------------------
 
+// ─── Phase 19: Real vendors ──────────────────────────────────────────────────
+
+async function seedRealVendors(tenantId: string) {
+  // Idempotency guard: skip if Microsoft already exists for this tenant
+  const allVendors = await db
+    .select({ name: vendorsTable.name })
+    .from(vendorsTable)
+    .where(eq(vendorsTable.tenantId, tenantId));
+
+  if (allVendors.some((v) => v.name === "Microsoft")) {
+    console.log(`[Seed] Real vendors already seeded for tenant ${tenantId}, skipping`);
+    return [];
+  }
+
+  const realVendorDefs = [
+    {
+      name: "Microsoft",
+      description:
+        "Enterprise cloud and productivity platform provider. Azure IaaS/PaaS, Microsoft 365, Entra ID (Azure AD), Defender for Cloud, Teams, and Power Platform. Primary identity provider and collaboration backbone.",
+      tier: "critical" as const,
+      status: "monitoring" as const,
+      category: "Cloud & Identity",
+      contactEmail: "security@microsoft.com",
+      riskScore: "25.50",
+    },
+    {
+      name: "Amazon Web Services",
+      description:
+        "Core cloud infrastructure provider. EC2, S3, RDS, Lambda, CloudFront CDN, IAM, GuardDuty, and CloudTrail. Hosts production workloads and data storage. SOC 2 Type II and ISO 27001 certified.",
+      tier: "critical" as const,
+      status: "monitoring" as const,
+      category: "Cloud Infrastructure",
+      contactEmail: "aws-security@amazon.com",
+      riskScore: "22.00",
+    },
+    {
+      name: "Cloudflare",
+      description:
+        "CDN, DDoS protection, WAF, DNS, and Zero Trust network access provider. Handles edge security, bot management, and SSL/TLS termination for all public-facing services.",
+      tier: "high" as const,
+      status: "contracting" as const,
+      category: "CDN & Security",
+      contactEmail: "security@cloudflare.com",
+      riskScore: null,
+    },
+    {
+      name: "Salesforce",
+      description:
+        "Customer relationship management (CRM) platform. Sales Cloud, Service Cloud, Marketing Cloud, and MuleSoft integration. Processes customer PII, sales pipeline data, and support case records.",
+      tier: "high" as const,
+      status: "due_diligence" as const,
+      category: "CRM & Sales",
+      contactEmail: "security@salesforce.com",
+      riskScore: null,
+    },
+    {
+      name: "SAP Business One",
+      description:
+        "Enterprise resource planning (ERP) system for financials, inventory, purchasing, and manufacturing. Processes financial transactions, employee data, and supply chain records.",
+      tier: "medium" as const,
+      status: "risk_assessment" as const,
+      category: "ERP & Finance",
+      contactEmail: "security@sap.com",
+      riskScore: null,
+    },
+  ];
+
+  const inserted = await db
+    .insert(vendorsTable)
+    .values(
+      realVendorDefs.map((v) => ({
+        tenantId,
+        name: v.name,
+        description: v.description,
+        tier: v.tier,
+        status: v.status,
+        category: v.category,
+        contactEmail: v.contactEmail,
+        riskScore: v.riskScore,
+      }))
+    )
+    .returning();
+
+  console.log(`[Seed] Created ${inserted.length} real vendors for tenant ${tenantId}`);
+  return inserted;
+}
+
+// ─── Phase 19: Compliance thresholds ────────────────────────────────────────
+
+async function seedComplianceThresholds(tenantId: string): Promise<void> {
+  const frameworks = await db
+    .select()
+    .from(frameworksTable)
+    .where(eq(frameworksTable.tenantId, tenantId));
+
+  const thresholds: Record<string, string> = {
+    iso: "80.00",
+    soc2: "75.00",
+    nist: "70.00",
+  };
+
+  for (const fw of frameworks) {
+    if (fw.type && thresholds[fw.type] && !fw.complianceThreshold) {
+      await db
+        .update(frameworksTable)
+        .set({ complianceThreshold: thresholds[fw.type] })
+        .where(eq(frameworksTable.id, fw.id));
+      console.log(`[Seed] Set compliance threshold for ${fw.name}: ${thresholds[fw.type]}%`);
+    }
+  }
+}
+
 async function seedExpandedDataForExistingTenant(tenantId: string): Promise<void> {
   try {
     // Load existing entities for FK references
@@ -1986,6 +2098,10 @@ async function seedExpandedDataForExistingTenant(tenantId: string): Promise<void
     const signalIdMap = await seedExpandedSignals(tenantId, vendors);
     await seedFindings(tenantId, signalIdMap, risks, vendors);
     await seedRiskSnapshots(tenantId);
+
+    // Phase 19: Real vendors, DPIA template, compliance thresholds
+    await seedRealVendors(tenantId);
+    await seedComplianceThresholds(tenantId);
   } catch (err) {
     console.error("[Seed] Expanded seed failed:", err);
   }
@@ -2185,6 +2301,10 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
 
     // Task 4 (Plan 18-03): Historical risk snapshots for dashboard trend charts
     await seedRiskSnapshots(tenant.id);
+
+    // Phase 19: Real vendors, DPIA template, compliance thresholds
+    const realVendors = await seedRealVendors(tenant.id);
+    await seedComplianceThresholds(tenant.id);
 
     console.log(`[Seed] Done — Acme Corp demo dataset created. Login: any-user@acme.com / Ballpen-Kiosk-0!`);
   } catch (err) {
