@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to plan
+status: Milestone complete
 stopped_at: Checkpoint 17-02 task 2 — awaiting human verify of Risk Explorer in browser
-last_updated: "2026-03-24T10:40:12.849Z"
+last_updated: "2026-03-24T10:49:51.065Z"
 progress:
   total_phases: 9
   completed_phases: 7
