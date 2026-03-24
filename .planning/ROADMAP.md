@@ -298,3 +298,13 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 Plans:
 - [x] 15-01-PLAN.md — Install echarts deps + create RiskHeatmapChart ECharts component
 - [x] 15-02-PLAN.md — Rewire risk-heatmap.tsx to use ECharts + human verification
+
+### Phase 16: Risk Heatmap Dashboard Redesign
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 15
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 16 to break down)
