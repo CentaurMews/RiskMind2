@@ -171,12 +171,22 @@ export default function RiskHeatmap() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-4">
 
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Risk Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Enterprise risk posture at a glance</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Risk Dashboard</h1>
+            <p className="text-muted-foreground text-sm">Enterprise risk posture at a glance</p>
+          </div>
+          {(aboveAppetiteFilter || activeDomain) && (
+            <button
+              className="text-xs text-muted-foreground hover:text-foreground border rounded-md px-3 py-1.5 transition-colors"
+              onClick={() => { setAboveAppetiteFilter(false); setActiveDomain(null); }}
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
 
         {isLoading ? (
@@ -186,26 +196,22 @@ export default function RiskHeatmap() {
         ) : (
           <>
             {/* SECTION 1: Top KPI Strip */}
-            <div className="flex flex-col sm:flex-row items-stretch gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch gap-3">
 
               {/* Posture bar card */}
-              <div className="flex-1 bg-card border rounded-xl p-4">
-                <div className="text-xs font-medium text-muted-foreground mb-2">Risk Posture Index</div>
+              <div className="flex-1 bg-card border rounded-lg p-3">
+                <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Risk Posture Index</div>
                 <RiskPostureBar
                   score={dashboardData?.postureScore ?? 0}
                   appetiteThreshold={globalAppetiteThreshold}
                   onClick={() => setShowExplanation(true)}
                 />
-                <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  Click for calculation details
-                </div>
               </div>
 
               {/* Above-appetite pill */}
               <div
                 className={cn(
-                  "flex items-center gap-3 bg-card border rounded-xl px-5 py-3 cursor-pointer transition-colors",
+                  "flex items-center gap-2.5 bg-card border rounded-lg px-4 py-2 cursor-pointer transition-colors flex-shrink-0",
                   aboveAppetiteFilter
                     ? "ring-2 ring-severity-critical bg-severity-critical/5"
                     : "hover:bg-muted/50"
@@ -222,20 +228,18 @@ export default function RiskHeatmap() {
                   }
                 }}
               >
-                <AlertCircle className="h-5 w-5 text-severity-critical flex-shrink-0" />
+                <AlertCircle className="h-4 w-4 text-severity-critical flex-shrink-0" />
                 <div>
-                  <div className="text-2xl font-bold">{dashboardData?.aboveAppetiteCount ?? 0}</div>
-                  <div className="text-xs text-muted-foreground">above appetite</div>
+                  <div className="text-lg font-bold leading-tight">{dashboardData?.aboveAppetiteCount ?? 0}</div>
+                  <div className="text-[10px] text-muted-foreground">above appetite</div>
                 </div>
-                {dashboardData?.aboveAppetiteDelta != null && (
+                {dashboardData?.aboveAppetiteDelta != null && dashboardData.aboveAppetiteDelta !== 0 && (
                   <span
                     className={cn(
-                      "text-xs font-medium",
+                      "text-[10px] font-medium",
                       dashboardData.aboveAppetiteDelta > 0
                         ? "text-severity-critical"
-                        : dashboardData.aboveAppetiteDelta < 0
-                        ? "text-severity-low"
-                        : "text-muted-foreground"
+                        : "text-severity-low"
                     )}
                   >
                     {dashboardData.aboveAppetiteDelta > 0 ? "+" : ""}
@@ -246,10 +250,10 @@ export default function RiskHeatmap() {
             </div>
 
             {/* SECTION 2: Split main content */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
               {/* Left: Heatmap (60% = 3/5 cols) */}
-              <div className="lg:col-span-3 bg-card border rounded-2xl p-6 shadow-sm">
+              <div className="lg:col-span-3 bg-card border rounded-xl p-4">
 
                 {/* Filter badges */}
                 {(aboveAppetiteFilter || activeDomain) && (
@@ -297,7 +301,7 @@ export default function RiskHeatmap() {
                 </div>
 
                 {/* Desktop: ECharts heatmap */}
-                <div className="hidden md:block w-full" style={{ minHeight: 400 }}>
+                <div className="hidden md:block w-full" style={{ minHeight: 300 }}>
                   <RiskHeatmapChart
                     cells={filteredCells as Array<{ likelihood: number; impact: number; risks: Array<{ id: string; title: string; status: string; category: string }> }>}
                     cellDeltas={dashboardData?.cellDeltas}
@@ -309,7 +313,7 @@ export default function RiskHeatmap() {
               </div>
 
               {/* Right: KRI Trend (40% = 2/5 cols) */}
-              <div className="lg:col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
+              <div className="lg:col-span-2 bg-card border rounded-xl p-4">
                 <KriTrendPanel
                   snapshots={snapshotData}
                   appetiteThreshold={globalAppetiteThreshold}
@@ -322,7 +326,7 @@ export default function RiskHeatmap() {
 
             {/* SECTION 3: Domain Cards Strip */}
             {(dashboardData?.domainSummaries || []).length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                 {(dashboardData?.domainSummaries || []).map((domain) => (
                   <DomainCard
                     key={domain.category}

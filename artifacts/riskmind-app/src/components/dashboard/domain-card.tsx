@@ -80,27 +80,22 @@ export function DomainCard({
       onKeyDown={handleKeyDown}
       data-category={category}
       className={cn(
-        "border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        isActive && "ring-2 ring-primary",
+        "border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 min-w-0 overflow-hidden",
+        isActive && "ring-2 ring-primary bg-primary/5",
         className
       )}
     >
-      {/* Top row: display name + risk level badge */}
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold text-sm text-foreground">{displayName}</span>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium",
-            styles.badge
-          )}
-        >
-          <span className={cn("inline-block h-1.5 w-1.5 rounded-full flex-shrink-0", styles.dot)} />
+      {/* Top row: display name + risk level dot */}
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={cn("inline-block h-2 w-2 rounded-full flex-shrink-0", styles.dot)} />
+        <span className="font-semibold text-xs text-foreground truncate">{displayName}</span>
+        <span className={cn("text-[10px] font-medium flex-shrink-0 ml-auto", styles.badge.includes("critical") ? "text-severity-critical" : styles.badge.includes("high") ? "text-severity-high" : "text-muted-foreground")}>
           {riskLevel}
         </span>
       </div>
 
       {/* Middle: recharts sparkline */}
-      <ChartContainer config={sparkConfig} className="h-10 w-full">
+      <ChartContainer config={sparkConfig} className="h-6 w-full mt-1">
         <LineChart data={sparklineData}>
           <Line
             type="monotone"
@@ -113,8 +108,8 @@ export function DomainCard({
       </ChartContainer>
 
       {/* Bottom row: high/critical count */}
-      <div className="mt-2 text-xs text-muted-foreground">
-        {highCriticalCount} high/critical
+      <div className="mt-1 text-[10px] text-muted-foreground truncate">
+        {highCriticalCount > 0 ? `${highCriticalCount} high/critical` : "—"}
       </div>
     </div>
   );
