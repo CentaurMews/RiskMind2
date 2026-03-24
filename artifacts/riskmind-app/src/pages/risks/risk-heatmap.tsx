@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { cn } from "@/lib/utils";
 import { Loader2, AlertCircle, Info, X } from "lucide-react";
 import { SeverityBadge } from "@/components/ui/severity-badge";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { RiskHeatmapChart } from "@/components/dashboard/risk-heatmap-chart";
 import { KriTrendPanel } from "@/components/dashboard/kri-trend-panel";
 import { RiskPostureBar } from "@/components/dashboard/risk-posture-bar";
 import { DomainCard } from "@/components/dashboard/domain-card";
+import { RiskParallelChart } from "@/components/dashboard/risk-parallel-chart";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,8 @@ export default function RiskHeatmap() {
   const [activeDomain, setActiveDomain] = useState<string | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [aboveAppetiteFilter, setAboveAppetiteFilter] = useState(false);
+  const [viewMode, setViewMode] = useState<"heatmap" | "explorer">("heatmap");
+  const [, navigate] = useLocation();
 
   // URL deep linking: read ?l=X&i=Y on mount
   useEffect(() => {
@@ -151,6 +154,17 @@ export default function RiskHeatmap() {
       )
     : dashboardData?.cells || [];
 
+  // Flatten filtered cells into individual risks for the Explorer view
+  const allRisks = useMemo(() => {
+    return filteredCells.flatMap((cell) =>
+      cell.risks.map((r) => ({
+        ...r,
+        likelihood: r.likelihood ?? cell.likelihood,
+        impact: r.impact ?? cell.impact,
+      }))
+    );
+  }, [filteredCells]);
+
   const selectedCellData = selectedCell
     ? (dashboardData?.cells || []).find(
         (c) => c.likelihood === selectedCell.likelihood && c.impact === selectedCell.impact
@@ -179,14 +193,41 @@ export default function RiskHeatmap() {
             <h1 className="text-2xl font-bold tracking-tight">Risk Dashboard</h1>
             <p className="text-muted-foreground text-sm">Enterprise risk posture at a glance</p>
           </div>
-          {(aboveAppetiteFilter || activeDomain) && (
-            <button
-              className="text-xs text-muted-foreground hover:text-foreground border rounded-md px-3 py-1.5 transition-colors"
-              onClick={() => { setAboveAppetiteFilter(false); setActiveDomain(null); }}
-            >
-              Reset Filters
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {/* Heatmap / Explorer toggle */}
+            <div className="flex items-center rounded-full border bg-muted/40 p-0.5 gap-0.5">
+              <button
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  viewMode === "heatmap"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setViewMode("heatmap")}
+              >
+                Heatmap
+              </button>
+              <button
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  viewMode === "explorer"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setViewMode("explorer")}
+              >
+                Explorer
+              </button>
+            </div>
+            {(aboveAppetiteFilter || activeDomain) && (
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground border rounded-md px-3 py-1.5 transition-colors"
+                onClick={() => { setAboveAppetiteFilter(false); setActiveDomain(null); }}
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -252,76 +293,101 @@ export default function RiskHeatmap() {
             {/* SECTION 2: Split main content */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
-              {/* Left: Heatmap (60% = 3/5 cols) */}
-              <div className="lg:col-span-3 bg-card border rounded-xl p-4">
+              {viewMode === "heatmap" ? (
+                <>
+                  {/* Left: Heatmap (60% = 3/5 cols) */}
+                  <div className="lg:col-span-3 bg-card border rounded-xl p-4">
 
-                {/* Filter badges */}
-                {(aboveAppetiteFilter || activeDomain) && (
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {aboveAppetiteFilter && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-severity-critical/10 text-severity-critical border border-severity-critical/20">
-                        Showing above-appetite only
-                        <button
-                          className="hover:opacity-70"
-                          onClick={() => setAboveAppetiteFilter(false)}
-                          aria-label="Clear above-appetite filter"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
+                    {/* Filter badges */}
+                    {(aboveAppetiteFilter || activeDomain) && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {aboveAppetiteFilter && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-severity-critical/10 text-severity-critical border border-severity-critical/20">
+                            Showing above-appetite only
+                            <button
+                              className="hover:opacity-70"
+                              onClick={() => setAboveAppetiteFilter(false)}
+                              aria-label="Clear above-appetite filter"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                        {activeDomain && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                            Filtered: {CATEGORY_DISPLAY[activeDomain] ?? activeDomain}
+                            <button
+                              className="hover:opacity-70"
+                              onClick={() => setActiveDomain(null)}
+                              aria-label="Clear domain filter"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                      </div>
                     )}
-                    {activeDomain && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-                        Filtered: {CATEGORY_DISPLAY[activeDomain] ?? activeDomain}
-                        <button
-                          className="hover:opacity-70"
-                          onClick={() => setActiveDomain(null)}
-                          aria-label="Clear domain filter"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                )}
 
-                {/* Mobile: severity summary */}
-                <div className="md:hidden space-y-2 w-full min-h-[200px]">
-                  {[
-                    { label: "Critical", count: mobileCounts.critical, className: "text-severity-critical bg-severity-critical/10 border-severity-critical/30" },
-                    { label: "High", count: mobileCounts.high, className: "text-severity-high bg-severity-high/10 border-severity-high/30" },
-                    { label: "Medium", count: mobileCounts.medium, className: "text-foreground bg-severity-medium/10 border-severity-medium/30" },
-                    { label: "Low", count: mobileCounts.low, className: "text-muted-foreground bg-severity-low/10 border-severity-low/30" },
-                  ].map(({ label, count, className: cls }) => (
-                    <div key={label} className={cn("flex items-center justify-between px-3 py-2 rounded-md border font-mono text-sm", cls)}>
-                      <span className="font-medium">{label}</span>
-                      <span className="font-bold">{count} risk{count !== 1 ? "s" : ""}</span>
+                    {/* Mobile: severity summary */}
+                    <div className="md:hidden space-y-2 w-full min-h-[200px]">
+                      {[
+                        { label: "Critical", count: mobileCounts.critical, className: "text-severity-critical bg-severity-critical/10 border-severity-critical/30" },
+                        { label: "High", count: mobileCounts.high, className: "text-severity-high bg-severity-high/10 border-severity-high/30" },
+                        { label: "Medium", count: mobileCounts.medium, className: "text-foreground bg-severity-medium/10 border-severity-medium/30" },
+                        { label: "Low", count: mobileCounts.low, className: "text-muted-foreground bg-severity-low/10 border-severity-low/30" },
+                      ].map(({ label, count, className: cls }) => (
+                        <div key={label} className={cn("flex items-center justify-between px-3 py-2 rounded-md border font-mono text-sm", cls)}>
+                          <span className="font-medium">{label}</span>
+                          <span className="font-bold">{count} risk{count !== 1 ? "s" : ""}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
 
-                {/* Desktop: ECharts heatmap */}
-                <div className="hidden md:block w-full" style={{ minHeight: 300 }}>
-                  <RiskHeatmapChart
-                    cells={filteredCells as Array<{ likelihood: number; impact: number; risks: Array<{ id: string; title: string; status: string; category: string }> }>}
-                    cellDeltas={dashboardData?.cellDeltas}
-                    aboveAppetiteCells={aboveAppetiteCellsSet}
-                    onCellClick={(l, i) => setSelectedCell({ likelihood: l, impact: i })}
-                    selectedCell={selectedCell}
-                  />
-                </div>
-              </div>
+                    {/* Desktop: ECharts heatmap */}
+                    <div className="hidden md:block w-full" style={{ minHeight: 300 }}>
+                      <RiskHeatmapChart
+                        cells={filteredCells as Array<{ likelihood: number; impact: number; risks: Array<{ id: string; title: string; status: string; category: string }> }>}
+                        cellDeltas={dashboardData?.cellDeltas}
+                        aboveAppetiteCells={aboveAppetiteCellsSet}
+                        onCellClick={(l, i) => setSelectedCell({ likelihood: l, impact: i })}
+                        selectedCell={selectedCell}
+                      />
+                    </div>
+                  </div>
 
-              {/* Right: KRI Trend (40% = 2/5 cols) */}
-              <div className="lg:col-span-2 bg-card border rounded-xl p-4">
-                <KriTrendPanel
-                  snapshots={snapshotData}
-                  appetiteThreshold={globalAppetiteThreshold}
-                  selectedRange={selectedRange}
-                  onRangeChange={setSelectedRange}
-                  collecting={dashboardData?.collecting}
-                />
-              </div>
+                  {/* Right: KRI Trend (40% = 2/5 cols) */}
+                  <div className="lg:col-span-2 bg-card border rounded-xl p-4">
+                    <KriTrendPanel
+                      snapshots={snapshotData}
+                      appetiteThreshold={globalAppetiteThreshold}
+                      selectedRange={selectedRange}
+                      onRangeChange={setSelectedRange}
+                      collecting={dashboardData?.collecting}
+                    />
+                  </div>
+                </>
+              ) : (
+                /* Explorer view: full width */
+                <div className="lg:col-span-5 bg-card border rounded-xl p-4" style={{ minHeight: 500 }}>
+                  {/* Mobile fallback */}
+                  <div className="md:hidden text-center py-12 text-muted-foreground">
+                    <p className="text-sm mb-2">Risk Explorer requires a wider screen</p>
+                    <button
+                      className="text-xs text-primary hover:underline"
+                      onClick={() => setViewMode("heatmap")}
+                    >
+                      Switch to Heatmap view
+                    </button>
+                  </div>
+                  {/* Desktop: parallel coordinates chart */}
+                  <div className="hidden md:block w-full h-full" style={{ minHeight: 500 }}>
+                    <RiskParallelChart
+                      risks={allRisks}
+                      onRiskClick={(id) => navigate(`/risks/${id}`)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* SECTION 3: Domain Cards Strip */}
