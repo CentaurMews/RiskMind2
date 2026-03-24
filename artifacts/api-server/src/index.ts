@@ -7,6 +7,7 @@ import { startAgentScheduler } from "./lib/agent-scheduler";
 import { startSignalFeedPoller } from "./lib/signal-feed-poller";
 import { startRiskSnapshotScheduler } from "./lib/risk-snapshot-scheduler";
 import { seedDemoDataIfEmpty } from "./lib/seed";
+import "./adapters/index"; // Register all signal feed adapters (NVD, Shodan, Sentinel, MISP, Email)
 
 // Fail-fast: validate all required env vars before any other code runs
 const REQUIRED_ENV = ["PORT", "DATABASE_URL", "JWT_SECRET", "ENCRYPTION_KEY"] as const;
