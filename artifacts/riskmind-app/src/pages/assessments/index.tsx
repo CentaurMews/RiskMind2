@@ -152,7 +152,7 @@ export default function AssessmentList() {
         params.set("contextType", typeFilter);
       }
 
-      const result = await apiGet<AssessmentsListResponse>(`/v1/assessments?${params.toString()}`);
+      const result = await apiGet<AssessmentsListResponse>(`/api/v1/assessments?${params.toString()}`);
       setAssessments(result.data ?? []);
       setTotal(result.total ?? 0);
     } catch {

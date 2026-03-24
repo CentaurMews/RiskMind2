@@ -227,7 +227,7 @@ export default function AssessmentSession() {
   useEffect(() => {
     if (!assessmentId) return;
     setIsLoading(true);
-    apiGet<AssessmentFromApi>(`/v1/assessments/${assessmentId}`)
+    apiGet<AssessmentFromApi>(`/api/v1/assessments/${assessmentId}`)
       .then((data) => {
         setAssessment(data);
         const templateSections = data.template?.questions?.sections ?? [];
@@ -259,7 +259,7 @@ export default function AssessmentSession() {
     async (nextIndex: number, nextCompleted: string[], nextResponses: Record<string, QuestionResponse>, nextFollowUps: AiFollowUpRecord[]) => {
       setIsSaving(true);
       try {
-        await apiPatch(`/v1/assessments/${assessmentId}/responses`, {
+        await apiPatch(`/api/v1/assessments/${assessmentId}/responses`, {
           currentSectionIndex: nextIndex,
           responses: nextResponses,
           aiFollowUps: nextFollowUps,
@@ -409,7 +409,7 @@ export default function AssessmentSession() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await apiPost(`/v1/assessments/${assessmentId}/submit`);
+      await apiPost(`/api/v1/assessments/${assessmentId}/submit`);
       setLocation(`/assessments/${assessmentId}/results`);
     } catch {
       toast({
@@ -423,7 +423,7 @@ export default function AssessmentSession() {
 
   const handleAbandon = async () => {
     try {
-      await apiPost(`/v1/assessments/${assessmentId}/abandon`);
+      await apiPost(`/api/v1/assessments/${assessmentId}/abandon`);
       setLocation("/assessments");
     } catch {
       toast({ title: "Failed to abandon assessment", variant: "destructive" });

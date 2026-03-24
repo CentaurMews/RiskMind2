@@ -29,6 +29,25 @@ import AssessmentTemplateBuilder from "@/pages/assessments/templates/builder";
 import AssessmentSession from "@/pages/assessments/session";
 import AssessmentResults from "@/pages/assessments/results";
 
+function AssessmentNew() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const templateId = params.get("templateId");
+    if (!templateId) { setLocation("/assessments/templates"); return; }
+    const token = localStorage.getItem("accessToken");
+    fetch("/api/v1/assessments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ templateId, contextType: "vendor" }),
+    })
+      .then((r) => r.json())
+      .then((data) => setLocation(`/assessments/${data.id}/session`, { replace: true }))
+      .catch(() => setLocation("/assessments/templates"));
+  }, [setLocation]);
+  return <div className="flex items-center justify-center h-screen text-muted-foreground">Creating assessment…</div>;
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -68,6 +87,7 @@ function AppRouter() {
       <Route path="/assessments/templates/new">{() => <ProtectedPage Component={AssessmentTemplateBuilder} />}</Route>
       <Route path="/assessments/templates/:id/edit">{() => <ProtectedPage Component={AssessmentTemplateBuilder} />}</Route>
       <Route path="/assessments/templates">{() => <ProtectedPage Component={AssessmentTemplateLibrary} />}</Route>
+      <Route path="/assessments/new">{() => <ProtectedPage Component={AssessmentNew} />}</Route>
       <Route path="/assessments/:id/session">{() => <ProtectedPage Component={AssessmentSession} />}</Route>
       <Route path="/assessments/:id/results">{() => <ProtectedPage Component={AssessmentResults} />}</Route>
       <Route path="/assessments">{() => <ProtectedPage Component={AssessmentList} />}</Route>

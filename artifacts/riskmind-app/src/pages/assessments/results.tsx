@@ -201,7 +201,7 @@ export default function AssessmentResults() {
   const loadResults = async (quiet = false) => {
     if (!quiet) setIsLoading(true);
     try {
-      const result = await apiGet<ResultsFromApi>(`/v1/assessments/${assessmentId}/results`);
+      const result = await apiGet<ResultsFromApi>(`/api/v1/assessments/${assessmentId}/results`);
       setData(result);
 
       // Poll for AI summary if not yet available

@@ -27,16 +27,32 @@ const router = Router();
 
 router.get("/v1/frameworks", async (req, res) => {
   try {
+    const tenantId = req.user!.tenantId;
     const frameworks = await db.select({
       id: frameworksTable.id,
       name: frameworksTable.name,
       version: frameworksTable.version,
       type: frameworksTable.type,
       description: frameworksTable.description,
+      complianceThreshold: frameworksTable.complianceThreshold,
       createdAt: frameworksTable.createdAt,
-    }).from(frameworksTable).where(eq(frameworksTable.tenantId, req.user!.tenantId)).orderBy(frameworksTable.name);
+    }).from(frameworksTable).where(eq(frameworksTable.tenantId, tenantId)).orderBy(frameworksTable.name);
 
-    res.json({ data: frameworks });
+    // Enrich with compliance stats via separate queries to avoid correlated subquery ambiguity
+    const enriched = await Promise.all(frameworks.map(async (f) => {
+      const reqResult = await db.execute(sql`SELECT count(*)::int AS cnt FROM framework_requirements WHERE framework_id = ${f.id} AND tenant_id = ${tenantId}`);
+      const ctrlResult = await db.execute(sql`SELECT count(DISTINCT crm.control_id)::int AS cnt FROM control_requirement_maps crm JOIN framework_requirements fr ON crm.requirement_id = fr.id WHERE fr.framework_id = ${f.id} AND crm.tenant_id = ${tenantId}`);
+      const activeResult = await db.execute(sql`SELECT count(DISTINCT crm.control_id)::int AS cnt FROM control_requirement_maps crm JOIN framework_requirements fr ON crm.requirement_id = fr.id JOIN controls c ON crm.control_id = c.id WHERE fr.framework_id = ${f.id} AND crm.tenant_id = ${tenantId} AND c.control_status = 'active'`);
+
+      const reqs = (reqResult.rows[0] as { cnt: number }).cnt;
+      const ctrls = (ctrlResult.rows[0] as { cnt: number }).cnt;
+      const active = (activeResult.rows[0] as { cnt: number }).cnt;
+      const compliancePct = active > 0 && ctrls > 0 ? Math.round((active / ctrls) * 100) : 0;
+
+      return { ...f, requirementCount: reqs, controlCount: ctrls, activeControlCount: active, compliancePercentage: Math.min(compliancePct, 100) };
+    }));
+
+    res.json({ data: enriched });
   } catch (err) {
     console.error("List frameworks error:", err);
     serverError(res);
