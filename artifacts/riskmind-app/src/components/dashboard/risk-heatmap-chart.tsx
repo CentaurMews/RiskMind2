@@ -8,6 +8,8 @@ interface RiskHeatmapChartProps {
     impact: number;
     risks: Array<{ id: string; title: string; status: string; category: string }>;
   }>;
+  cellDeltas?: Record<string, number>;         // "likelihood-impact" -> change count
+  aboveAppetiteCells?: Set<string>;             // "likelihood-impact" keys above threshold
   onCellClick?: (likelihood: number, impact: number) => void;
   selectedCell?: { likelihood: number; impact: number } | null;
 }
@@ -54,7 +56,7 @@ function getSeverityColor(
   return colors.severityLow;
 }
 
-export function RiskHeatmapChart({ cells, onCellClick, selectedCell }: RiskHeatmapChartProps) {
+export function RiskHeatmapChart({ cells, cellDeltas, aboveAppetiteCells, onCellClick, selectedCell }: RiskHeatmapChartProps) {
   const echartsRef = useRef<ReactECharts>(null);
   const [themeVersion, setThemeVersion] = useState(0);
 
@@ -99,6 +101,11 @@ export function RiskHeatmapChart({ cells, onCellClick, selectedCell }: RiskHeatm
     return data;
   }, [cells]);
 
+  // Compute total risks for percentage calculation
+  const totalRisks = useMemo(() => {
+    return cells.reduce((sum, cell) => sum + (cell.risks?.length ?? 0), 0);
+  }, [cells]);
+
   const option: EChartsOption = useMemo(() => {
     const likelihoodLabels = ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"];
     const impactLabels = ["Negligible", "Minor", "Moderate", "Major", "Catastrophic"];
@@ -113,11 +120,25 @@ export function RiskHeatmapChart({ cells, onCellClick, selectedCell }: RiskHeatm
           const score = likelihood * impact;
           const severityLabel =
             score >= 15 ? "Critical" : score >= 10 ? "High" : score >= 5 ? "Medium" : "Low";
+          const pct = totalRisks > 0 ? Math.round((count / totalRisks) * 100) : 0;
+          const key = `${likelihood}-${impact}`;
+          let deltaText = "";
+          if (cellDeltas) {
+            const delta = cellDeltas[key] ?? 0;
+            if (delta > 0) {
+              deltaText = `+${delta} since last period`;
+            } else if (delta < 0) {
+              deltaText = `${delta} since last period`;
+            } else {
+              deltaText = "No change";
+            }
+          }
           return (
             `<strong>${severityLabel}</strong> (Score: ${score})<br/>` +
             `Likelihood: ${likelihoodLabels[lIdx]}<br/>` +
             `Impact: ${impactLabels[iIdx]}<br/>` +
-            `Risks: <strong>${count}</strong>`
+            `Risks: <strong>${count}</strong> (${pct}% of total)` +
+            (deltaText ? `<br/>${deltaText}` : "")
           );
         },
       },
@@ -153,12 +174,20 @@ export function RiskHeatmapChart({ cells, onCellClick, selectedCell }: RiskHeatm
           label: {
             show: true,
             formatter: (params: any) => {
-              const count = (params.value as [number, number, number])[2];
-              return count > 0 ? String(count) : "";
+              const [iIdx, lIdx, count] = params.value as [number, number, number];
+              const likelihood = lIdx + 1;
+              const impact = iIdx + 1;
+              const key = `${likelihood}-${impact}`;
+              const delta = cellDeltas?.[key] ?? 0;
+              const isAboveAppetite = aboveAppetiteCells?.has(key) ?? false;
+              const arrow = delta > 0 ? " ↑" : delta < 0 ? " ↓" : "";
+              const badge = isAboveAppetite ? " !" : "";
+              return count > 0 ? `${count}${arrow}${badge}` : "";
             },
-            fontSize: 14,
+            fontSize: 11,
             fontWeight: "bold",
             color: colors.foreground,
+            overflow: "truncate",
           },
           emphasis: {
             itemStyle: {
@@ -179,7 +208,7 @@ export function RiskHeatmapChart({ cells, onCellClick, selectedCell }: RiskHeatm
         },
       ],
     };
-  }, [heatmapData, colors]);
+  }, [heatmapData, colors, cellDeltas, aboveAppetiteCells, totalRisks]);
 
   // Dispatch highlight action for selected cell
   useEffect(() => {
@@ -207,12 +236,17 @@ export function RiskHeatmapChart({ cells, onCellClick, selectedCell }: RiskHeatm
   );
 
   return (
-    <ReactECharts
-      ref={echartsRef}
-      option={option}
-      onEvents={onEvents}
-      style={{ height: "100%", minHeight: 500 }}
-      opts={{ renderer: "canvas" }}
-    />
+    <div
+      aria-label={`Risk heatmap with ${totalRisks} risks across 25 cells`}
+      style={{ height: "100%" }}
+    >
+      <ReactECharts
+        ref={echartsRef}
+        option={option}
+        onEvents={onEvents}
+        style={{ height: "100%", minHeight: 500 }}
+        opts={{ renderer: "canvas" }}
+      />
+    </div>
   );
 }
