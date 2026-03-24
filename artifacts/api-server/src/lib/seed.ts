@@ -20,6 +20,7 @@ import {
   orgDependenciesTable,
   monitoringConfigsTable,
   riskAppetiteConfigsTable,
+  riskSnapshotsTable,
 } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
@@ -1799,6 +1800,155 @@ async function seedFindings(
 }
 
 // --------------------------------------------------------------------------
+// Risk Snapshots — 90 days of historical data for dashboard trend charts
+// --------------------------------------------------------------------------
+
+async function seedRiskSnapshots(tenantId: string): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM risk_snapshots WHERE tenant_id = ${tenantId}`
+  );
+  const existing = (countResult.rows[0] as { cnt: number }).cnt;
+  if (existing > 0) {
+    console.log("[Seed] Risk snapshots already seeded, skipping");
+    return;
+  }
+
+  // Deterministic score progression curve:
+  // Days 90-46: Start 72, decrease to 58 (improvement, ~0.3/day + sine noise)
+  // Day 45: Spike to 78 (phishing campaign incident)
+  // Days 44-31: Rapid recovery 78 → 62
+  // Days 30-1: Gradual improvement 62 → 52
+  function computeScore(dayOffset: number): number {
+    const dayIndex = 90 - dayOffset; // 0 = 90 days ago, 89 = yesterday
+    const noise = 2 * Math.sin(dayIndex * 0.7);
+
+    if (dayOffset === 45) {
+      return 78; // Phishing incident spike
+    } else if (dayOffset >= 46) {
+      // Days 90-46 ago: 72 → 58, gradual improvement
+      const progress = (90 - dayOffset) / (90 - 46); // 0 at day 90, 1 at day 46
+      return Math.round((72 - progress * 14 + noise) * 10) / 10;
+    } else if (dayOffset >= 31) {
+      // Days 44-31 ago: rapid recovery 78 → 62
+      const progress = (44 - dayOffset) / (44 - 31); // 0 at day 44, 1 at day 31
+      return Math.round((78 - progress * 16 + noise) * 10) / 10;
+    } else {
+      // Days 30-1 ago: gradual improvement 62 → 52
+      const progress = (30 - dayOffset) / (30 - 1); // 0 at day 30, 1 at day 1
+      return Math.round((62 - progress * 10 + noise) * 10) / 10;
+    }
+  }
+
+  function computeTotalRisks(dayOffset: number): number {
+    // Start at 22, increase to 28 over 90 days (~1 per 15 days)
+    const dayIndex = 90 - dayOffset; // 0 at 90 days ago, 89 at yesterday
+    return 22 + Math.floor(dayIndex / 15);
+  }
+
+  function computeAboveAppetite(score: number): number {
+    // Correlate with compositeScore — higher score = more above appetite. Range 2-8.
+    if (score >= 75) return 8;
+    if (score >= 70) return 7;
+    if (score >= 65) return 6;
+    if (score >= 60) return 5;
+    if (score >= 55) return 4;
+    if (score >= 50) return 3;
+    return 2;
+  }
+
+  function computeCellCounts(dayIndex: number): Record<string, number> {
+    // Base distribution, deterministically varied by dayIndex (cycle of 7)
+    const base: Record<string, number> = {
+      "1-1": 2, "1-2": 1, "2-2": 3, "2-3": 2, "3-3": 4,
+      "3-4": 3, "4-3": 2, "4-4": 2, "2-5": 1, "3-5": 2,
+      "2-4": 2, "4-2": 1, "1-3": 1,
+    };
+    // Shift 1-2 cells using deterministic pattern based on dayIndex
+    const cells = Object.keys(base);
+    const fromIdx = dayIndex % cells.length;
+    const toIdx = (dayIndex * 3 + 1) % cells.length;
+    const result = { ...base };
+    if (fromIdx !== toIdx && result[cells[fromIdx]] > 1) {
+      result[cells[fromIdx]] -= 1;
+      result[cells[toIdx]] += 1;
+    }
+    return result;
+  }
+
+  function computeCategoryCounts(score: number, dayOffset: number): Record<string, { score: number; count: number; highCriticalCount: number }> {
+    // Scale factor: how much above/below the "normal" state (compositeScore ~62)
+    const scaleFactor = (score - 62) / 20; // 0 at normal, positive at spike
+
+    const techScore = Math.round(Math.min(98, Math.max(45, 68 + scaleFactor * 20)));
+    const opScore = Math.round(Math.min(85, Math.max(35, 55 + scaleFactor * 10)));
+    const compScore = Math.round(Math.min(80, Math.max(35, 52 + scaleFactor * 8)));
+    const finScore = Math.round(Math.min(75, Math.max(30, 48 + scaleFactor * 6)));
+    const stratScore = Math.round(Math.min(70, Math.max(28, 42 + scaleFactor * 5)));
+    const repScore = Math.round(Math.min(82, Math.max(38, 58 + scaleFactor * 12)));
+
+    // During spike (day 45), technology jumps prominently
+    const isSpikeDay = dayOffset === 45;
+
+    return {
+      technology: {
+        score: isSpikeDay ? 85 : techScore,
+        count: 8,
+        highCriticalCount: isSpikeDay ? 4 : (techScore >= 70 ? 3 : techScore >= 60 ? 2 : 1),
+      },
+      operational: {
+        score: opScore,
+        count: 5,
+        highCriticalCount: opScore >= 65 ? 2 : 1,
+      },
+      compliance: {
+        score: compScore,
+        count: 4,
+        highCriticalCount: compScore >= 60 ? 2 : 1,
+      },
+      financial: {
+        score: finScore,
+        count: 4,
+        highCriticalCount: finScore >= 55 ? 1 : 0,
+      },
+      strategic: {
+        score: stratScore,
+        count: 4,
+        highCriticalCount: 0,
+      },
+      reputational: {
+        score: repScore,
+        count: 3,
+        highCriticalCount: repScore >= 62 ? 1 : 0,
+      },
+    };
+  }
+
+  const snapshots = [];
+  for (let dayOffset = 90; dayOffset >= 1; dayOffset--) {
+    const dayIndex = 90 - dayOffset; // 0 = 90 days ago, 89 = yesterday
+    const snapshotDate = new Date(Date.now() - dayOffset * 86400000).toISOString().slice(0, 10);
+    const compositeScore = computeScore(dayOffset);
+    const totalRisks = computeTotalRisks(dayOffset);
+    const aboveAppetiteCount = computeAboveAppetite(compositeScore);
+    const cellCounts = computeCellCounts(dayIndex);
+    const categoryCounts = computeCategoryCounts(compositeScore, dayOffset);
+
+    snapshots.push({
+      tenantId,
+      snapshotDate,
+      compositeScore: String(compositeScore),
+      totalRisks,
+      aboveAppetiteCount,
+      cellCounts,
+      categoryCounts,
+    });
+  }
+
+  await db.insert(riskSnapshotsTable).values(snapshots);
+  console.log(`[Seed] Created ${snapshots.length} risk snapshots (90 days of historical data)`);
+}
+
+// --------------------------------------------------------------------------
 // Main seed entry point
 // --------------------------------------------------------------------------
 
@@ -1991,6 +2141,9 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
     await seedAssessments(tenant.id, vendors, isoFramework.id);
     const signalIdMap = await seedExpandedSignals(tenant.id, vendors);
     await seedFindings(tenant.id, signalIdMap, risks, vendors);
+
+    // Task 4 (Plan 18-03): Historical risk snapshots for dashboard trend charts
+    await seedRiskSnapshots(tenant.id);
 
     console.log(`[Seed] Done — Acme Corp demo dataset created. Login: any-user@acme.com / Ballpen-Kiosk-0!`);
   } catch (err) {
