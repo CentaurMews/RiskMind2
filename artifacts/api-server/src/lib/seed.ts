@@ -21,6 +21,9 @@ import {
   monitoringConfigsTable,
   riskAppetiteConfigsTable,
   riskSnapshotsTable,
+  controlsTable,
+  controlRequirementMapsTable,
+  controlTestsTable,
 } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
@@ -2064,6 +2067,445 @@ async function seedComplianceThresholds(tenantId: string): Promise<void> {
   }
 }
 
+// ─── Phase 19-02: Controls, requirement maps, control tests ──────────────────
+
+type ControlDef = {
+  title: string;
+  description: string;
+  status: "active" | "inactive" | "planned";
+  isoCode: string;
+};
+
+const controlDefs: ControlDef[] = [
+  // Active controls (11)
+  { title: "Multi-Factor Authentication (MFA)", description: "Enforce MFA for all user accounts accessing corporate systems and data. Covers Azure AD Conditional Access policies and hardware token enrollment.", status: "active", isoCode: "A.8.5" },
+  { title: "Data Encryption at Rest", description: "AES-256 encryption for all data at rest in databases, file storage, and backups. Key management via AWS KMS with annual rotation.", status: "active", isoCode: "A.8.24" },
+  { title: "Data Encryption in Transit", description: "TLS 1.3 enforced for all external communications. Internal service mesh uses mTLS. Certificate management automated via Let's Encrypt.", status: "active", isoCode: "A.8.24" },
+  { title: "Incident Response Plan", description: "Documented IR plan with defined roles, escalation procedures, communication templates, and post-incident review process. Tested via quarterly tabletop exercises.", status: "active", isoCode: "A.5.24" },
+  { title: "Privileged Access Management", description: "Just-in-time privileged access with 4-hour session limits. All admin actions logged and reviewed weekly. Break-glass procedures documented.", status: "active", isoCode: "A.8.2" },
+  { title: "Vulnerability Management Program", description: "Weekly automated vulnerability scans (Qualys), monthly penetration testing for critical systems, 72-hour SLA for critical CVE patching.", status: "active", isoCode: "A.8.8" },
+  { title: "Security Awareness Training", description: "Mandatory annual security awareness training for all employees. Quarterly phishing simulations. Role-specific training for developers and admins.", status: "active", isoCode: "A.6.3" },
+  { title: "Network Segmentation", description: "Production, staging, and corporate networks segmented via VLANs and firewall rules. Zero Trust network access for remote workers via Cloudflare WARP.", status: "active", isoCode: "A.8.22" },
+  { title: "Backup and Recovery", description: "Daily incremental and weekly full backups. RPO: 4 hours, RTO: 8 hours. Backups stored in geographically separate region. Monthly restore tests.", status: "active", isoCode: "A.8.13" },
+  { title: "Access Review Process", description: "Quarterly access reviews for all systems. Automated deprovisioning within 24 hours of termination. Privileged access reviewed monthly.", status: "active", isoCode: "A.5.18" },
+  { title: "Logging and Monitoring", description: "Centralized SIEM (Microsoft Sentinel) collecting logs from all production systems. Real-time alerting for anomalous patterns. 90-day log retention.", status: "active", isoCode: "A.8.15" },
+  // Planned controls (4)
+  { title: "Data Loss Prevention (DLP)", description: "Planned deployment of Microsoft Purview DLP policies for email, Teams, and SharePoint. Classification labels for sensitive data. Scheduled for Q2 2026.", status: "planned", isoCode: "A.8.12" },
+  { title: "Secure SDLC Integration", description: "Planned integration of SAST/DAST tools into CI/CD pipeline. Code review requirements for security-sensitive changes. Developer security champion program.", status: "planned", isoCode: "A.8.25" },
+  { title: "Third-Party Risk Continuous Monitoring", description: "Planned automated monitoring of vendor security posture via SecurityScorecard. Automated alerts for rating changes. Integration with vendor management workflow.", status: "planned", isoCode: "A.5.22" },
+  { title: "Configuration Management Baseline", description: "Planned CIS benchmark hardening for all server and workstation images. Automated drift detection and remediation. Quarterly baseline review.", status: "planned", isoCode: "A.8.9" },
+  // Inactive controls (2)
+  { title: "Legacy VPN Access Control", description: "Deprecated traditional VPN replaced by Zero Trust network access. Maintained for legacy on-prem systems pending migration. Decommission scheduled Q3 2026.", status: "inactive", isoCode: "A.8.20" },
+  { title: "Manual Change Approval Board", description: "Replaced by automated CI/CD approval gates and pull request reviews. Retained documentation for audit trail purposes only.", status: "inactive", isoCode: "A.8.32" },
+];
+
+// Multi-mappings: some controls map to additional ISO codes
+const additionalMappings: Record<string, string[]> = {
+  "Multi-Factor Authentication (MFA)": ["A.5.17"],
+  "Data Encryption at Rest": ["A.8.11"],
+  "Incident Response Plan": ["A.5.26", "A.5.27"],
+  "Vulnerability Management Program": ["A.8.7"],
+  "Logging and Monitoring": ["A.8.16"],
+};
+
+type InsertedControl = { id: string; title: string };
+
+async function seedControls(
+  tenantId: string,
+  users: { id: string; role: string }[]
+): Promise<InsertedControl[]> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM controls WHERE tenant_id = ${tenantId}`
+  );
+  const cnt = (countResult.rows[0] as { cnt: number }).cnt;
+  if (cnt > 0) {
+    console.log("[Seed] Controls already seeded, skipping");
+    const existing = await db.select({ id: controlsTable.id, title: controlsTable.title })
+      .from(controlsTable)
+      .where(eq(controlsTable.tenantId, tenantId));
+    return existing;
+  }
+
+  const adminUser = users.find((u) => u.role === "admin") || users[0];
+  const rmUser = users.find((u) => u.role === "risk_manager") || adminUser;
+  const roUser = users.find((u) => u.role === "risk_owner") || adminUser;
+  const ownerRotation = [adminUser, rmUser, roUser];
+
+  const inserted = await db.insert(controlsTable).values(
+    controlDefs.map((def, i) => ({
+      tenantId,
+      title: def.title,
+      description: def.description,
+      status: def.status,
+      ownerId: ownerRotation[i % ownerRotation.length].id,
+    }))
+  ).returning({ id: controlsTable.id, title: controlsTable.title });
+
+  console.log(`[Seed] Created ${inserted.length} controls for tenant ${tenantId}`);
+  return inserted;
+}
+
+async function seedControlRequirementMaps(
+  tenantId: string,
+  controls: InsertedControl[]
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM control_requirement_maps WHERE tenant_id = ${tenantId}`
+  );
+  const cnt = (countResult.rows[0] as { cnt: number }).cnt;
+  if (cnt > 0) {
+    console.log("[Seed] Control requirement maps already seeded, skipping");
+    return;
+  }
+
+  // Build a lookup map: ISO code -> requirement ID
+  const reqRows = await db
+    .select({ id: frameworkRequirementsTable.id, code: frameworkRequirementsTable.code })
+    .from(frameworkRequirementsTable)
+    .where(eq(frameworkRequirementsTable.tenantId, tenantId));
+
+  const codeToReqId: Record<string, string> = {};
+  for (const r of reqRows) {
+    codeToReqId[r.code] = r.id;
+  }
+
+  const mapsToInsert: { tenantId: string; controlId: string; requirementId: string }[] = [];
+
+  for (const control of controls) {
+    const def = controlDefs.find((d) => d.title === control.title);
+    if (!def) continue;
+
+    // Primary mapping
+    const primaryReqId = codeToReqId[def.isoCode];
+    if (primaryReqId) {
+      mapsToInsert.push({ tenantId, controlId: control.id, requirementId: primaryReqId });
+    }
+
+    // Additional mappings
+    const extra = additionalMappings[def.title] || [];
+    for (const code of extra) {
+      const reqId = codeToReqId[code];
+      if (reqId) {
+        mapsToInsert.push({ tenantId, controlId: control.id, requirementId: reqId });
+      }
+    }
+  }
+
+  if (mapsToInsert.length > 0) {
+    await db.insert(controlRequirementMapsTable).values(mapsToInsert);
+  }
+  console.log(`[Seed] Created ${mapsToInsert.length} control requirement maps for tenant ${tenantId}`);
+}
+
+async function seedControlTests(
+  tenantId: string,
+  controls: InsertedControl[],
+  users: { id: string; role: string }[]
+): Promise<void> {
+  const countResult = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM control_tests WHERE tenant_id = ${tenantId}`
+  );
+  const cnt = (countResult.rows[0] as { cnt: number }).cnt;
+  if (cnt > 0) {
+    console.log("[Seed] Control tests already seeded, skipping");
+    return;
+  }
+
+  const adminUser = users.find((u) => u.role === "admin") || users[0];
+  const rmUser = users.find((u) => u.role === "risk_manager") || adminUser;
+  const roUser = users.find((u) => u.role === "risk_owner") || adminUser;
+  const testerRotation = [adminUser, rmUser, roUser];
+
+  const testDefs = [
+    { controlTitle: "Multi-Factor Authentication (MFA)", result: "pass" as const, evidence: "Azure AD Conditional Access policy audit export showing 100% MFA enforcement across all user accounts. Exception list reviewed and approved by CISO.", testedAt: new Date("2026-02-15"), notes: "All user accounts verified. 3 service accounts use certificate-based auth." },
+    { controlTitle: "Data Encryption at Rest", result: "pass" as const, evidence: "AWS KMS key audit report. RDS encryption status verified for all 12 database instances. S3 bucket policies confirmed default encryption.", testedAt: new Date("2026-02-20"), notes: "Annual key rotation completed on schedule." },
+    { controlTitle: "Incident Response Plan", result: "partial" as const, evidence: "Tabletop exercise report from Q1 2026. Communication chain validated but escalation to external counsel took 6 hours vs 2-hour target.", testedAt: new Date("2026-01-30"), notes: "Action item: Update external counsel contact procedures. Retest in Q2." },
+    { controlTitle: "Vulnerability Management Program", result: "pass" as const, evidence: "Qualys scan summary: 0 critical, 2 high (patched within SLA), 15 medium vulnerabilities. Penetration test report from Coalfire dated 2026-01-15.", testedAt: new Date("2026-02-10"), notes: "All critical and high findings remediated within SLA." },
+    { controlTitle: "Backup and Recovery", result: "pass" as const, evidence: "Monthly restore test log showing successful RDS snapshot restore in 3.5 hours (under 8-hour RTO). Data integrity verified via checksum comparison.", testedAt: new Date("2026-03-01"), notes: "RTO well within target. RPO met at 2.1 hours." },
+    { controlTitle: "Access Review Process", result: "fail" as const, evidence: "Q4 2025 access review found 8 accounts with access to production systems belonging to employees terminated 30-60 days prior. Root cause: HR termination feed delay.", testedAt: new Date("2025-12-15"), notes: "Remediation: Real-time HR-to-IAM integration deployed in Jan 2026. Retest scheduled." },
+    { controlTitle: "Network Segmentation", result: "partial" as const, evidence: "Firewall rule audit shows proper VLAN segmentation for production and corporate. However, staging environment shares subnet with development.", testedAt: new Date("2026-01-20"), notes: "Staging/dev separation planned for Q2 2026 infrastructure refresh." },
+  ];
+
+  const testsToInsert = testDefs.map((def, i) => {
+    const control = controls.find((c) => c.title === def.controlTitle);
+    return {
+      tenantId,
+      controlId: control?.id ?? controls[0].id,
+      testerId: testerRotation[i % testerRotation.length].id,
+      result: def.result,
+      evidence: def.evidence,
+      notes: def.notes,
+      testedAt: def.testedAt,
+    };
+  });
+
+  await db.insert(controlTestsTable).values(testsToInsert);
+  console.log(`[Seed] Created ${testsToInsert.length} control tests for tenant ${tenantId}`);
+}
+
+// ─── Phase 19-02: Completed assessments ──────────────────────────────────────
+
+async function seedCompletedAssessments(
+  tenantId: string,
+  realVendors: { id: string; name: string }[],
+  isoFrameworkId: string
+): Promise<void> {
+  // Idempotency: skip if Microsoft vendor assessment already exists
+  const existing = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM assessments WHERE tenant_id = ${tenantId} AND context_type = 'vendor' AND context_id IN (SELECT id FROM vendors WHERE tenant_id = ${tenantId} AND name = 'Microsoft')`
+  );
+  const cnt = (existing.rows[0] as { cnt: number }).cnt;
+  if (cnt > 0) {
+    console.log("[Seed] Completed assessments already seeded, skipping");
+    return;
+  }
+
+  // Ensure templates exist
+  await seedPrebuiltTemplates(tenantId);
+
+  // Look up templates
+  const dpiaTemplateRow = await db
+    .select({ id: assessmentTemplatesTable.id })
+    .from(assessmentTemplatesTable)
+    .where(sql`tenant_id = ${tenantId} AND title = 'Vendor Security + Privacy (DPIA)'`)
+    .limit(1);
+
+  const ccTemplateRow = await db
+    .select({ id: assessmentTemplatesTable.id })
+    .from(assessmentTemplatesTable)
+    .where(sql`tenant_id = ${tenantId} AND title = 'Compliance Control Assessment'`)
+    .limit(1);
+
+  if (!dpiaTemplateRow[0] || !ccTemplateRow[0]) {
+    console.log("[Seed] Required assessment templates not found, skipping completed assessments");
+    return;
+  }
+
+  const dpiaTemplateId = dpiaTemplateRow[0].id;
+  const ccTemplateId = ccTemplateRow[0].id;
+
+  const microsoftVendor = realVendors.find((v) => v.name === "Microsoft");
+  const awsVendor = realVendors.find((v) => v.name === "Amazon Web Services");
+
+  if (!microsoftVendor || !awsVendor) {
+    console.log("[Seed] Microsoft or AWS vendor not found, skipping completed assessments");
+    return;
+  }
+
+  // ── Assessment 1: Microsoft DPIA — ~82% ──────────────────────────────────
+  const microsoftDpiaResponses = {
+    // Section A: General Information (text answers score 1.0)
+    "q-dp-001": { value: "2026-01-15", score: 1.0 },
+    "q-dp-002": { value: "Sarah Chen, CISO", score: 1.0 },
+    "q-dp-003": { value: "Microsoft Azure & M365 DPIA", score: 1.0 },
+    "q-dp-004": { value: "Comprehensive DPIA for Microsoft cloud services covering Azure IaaS, Microsoft 365, and Entra ID identity management processing employee and customer PII.", score: 1.0 },
+    "q-dp-005": { value: "review", score: 0.25 },
+    "q-dp-006": { value: "false", score: 0.0 },
+    "q-dp-007": { value: "2024-03-01", score: 1.0 },
+    "q-dp-008": { value: "IT", score: 1.0 },
+    // Section B: Data Processing Details
+    "q-dp-009": { value: "names", score: 1.0 },
+    "q-dp-010": { value: "10k_100k", score: 0.5 },
+    "q-dp-011": { value: "Employee data, customer identity records, audit logs, and usage analytics processed for service delivery and security monitoring.", score: 1.0 },
+    "q-dp-012": { value: "legitimate_interests", score: 0.85 },
+    "q-dp-013": { value: "Data is retained per Microsoft's documented retention policies aligned with our contractual terms. Employee data retained for duration of employment plus 7 years.", score: 1.0 },
+    "q-dp-014": { value: "true", score: 1.0 },
+    "q-dp-015": { value: "3_7yr", score: 0.6 },
+    "q-dp-016": { value: "IT", score: 1.0 },
+    "q-dp-017": { value: "true", score: 1.0 },
+    "q-dp-018": { value: "cloud_hosting", score: 1.0 },
+    "q-dp-019": { value: "GDPR", score: 1.0 },
+    "q-dp-020": { value: "true", score: 1.0 },
+    // Section C: Data Transfers
+    "q-dp-021": { value: "true", score: 1.0 },
+    "q-dp-022": { value: "true", score: 1.0 },
+    "q-dp-023": { value: "Microsoft processes data in EU data centers for EU-based tenants. US processing limited to global directories with adequacy decisions in place.", score: 1.0 },
+    "q-dp-024": { value: "true", score: 1.0 },
+    "q-dp-025": { value: "adequacy", score: 0.8 },
+    "q-dp-026": { value: "true", score: 1.0 },
+    "q-dp-027": { value: "Microsoft Data Processing Agreement v2024 includes GDPR-compliant SCCs and EU Data Boundary commitments for all processing within the EU.", score: 1.0 },
+    // Section D: Data Subject Rights
+    "q-dp-028": { value: "true", score: 1.0 },
+    "q-dp-029": { value: "true", score: 1.0 },
+    "q-dp-030": { value: "lt72h", score: 1.0 },
+    "q-dp-031": { value: "true", score: 1.0 },
+    "q-dp-032": { value: "true", score: 1.0 },
+    "q-dp-033": { value: "Dedicated privacy portal at privacy.microsoft.com with self-service DSAR submission. Average response time 45 hours per SLA.", score: 1.0 },
+    "q-dp-034": { value: "true", score: 1.0 },
+    // Section E: Security Measures
+    "q-dp-035": { value: "true", score: 1.0 },
+    "q-dp-036": { value: "true", score: 1.0 },
+    "q-dp-037": { value: "true", score: 1.0 },
+    "q-dp-038": { value: "true", score: 1.0 },
+    "q-dp-039": { value: "true", score: 1.0 },
+    "q-dp-040": { value: "AES-256", score: 1.0 },
+    "q-dp-041": { value: "true", score: 1.0 },
+    "q-dp-042": { value: "quarterly", score: 0.75 },
+    "q-dp-043": { value: "true", score: 1.0 },
+    "q-dp-044": { value: "lt24h", score: 1.0 },
+    "q-dp-045": { value: "true", score: 1.0 },
+    "q-dp-046": { value: "quarterly", score: 0.75 },
+    "q-dp-047": { value: "true", score: 1.0 },
+    "q-dp-048": { value: "ISO 27001:2022 certified (cert# MS-ISO27K-2024). SOC 2 Type II report available. FedRAMP High authorized for US government cloud. Annual third-party audit by Deloitte.", score: 1.0 },
+    // Section F: Risk Assessment
+    "q-dp-049": { value: "low", score: 0.75 },
+    "q-dp-050": { value: "moderate", score: 0.5 },
+    "q-dp-051": { value: "low", score: 0.75 },
+    "q-dp-052": { value: "true", score: 1.0 },
+    "q-dp-053": { value: "Residual risk is acceptable given Microsoft's enterprise security posture, regulatory certifications, and contractual privacy commitments.", score: 1.0 },
+    "q-dp-054": { value: "MFA enforcement, conditional access policies, and data minimization measures are implemented. Ongoing monitoring via Microsoft Defender for Cloud.", score: 1.0 },
+    "q-dp-055": { value: "true", score: 1.0 },
+    "q-dp-056": { value: "true", score: 1.0 },
+    // Section G: Approval
+    "q-dp-057": { value: "approve", score: 1.0 },
+    "q-dp-058": { value: "Approved by CISO and DPO. Annual review scheduled for 2027-01-15.", score: 1.0 },
+    "q-dp-059": { value: "Sarah Chen, CISO — 2026-01-15", score: 1.0 },
+    "q-dp-060": { value: "Marcus Webb, DPO — 2026-01-18", score: 1.0 },
+    "q-dp-061": { value: "annually", score: 0.75 },
+    "q-dp-062": { value: "Microsoft's EU Data Boundary commitment and comprehensive DPA provide strong privacy protections. Recommend continued monitoring of Azure region compliance.", score: 1.0 },
+  };
+
+  // ── Assessment 2: AWS DPIA — ~71% ────────────────────────────────────────
+  const awsDpiaResponses = {
+    // Section A: General Information
+    "q-dp-001": { value: "2026-02-01", score: 1.0 },
+    "q-dp-002": { value: "James Park, VP Engineering", score: 1.0 },
+    "q-dp-003": { value: "AWS Cloud Infrastructure DPIA", score: 1.0 },
+    "q-dp-004": { value: "DPIA for AWS cloud infrastructure hosting production workloads including EC2, RDS, and S3. Processes customer data, employee PII, and operational telemetry.", score: 1.0 },
+    "q-dp-005": { value: "review", score: 0.25 },
+    "q-dp-006": { value: "false", score: 0.0 },
+    "q-dp-007": { value: "2022-06-01", score: 1.0 },
+    "q-dp-008": { value: "IT", score: 1.0 },
+    // Section B: Data Processing Details
+    "q-dp-009": { value: "financial", score: 0.75 },
+    "q-dp-010": { value: "10k_100k", score: 0.5 },
+    "q-dp-011": { value: "Production application data, customer records, financial transaction logs, and operational metrics stored in RDS and S3.", score: 1.0 },
+    "q-dp-012": { value: "contract", score: 0.9 },
+    "q-dp-013": { value: "Data retained per application data lifecycle policies. Financial records 7 years, operational logs 90 days, customer data per contract terms.", score: 1.0 },
+    "q-dp-014": { value: "true", score: 1.0 },
+    "q-dp-015": { value: "3_7yr", score: 0.6 },
+    "q-dp-016": { value: "IT", score: 1.0 },
+    "q-dp-017": { value: "true", score: 1.0 },
+    "q-dp-018": { value: "cloud_hosting", score: 1.0 },
+    "q-dp-019": { value: "GDPR", score: 1.0 },
+    "q-dp-020": { value: "true", score: 1.0 },
+    // Section C: Data Transfers (weaker — no full adequacy for all regions)
+    "q-dp-021": { value: "true", score: 1.0 },
+    "q-dp-022": { value: "true", score: 1.0 },
+    "q-dp-023": { value: "Primary processing in eu-west-1 (Ireland). DR workloads in us-east-1 without full adequacy decision documentation.", score: 1.0 },
+    "q-dp-024": { value: "false", score: 0.0 },
+    "q-dp-025": { value: "SCCs", score: 1.0 },
+    "q-dp-026": { value: "false", score: 0.0 },
+    "q-dp-027": { value: "AWS DPA includes SCCs for EU-US transfers. However, DR region transfers lack documented adequacy decisions. Remediation in progress.", score: 1.0 },
+    // Section D: Data Subject Rights (weaker — DSAR response slower)
+    "q-dp-028": { value: "true", score: 1.0 },
+    "q-dp-029": { value: "false", score: 0.0 },
+    "q-dp-030": { value: "72h_1w", score: 0.75 },
+    "q-dp-031": { value: "true", score: 1.0 },
+    "q-dp-032": { value: "false", score: 0.0 },
+    "q-dp-033": { value: "DSARs handled via internal process with 5-day average response time. No self-service portal. Erasure requests require manual coordination with 3 teams.", score: 1.0 },
+    "q-dp-034": { value: "false", score: 0.0 },
+    // Section E: Security Measures (strong)
+    "q-dp-035": { value: "true", score: 1.0 },
+    "q-dp-036": { value: "true", score: 1.0 },
+    "q-dp-037": { value: "true", score: 1.0 },
+    "q-dp-038": { value: "true", score: 1.0 },
+    "q-dp-039": { value: "true", score: 1.0 },
+    "q-dp-040": { value: "AES-256", score: 1.0 },
+    "q-dp-041": { value: "true", score: 1.0 },
+    "q-dp-042": { value: "annually", score: 0.5 },
+    "q-dp-043": { value: "true", score: 1.0 },
+    "q-dp-044": { value: "lt72h", score: 0.75 },
+    "q-dp-045": { value: "true", score: 1.0 },
+    "q-dp-046": { value: "quarterly", score: 0.75 },
+    "q-dp-047": { value: "true", score: 1.0 },
+    "q-dp-048": { value: "ISO 27001 certified. SOC 2 Type II (Security, Availability, Confidentiality). PCI DSS Level 1. Annual external security audit.", score: 1.0 },
+    // Section F: Risk Assessment (moderate — residual risk is Medium)
+    "q-dp-049": { value: "low", score: 0.75 },
+    "q-dp-050": { value: "moderate", score: 0.5 },
+    "q-dp-051": { value: "medium", score: 0.5 },
+    "q-dp-052": { value: "true", score: 1.0 },
+    "q-dp-053": { value: "Residual risk is MEDIUM. Key gaps: DR region data transfer adequacy documentation incomplete, DSAR response time exceeds 72-hour target. Remediation plan in place.", score: 1.0 },
+    "q-dp-054": { value: "Encryption at rest and in transit enforced. IAM least-privilege applied. GuardDuty threat detection active. Remediation planned for transfer governance gaps.", score: 1.0 },
+    "q-dp-055": { value: "false", score: 0.0 },
+    "q-dp-056": { value: "true", score: 1.0 },
+    // Section G: Approval
+    "q-dp-057": { value: "approve_conditions", score: 0.75 },
+    "q-dp-058": { value: "Conditionally approved pending: (1) adequacy decision documentation for DR region, (2) DSAR self-service portal implementation by Q3 2026.", score: 1.0 },
+    "q-dp-059": { value: "Sarah Chen, CISO — 2026-02-05", score: 1.0 },
+    "q-dp-060": { value: "Marcus Webb, DPO — 2026-02-08", score: 1.0 },
+    "q-dp-061": { value: "6months", score: 1.0 },
+    "q-dp-062": { value: "Re-assess in 6 months to verify remediation of data transfer adequacy and DSAR response time gaps.", score: 1.0 },
+  };
+
+  // ── Assessment 3: ISO 27001 Compliance Control Assessment — ~65% ─────────
+  const isoComplianceResponses = {
+    // Section 1: Control Design
+    "q-cc-001": { value: "true", score: 1.0 },
+    "q-cc-002": { value: "true", score: 1.0 },
+    "q-cc-003": { value: "ad-hoc", score: 0.1 },
+    "q-cc-004": { value: "detective", score: 0.75 },
+    "q-cc-005": { value: "partially-automated", score: 0.6 },
+    // Section 2: Implementation
+    "q-cc-006": { value: "true", score: 1.0 },
+    "q-cc-007": { value: "true", score: 1.0 },
+    "q-cc-008": { value: "true", score: 1.0 },
+    "q-cc-009": { value: "6", score: 0.6 },
+    // Section 3: Evidence & Testing
+    "q-cc-010": { value: "true", score: 1.0 },
+    "q-cc-011": { value: "true", score: 1.0 },
+    "q-cc-012": { value: "true", score: 1.0 },
+    "q-cc-013": { value: "within-90-days", score: 0.75 },
+    "q-cc-014": { value: "false", score: 0.0 },
+    "q-cc-015": { value: "Control testing performed quarterly for critical controls, annually for others. Evidence collected in SharePoint. Documentation incomplete for 4 controls.", score: 1.0 },
+    // Section 4: Risk & Gaps
+    "q-cc-016": { value: "Control framework covers ISO 27001 Annex A controls. Notable gaps in access control (A.5.18) and logging/monitoring completeness (A.8.15, A.8.16).", score: 1.0 },
+    "q-cc-017": { value: "true", score: 1.0 },
+    "q-cc-018": { value: "medium", score: 0.5 },
+    "q-cc-019": { value: "true", score: 1.0 },
+    "q-cc-020": { value: "90-days", score: 0.5 },
+    "q-cc-021": { value: "Access control quarterly review process and SIEM coverage extension are primary remediation items. Owner assigned to each gap with Q2 2026 target.", score: 1.0 },
+    // Section 5: Overall Assessment
+    "q-cc-022": { value: "Control framework is partially implemented with moderate effectiveness. Key strengths: encryption and MFA controls. Key gaps: access review frequency, logging completeness, evidence documentation consistency.", score: 1.0 },
+  };
+
+  const assessmentsToInsert = [
+    {
+      tenantId,
+      templateId: dpiaTemplateId,
+      contextType: "vendor" as const,
+      contextId: microsoftVendor.id,
+      status: "completed" as const,
+      responses: microsoftDpiaResponses,
+      score: "82.40",
+      aiSummary: "Microsoft demonstrates a mature security and privacy posture with comprehensive certifications (ISO 27001, SOC 2 Type II, FedRAMP High) and strong contractual privacy commitments. The EU Data Boundary commitment and GDPR-compliant DPA provide robust transfer governance. Minor gaps include the review-stage project status and opportunity to transition from legitimate interests to consent basis for some processing activities.",
+    },
+    {
+      tenantId,
+      templateId: dpiaTemplateId,
+      contextType: "vendor" as const,
+      contextId: awsVendor.id,
+      status: "completed" as const,
+      responses: awsDpiaResponses,
+      score: "71.30",
+      aiSummary: "AWS shows solid technical security controls but has gaps in data transfer governance and data subject rights processes. The DR region lacks documented adequacy decisions for cross-border transfers, and DSAR response time exceeds the 72-hour target. Conditionally approved with remediation required for transfer adequacy documentation and self-service DSAR portal implementation by Q3 2026.",
+    },
+    {
+      tenantId,
+      templateId: ccTemplateId,
+      contextType: "framework" as const,
+      contextId: isoFrameworkId,
+      status: "completed" as const,
+      responses: isoComplianceResponses,
+      score: "65.20",
+      aiSummary: "Control assessment reveals moderate implementation maturity with key gaps in evidence documentation and remediation timelines. Ad-hoc monitoring frequency and incomplete evidence documentation for 4 controls are primary concerns. The score of 65.2% falls below the 80% compliance threshold, indicating AT-RISK status. Priority remediation items include formalizing access review cadence and extending SIEM coverage to achieve logging completeness targets.",
+    },
+  ];
+
+  await db.insert(assessmentsTable).values(assessmentsToInsert);
+  console.log(`[Seed] Created ${assessmentsToInsert.length} completed assessments for tenant ${tenantId}`);
+}
+
 async function seedExpandedDataForExistingTenant(tenantId: string): Promise<void> {
   try {
     // Load existing entities for FK references
@@ -2100,8 +2542,17 @@ async function seedExpandedDataForExistingTenant(tenantId: string): Promise<void
     await seedRiskSnapshots(tenantId);
 
     // Phase 19: Real vendors, DPIA template, compliance thresholds
-    await seedRealVendors(tenantId);
+    const realVendors2 = await seedRealVendors(tenantId);
     await seedComplianceThresholds(tenantId);
+
+    // Phase 19-02: Controls, requirement maps, control tests, completed assessments
+    const controls = await seedControls(tenantId, [adminUser, rmUser, roUser]);
+    await seedControlRequirementMaps(tenantId, controls);
+    await seedControlTests(tenantId, controls, [adminUser, rmUser, roUser]);
+    const isoFw = frameworks.find((f) => f.type === "iso");
+    if (realVendors2.length > 0 && isoFw) {
+      await seedCompletedAssessments(tenantId, realVendors2, isoFw.id);
+    }
   } catch (err) {
     console.error("[Seed] Expanded seed failed:", err);
   }
@@ -2305,6 +2756,12 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
     // Phase 19: Real vendors, DPIA template, compliance thresholds
     const realVendors = await seedRealVendors(tenant.id);
     await seedComplianceThresholds(tenant.id);
+
+    // Phase 19-02: Controls, requirement maps, control tests, completed assessments
+    const controls = await seedControls(tenant.id, [adminUser, rmUser, roUser]);
+    await seedControlRequirementMaps(tenant.id, controls);
+    await seedControlTests(tenant.id, controls, [adminUser, rmUser, roUser]);
+    await seedCompletedAssessments(tenant.id, realVendors, isoFramework.id);
 
     console.log(`[Seed] Done — Acme Corp demo dataset created. Login: any-user@acme.com / Ballpen-Kiosk-0!`);
   } catch (err) {
