@@ -35,3 +35,7 @@ export * from "./foresight";
 export * from "./vendor-subprocessors";
 export * from "./org-dependencies";
 export * from "./monitoring-configs";
+
+// Phase 16 schema additions
+export * from "./risk-snapshots";
+export * from "./risk-appetite-configs";

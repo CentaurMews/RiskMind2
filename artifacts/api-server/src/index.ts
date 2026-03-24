@@ -5,6 +5,7 @@ import { registerAIWorkers } from "./lib/ai-workers";
 import { startMonitoringScheduler } from "./lib/monitoring";
 import { startAgentScheduler } from "./lib/agent-scheduler";
 import { startSignalFeedPoller } from "./lib/signal-feed-poller";
+import { startRiskSnapshotScheduler } from "./lib/risk-snapshot-scheduler";
 import { seedDemoDataIfEmpty } from "./lib/seed";
 
 // Fail-fast: validate all required env vars before any other code runs
@@ -31,6 +32,7 @@ async function start() {
   startMonitoringScheduler();
   startAgentScheduler();
   startSignalFeedPoller();
+  startRiskSnapshotScheduler();
 
   app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
