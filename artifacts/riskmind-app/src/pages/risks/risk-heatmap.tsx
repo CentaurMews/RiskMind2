@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { SeverityBadge } from "@/components/ui/severity-badge";
 import { Link } from "wouter";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { HeatmapGrid } from "@/components/dashboard/heatmap-grid";
+import { RiskHeatmapChart } from "@/components/dashboard/risk-heatmap-chart";
 
 export default function RiskHeatmap() {
   const { data, isLoading } = useGetRiskHeatmap();
@@ -18,15 +18,6 @@ export default function RiskHeatmap() {
     const i = params.get("i");
     if (l && i) setSelectedCell({ likelihood: Number(l), impact: Number(i) });
   }, []);
-
-  const getCellColor = (count: number, likelihood: number, impact: number) => {
-    if (count === 0) return "bg-card hover:bg-muted/50 border-border/50";
-    const score = likelihood * impact;
-    if (score >= 15) return "bg-severity-critical/20 hover:bg-severity-critical/30 border-severity-critical/50 text-severity-critical font-bold shadow-[inset_0_0_20px_rgba(220,38,38,0.1)]";
-    if (score >= 10) return "bg-severity-high/20 hover:bg-severity-high/30 border-severity-high/50 text-severity-high font-bold";
-    if (score >= 5) return "bg-severity-medium/20 hover:bg-severity-medium/30 border-severity-medium/50 text-yellow-600 dark:text-yellow-500 font-bold";
-    return "bg-severity-low/20 hover:bg-severity-low/30 border-severity-low/50 text-severity-low font-bold";
-  };
 
   const getCellData = (l: number, i: number) => {
     return data?.cells?.find(c => c.likelihood === l && c.impact === i);
@@ -51,47 +42,46 @@ export default function RiskHeatmap() {
           <p className="text-muted-foreground mt-1">Visual distribution of enterprise risks by likelihood and impact. Click a cell to drill down.</p>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 lg:p-16 shadow-sm overflow-hidden flex flex-col items-center justify-center min-h-[600px] relative">
+        <div className="bg-card border rounded-2xl p-8 shadow-sm overflow-hidden flex flex-col items-center justify-center min-h-[600px] relative">
           {isLoading ? (
             <Loader2 className="animate-spin h-8 w-8 text-primary" />
           ) : (
-            <div className="relative w-full max-w-3xl">
-              <div className="absolute -left-12 top-1/2 -translate-y-1/2 -rotate-90 origin-center text-sm font-bold tracking-widest text-muted-foreground whitespace-nowrap uppercase">
-                Likelihood
-              </div>
-              
-              <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-sm font-bold tracking-widest text-muted-foreground uppercase">
-                Impact
+            <>
+              {/* Mobile fallback: severity summary list */}
+              <div className="md:hidden space-y-2 w-full">
+                {(() => {
+                  const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+                  (data?.cells || []).forEach((cell: any) => {
+                    const score = cell.likelihood * cell.impact;
+                    const count = cell.risks?.length || 0;
+                    if (score >= 15) counts.critical += count;
+                    else if (score >= 10) counts.high += count;
+                    else if (score >= 5) counts.medium += count;
+                    else counts.low += count;
+                  });
+                  return [
+                    { label: "Critical", count: counts.critical, className: "text-severity-critical bg-severity-critical/10 border-severity-critical/30" },
+                    { label: "High", count: counts.high, className: "text-severity-high bg-severity-high/10 border-severity-high/30" },
+                    { label: "Medium", count: counts.medium, className: "text-foreground bg-severity-medium/10 border-severity-medium/30" },
+                    { label: "Low", count: counts.low, className: "text-muted-foreground bg-severity-low/10 border-severity-low/30" },
+                  ].map(({ label, count, className }) => (
+                    <div key={label} className={cn("flex items-center justify-between px-3 py-2 rounded-md border font-mono text-sm", className)}>
+                      <span className="font-medium">{label}</span>
+                      <span className="font-bold">{count} risk{count !== 1 ? "s" : ""}</span>
+                    </div>
+                  ));
+                })()}
               </div>
 
-              <div className="grid grid-cols-[auto_1fr] gap-4">
-                <div className="flex flex-col justify-between items-end pr-4 text-xs font-mono text-muted-foreground font-medium py-4">
-                  <span>5 (Almost Certain)</span>
-                  <span>4 (Likely)</span>
-                  <span>3 (Possible)</span>
-                  <span>2 (Unlikely)</span>
-                  <span>1 (Rare)</span>
-                </div>
-
-                <div className="aspect-square">
-                  <HeatmapGrid
-                    cells={(data?.cells || []) as Array<{ likelihood: number; impact: number; risks: Array<{ id: string; title: string; status: string; category: string }> }>}
-                    compact={false}
-                    onCellClick={(l, i) => setSelectedCell({ likelihood: l, impact: i })}
-                  />
-                </div>
-
-                <div />
-                
-                <div className="flex justify-between items-start pt-4 text-xs font-mono text-muted-foreground font-medium px-4">
-                  <span className="w-0 text-center relative -left-4">1 (Negligible)</span>
-                  <span className="w-0 text-center relative -left-4">2 (Minor)</span>
-                  <span className="w-0 text-center relative -left-4">3 (Moderate)</span>
-                  <span className="w-0 text-center relative -left-4">4 (Major)</span>
-                  <span className="w-0 text-center relative -left-8">5 (Catastrophic)</span>
-                </div>
+              {/* ECharts heatmap: hidden on mobile, visible on md+ */}
+              <div className="hidden md:block w-full" style={{ minHeight: 500 }}>
+                <RiskHeatmapChart
+                  cells={(data?.cells || []) as Array<{ likelihood: number; impact: number; risks: Array<{ id: string; title: string; status: string; category: string }> }>}
+                  onCellClick={(l, i) => setSelectedCell({ likelihood: l, impact: i })}
+                  selectedCell={selectedCell}
+                />
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
