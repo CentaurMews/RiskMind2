@@ -157,7 +157,7 @@ Plans:
 
 </details>
 
-### 🚧 v2.0 Core Platform Features (In Progress)
+### v2.0 Core Platform Features (In Progress)
 
 **Milestone Goal:** Transform RiskMind from a demo-ready platform into a full-featured enterprise risk management system with AI-driven assessments, redesigned vendor lifecycle, compliance workflows, real signal integrations, and predictive foresight capabilities.
 
@@ -173,7 +173,7 @@ Plans:
 ### Phase 9: Schema Foundation
 **Goal**: Every table and column required by v2.0 exists in the database — all subsequent phases can write feature code against correct, final schema without mid-development migration conflicts
 **Depends on**: Phase 8
-**Requirements**: (Foundation for ASMT-01–07, VNDR-01–07, COMP-01–03, SGNL-01–05, FRST-01–05)
+**Requirements**: (Foundation for ASMT-01-07, VNDR-01-07, COMP-01-03, SGNL-01-05, FRST-01-05)
 **Success Criteria** (what must be TRUE):
   1. `drizzle-kit push` applies cleanly with zero errors and all new tables visible in psql
   2. `assessments` table exists with `context_type` enum (vendor/compliance/control) and nullable `context_id` — no `vendor_id NOT NULL` anti-pattern present
@@ -251,7 +251,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can upload a CSV or JSON file of framework controls and see a diff preview before committing — import is additive (existing controls and mappings are preserved, not deleted)
   2. User can assign an assessment template to a compliance framework with questions mapped to control IDs — completing the assessment updates the compliance status of mapped controls
-  3. User can set a compliance threshold (0–100%) per framework and the dashboard shows COMPLIANT, AT-RISK, or NON-COMPLIANT status based on current control scores against that threshold
+  3. User can set a compliance threshold (0-100%) per framework and the dashboard shows COMPLIANT, AT-RISK, or NON-COMPLIANT status based on current control scores against that threshold
 **Plans**: TBD
 
 ### Phase 14: Foresight v2
@@ -313,10 +313,11 @@ Plans:
 
 ### Phase 17: Parallel Coordinates Risk Explorer
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** An interactive ECharts parallel coordinates Risk Explorer view on the dashboard page with 6 axes (likelihood, impact, score, category, status, risk count per category), severity-colored lines, axis brushing for filtering, and a Heatmap/Explorer toggle sharing all existing filter state
+**Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12
 **Depends on:** Phase 16
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 17 to break down)
+- [ ] 17-01-PLAN.md — Create RiskParallelChart ECharts component with 6-axis parallel coordinates, severity colors, brushing, tooltips, click navigation
+- [ ] 17-02-PLAN.md — Integrate into dashboard page with Heatmap/Explorer toggle, shared filters, mobile fallback, human verification
