@@ -316,8 +316,8 @@ Plans:
 **Goal:** An interactive ECharts parallel coordinates Risk Explorer view on the dashboard page with 6 axes (likelihood, impact, score, category, status, risk count per category), severity-colored lines, axis brushing for filtering, and a Heatmap/Explorer toggle sharing all existing filter state
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12
 **Depends on:** Phase 16
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 17-01-PLAN.md — Create RiskParallelChart ECharts component with 6-axis parallel coordinates, severity colors, brushing, tooltips, click navigation
+- [x] 17-01-PLAN.md — Create RiskParallelChart ECharts component with 6-axis parallel coordinates, severity colors, brushing, tooltips, click navigation
 - [ ] 17-02-PLAN.md — Integrate into dashboard page with Heatmap/Explorer toggle, shared filters, mobile fallback, human verification

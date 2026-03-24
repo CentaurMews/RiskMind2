@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to plan
-stopped_at: Completed 16-02-PLAN.md — frontend dashboard components
-last_updated: "2026-03-24T07:28:31.288Z"
+stopped_at: Completed 17-01-PLAN.md — RiskParallelChart component
+last_updated: "2026-03-24T10:25:00.621Z"
 progress:
   total_phases: 9
   completed_phases: 6
-  total_plans: 22
-  completed_plans: 22
+  total_plans: 24
+  completed_plans: 23
 ---
 
 # Project State
@@ -67,6 +67,7 @@ Plan: Not started
 | Phase 15-migrate-risk-heatmap-from-css-grid-to-apache-echarts P02 | 300 | 1 tasks | 1 files |
 | Phase 16-risk-heatmap-dashboard-redesign P01 | 392 | 3 tasks | 7 files |
 | Phase 16-risk-heatmap-dashboard-redesign P02 | 269 | 2 tasks | 4 files |
+| Phase 17-parallel-coordinates-risk-explorer P01 | 3508 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,9 @@ Recent decisions affecting current work:
 - [Phase 16-risk-heatmap-dashboard-redesign]: RiskHeatmapChart backward-compatible — cellDeltas and aboveAppetiteCells are optional props; label font 14→11 with overflow:truncate prevents cell label overflow at 60% width
 - [Phase 16-risk-heatmap-dashboard-redesign]: CSS posture bar chosen over ECharts gauge for RiskPostureBar — simpler, responsive, theme-compatible
 - [Phase 16-risk-heatmap-dashboard-redesign]: KriTrendPanel annotation markPoints require name field per EChartsOption MarkPointDataItemOption type — added name:a.label
+- [Phase 17-parallel-coordinates-risk-explorer]: inactiveOpacity/activeOpacity on parallel series for vivid brush-selected vs near-invisible unselected lines — no custom event handling needed
+- [Phase 17-parallel-coordinates-risk-explorer]: riskIdMap array maintained parallel to seriesData rows for O(1) dataIndex -> risk.id lookup on click
+- [Phase 17-parallel-coordinates-risk-explorer]: fontWeight must be numeric (600 not '600') for ECharts ZRFontWeight type compatibility
 
 ### Roadmap Evolution
 
@@ -163,7 +167,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T06:55:08.228Z
-Stopped at: Completed 16-02-PLAN.md — frontend dashboard components
+Last session: 2026-03-24T10:25:00.608Z
+Stopped at: Completed 17-01-PLAN.md — RiskParallelChart component
 Resume file: None
 Next step: `/gsd:plan-phase 9`
