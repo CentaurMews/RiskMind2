@@ -309,7 +309,7 @@ Plans:
 Plans:
 - [x] 16-01-PLAN.md — Backend: schema tables (risk_snapshots, risk_appetite_configs), snapshot scheduler, dashboard/appetite API endpoints
 - [x] 16-02-PLAN.md — Frontend components: enhanced heatmap chart, KRI trend panel, posture bar, domain cards
-- [ ] 16-03-PLAN.md — Dashboard page redesign (risk-heatmap.tsx wiring), Settings Risk Appetite tab, human verification
+- [x] 16-03-PLAN.md — Dashboard page redesign (risk-heatmap.tsx wiring), Settings Risk Appetite tab, human verification
 
 ### Phase 17: Parallel Coordinates Risk Explorer
 
@@ -343,4 +343,4 @@ Plans:
 
 Plans:
 - [x] 19-01-PLAN.md — DPIA template (7 sections, ~80 questions), 5 real-named vendors, compliance thresholds
-- [ ] 19-02-PLAN.md — Security controls + ISO 27001 mappings + control tests, completed assessments (DPIA + compliance)
+- [x] 19-02-PLAN.md — Security controls + ISO 27001 mappings + control tests, completed assessments (DPIA + compliance)
