@@ -6,6 +6,8 @@ type JobHandler = (job: { id: string; tenantId: string | null; type: string; pay
 const handlers = new Map<string, JobHandler>();
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+const JOB_TIMEOUT_MS = 30_000; // 30s max per job handler
+
 export function registerWorker(queue: string, handler: JobHandler) {
   handlers.set(queue, handler);
 }
@@ -31,6 +33,16 @@ export async function enqueueJob(
   }).returning();
 
   return job;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Job timeout after ${ms}ms: ${label}`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
 }
 
 async function claimAndProcessJob(queue: string, handler: JobHandler): Promise<boolean> {
@@ -60,12 +72,16 @@ async function claimAndProcessJob(queue: string, handler: JobHandler): Promise<b
     await client.query("COMMIT");
 
     try {
-      const result = await handler({
-        id: job.id,
-        tenantId: job.tenantId,
-        type: job.type,
-        payload: job.payload,
-      });
+      const result = await withTimeout(
+        handler({
+          id: job.id,
+          tenantId: job.tenantId,
+          type: job.type,
+          payload: job.payload,
+        }),
+        JOB_TIMEOUT_MS,
+        `${queue}/${job.type}`
+      );
 
       await db.update(jobsTable).set({
         status: "completed",
@@ -113,7 +129,6 @@ async function processNextJob(): Promise<boolean> {
 
 export function startJobProcessor(intervalMs = 5000) {
   if (pollInterval) return;
-  // Max jobs per tick prevents blocking the event loop when many jobs are queued
   const MAX_JOBS_PER_TICK = 5;
   pollInterval = setInterval(async () => {
     try {
@@ -125,7 +140,7 @@ export function startJobProcessor(intervalMs = 5000) {
       console.error("Job processor error:", err);
     }
   }, intervalMs);
-  console.log(`Job processor started (poll every ${intervalMs}ms, max ${MAX_JOBS_PER_TICK}/tick)`);
+  console.log(`Job processor started (poll every ${intervalMs}ms, max ${MAX_JOBS_PER_TICK}/tick, timeout ${JOB_TIMEOUT_MS}ms)`);
 }
 
 export function stopJobProcessor() {

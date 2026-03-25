@@ -16,6 +16,8 @@ const DEFAULT_SCHEDULES: Record<string, string> = {
   email: "*/5 * * * *",    // every 5 min (fallback for IDLE)
 };
 
+const POLL_TIMEOUT_MS = 30_000; // 30s max per adapter poll
+
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 
 export async function startSignalFeedPoller(): Promise<void> {
@@ -68,6 +70,18 @@ export async function pollSourceForAllTenants(sourceType: string): Promise<void>
   }
 }
 
+// ─── Timeout wrapper ──────────────────────────────────────────────────────────
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`[SignalPoller] Timeout after ${ms}ms: ${label}`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 // ─── Poll a single integration config row ────────────────────────────────────
 
 async function pollSingleConfig(config: IntegrationConfig): Promise<void> {
@@ -94,7 +108,11 @@ async function pollSingleConfig(config: IntegrationConfig): Promise<void> {
   }
 
   const since = config.lastPolledAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const rawSignals = await adapter.poll(decryptedConfig, since);
+  const rawSignals = await withTimeout(
+    adapter.poll(decryptedConfig, since),
+    POLL_TIMEOUT_MS,
+    `${config.sourceType} tenant ${config.tenantId}`
+  );
 
   for (const raw of rawSignals) {
     const inserted = await db

@@ -4,8 +4,19 @@ import { runAgentCycle, getTenantAgentConfig } from "./agent-service";
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 
 const CHECK_INTERVAL_MS = 60 * 1000;
+const AGENT_CYCLE_TIMEOUT_MS = 120_000; // 2 min max per tenant agent cycle
 
 const lastRunTimestamps = new Map<string, number>();
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Agent cycle timeout after ${ms}ms: ${label}`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
 
 function cronMatchesNow(cron: string): boolean {
   const parts = cron.trim().split(/\s+/);
@@ -71,7 +82,11 @@ async function checkAndRunTenants(): Promise<void> {
 
       try {
         lastRunTimestamps.set(tenant.id, Date.now());
-        await runAgentCycle(tenant.id, policyTier, { schedule, triggeredBy: "scheduler" });
+        await withTimeout(
+          runAgentCycle(tenant.id, policyTier, { schedule, triggeredBy: "scheduler" }),
+          AGENT_CYCLE_TIMEOUT_MS,
+          `tenant ${tenant.id}`
+        );
       } catch (err) {
         console.error(`[Agent Scheduler] Error for tenant ${tenant.id}:`, err instanceof Error ? err.message : err);
       }
