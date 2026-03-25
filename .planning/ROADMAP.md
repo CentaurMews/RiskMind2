@@ -165,7 +165,7 @@ Plans:
 - [x] **Phase 10: Assessment Engine** - AI-driven shared questionnaire engine with templates, scoring, and LLM follow-up (completed 2026-03-23)
 - [x] **Phase 11: Vendor Lifecycle Redesign** - Wizard onboarding, 4th party risk, continuous monitoring, AI enrichment (completed 2026-03-23)
 - [x] **Phase 12: Signal Integrations** - NVD, Shodan, Sentinel, MISP, email ingestion with per-tenant encrypted credentials (completed 2026-03-23)
-- [ ] **Phase 13: Compliance Flow** - Framework import, assessment-to-control linkage, per-framework thresholds
+- [x] **Phase 13: Compliance Flow** - Framework import, assessment-to-control linkage, per-framework thresholds (completed 2026-03-25)
 - [ ] **Phase 14: Foresight v2** - Monte Carlo simulation, loss exceedance curve, OSINT calibration, named scenarios
 
 ## Phase Details
@@ -291,7 +291,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 10. Assessment Engine | v2.0 | 4/4 | Complete    | 2026-03-23 |
 | 11. Vendor Lifecycle Redesign | v2.0 | 5/5 | Complete    | 2026-03-23 |
 | 12. Signal Integrations | v2.0 | 5/5 | Complete   | 2026-03-23 |
-| 13. Compliance Flow | v2.0 | 4/5 | In Progress|  |
+| 13. Compliance Flow | v2.0 | 4/5 | Complete    | 2026-03-25 |
 | 14. Foresight v2 | v2.0 | 0/? | Not started | - |
 
 ### Phase 15: Migrate Risk Heatmap from CSS Grid to Apache ECharts
@@ -299,7 +299,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 **Goal:** The full-page risk heatmap renders via Apache ECharts with position-based severity colors, rich tooltips, dark mode support, and click-to-drill-down -- replacing CSS Grid while preserving Sheet sidebar, URL deep linking, and mobile fallback exactly as-is
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14
 **Depends on:** Phase 8
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 
 Plans:
 - [x] 15-01-PLAN.md — Install echarts deps + create RiskHeatmapChart ECharts component
