@@ -6,21 +6,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/severity-badge";
-import { Plus, Search, Loader2, Shield, Link2 } from "lucide-react";
+import { Plus, Search, Loader2, Shield, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { AutoMapApprovalDialog } from "@/components/compliance/auto-map-approval-dialog";
 
 export default function ControlList() {
   const [search, setSearch] = useState("");
   const { data, isLoading } = useListControls();
-  const { data: frameworks } = useListFrameworks();
+  const { data: _frameworks } = useListFrameworks();
   const queryClient = useQueryClient();
-  
+
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({ title: "", description: "" });
-  const [mappingControlId, setMappingControlId] = useState<string | null>(null);
+
+  // Auto-map dialog state
+  const [autoMapOpen, setAutoMapOpen] = useState(false);
+  const [autoMapControl, setAutoMapControl] = useState<{
+    id: string;
+    title: string;
+    requirementIds: string[];
+  } | null>(null);
 
   const createMutation = useCreateControl({
     mutation: {
@@ -38,12 +46,9 @@ export default function ControlList() {
     }
   });
 
-  const mapMutation = useMapControlRequirements({
+  // Keep mapMutation for direct mapping if needed by other callers
+  const _mapMutation = useMapControlRequirements({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/v1/controls"] });
-        setMappingControlId(null);
-      },
       onError: (error) => {
         toast({
           variant: "destructive",
@@ -56,18 +61,26 @@ export default function ControlList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate({ 
-      data: { 
-        title: formData.title, 
+    createMutation.mutate({
+      data: {
+        title: formData.title,
         description: formData.description,
-        status: "planned" 
-      } 
+        status: "planned"
+      }
     });
   };
 
-  const handleAutoMap = (controlId: string) => {
-    setMappingControlId(controlId);
-    mapMutation.mutate({ id: controlId, data: { requirementIds: [] } });
+  const handleOpenAutoMap = (controlId: string, controlTitle: string) => {
+    setAutoMapControl({
+      id: controlId,
+      title: controlTitle,
+      requirementIds: [], // existing mapped requirement IDs — empty as list API doesn't return them
+    });
+    setAutoMapOpen(true);
+  };
+
+  const handleAutoMapSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/v1/controls"] });
   };
 
   return (
@@ -154,15 +167,10 @@ export default function ControlList() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-xs"
-                          disabled={mapMutation.isPending && mappingControlId === control.id}
-                          onClick={() => control.id && handleAutoMap(control.id)}
+                          className="text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30"
+                          onClick={() => control.id && handleOpenAutoMap(control.id, control.title || "")}
                         >
-                          {mapMutation.isPending && mappingControlId === control.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                          ) : (
-                            <Link2 className="h-3 w-3 mr-1" />
-                          )}
+                          <Sparkles className="h-3 w-3 mr-1" />
                           Auto-Map
                         </Button>
                       </TableCell>
@@ -174,6 +182,17 @@ export default function ControlList() {
           </div>
         </Card>
       </div>
+
+      {autoMapControl && (
+        <AutoMapApprovalDialog
+          open={autoMapOpen}
+          onOpenChange={setAutoMapOpen}
+          controlId={autoMapControl.id}
+          controlTitle={autoMapControl.title}
+          existingRequirementIds={autoMapControl.requirementIds}
+          onSuccess={handleAutoMapSuccess}
+        />
+      )}
     </AppLayout>
   );
 }
