@@ -514,13 +514,22 @@ router.post("/v1/controls", requireRole("admin", "risk_manager", "auditor"), asy
     }).returning();
 
     if (requirementIds && Array.isArray(requirementIds) && requirementIds.length > 0) {
-      await db.insert(controlRequirementMapsTable).values(
-        requirementIds.map((rid: string) => ({
-          tenantId: req.user!.tenantId,
-          controlId: control.id,
-          requirementId: rid,
-        }))
-      );
+      const validReqs = await db.select({ id: frameworkRequirementsTable.id })
+        .from(frameworkRequirementsTable)
+        .where(and(
+          inArray(frameworkRequirementsTable.id, requirementIds),
+          eq(frameworkRequirementsTable.tenantId, req.user!.tenantId),
+        ));
+      const validIds = validReqs.map(r => r.id);
+      if (validIds.length > 0) {
+        await db.insert(controlRequirementMapsTable).values(
+          validIds.map((rid) => ({
+            tenantId: req.user!.tenantId,
+            controlId: control.id,
+            requirementId: rid,
+          }))
+        );
+      }
     }
 
     await recordAudit(req, "create", "control", control.id);
@@ -582,9 +591,18 @@ router.post("/v1/controls/:id/requirements", requireRole("admin", "risk_manager"
       .where(and(eq(controlRequirementMapsTable.controlId, controlId), eq(controlRequirementMapsTable.tenantId, tenantId)));
 
     if (requirementIds.length > 0) {
-      await db.insert(controlRequirementMapsTable).values(
-        requirementIds.map((rid: string) => ({ tenantId, controlId, requirementId: rid }))
-      );
+      const validReqs = await db.select({ id: frameworkRequirementsTable.id })
+        .from(frameworkRequirementsTable)
+        .where(and(
+          inArray(frameworkRequirementsTable.id, requirementIds),
+          eq(frameworkRequirementsTable.tenantId, tenantId),
+        ));
+      const validIds = validReqs.map(r => r.id);
+      if (validIds.length > 0) {
+        await db.insert(controlRequirementMapsTable).values(
+          validIds.map((rid) => ({ tenantId, controlId, requirementId: rid }))
+        );
+      }
     }
 
     await recordAudit(req, "map_requirements", "control", controlId, { requirementIds });
