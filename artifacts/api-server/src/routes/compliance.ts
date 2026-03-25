@@ -1,5 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import multer from "multer";
+import fs from "fs";
+import path from "path";
 
 function p(req: Request, name: string): string {
   return String(req.params[name]);
@@ -15,6 +18,33 @@ import {
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError, conflict } from "../lib/errors";
+import { parseCsv, parseJson, computeDiff, resolveParentCodes } from "../lib/compliance-import";
+import { recalculateAndTriggerPipeline, computeComplianceScore, getComplianceStatus } from "../lib/compliance-pipeline";
+import { generateEmbedding, LLMUnavailableError } from "../lib/llm-service";
+import { enqueueJob } from "../lib/job-queue";
+
+// Create uploads directory at module load time
+fs.mkdirSync(path.join(process.cwd(), "uploads/evidence"), { recursive: true });
+
+const evidenceUpload = multer({
+  storage: multer.diskStorage({
+    destination: path.join(process.cwd(), "uploads/evidence"),
+    filename: (req, file, cb) => {
+      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}-${file.originalname}`;
+      cb(null, safeName);
+    },
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["application/pdf", "image/png", "image/jpeg", "text/plain"];
+    cb(null, allowed.includes(file.mimetype));
+  },
+}).single("evidence");
+
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+}).single("file");
 
 async function verifyControlOwnership(controlId: string, tenantId: string, res: Response): Promise<boolean> {
   const [control] = await db.select({ id: controlsTable.id }).from(controlsTable)
@@ -24,6 +54,15 @@ async function verifyControlOwnership(controlId: string, tenantId: string, res: 
 }
 
 const router = Router();
+
+// Serve uploaded evidence files
+router.use("/uploads/evidence", (req, res, next) => {
+  // Basic path traversal guard
+  const filePath = path.join(process.cwd(), "uploads/evidence", path.basename(req.path));
+  res.sendFile(filePath, (err) => {
+    if (err) notFound(res, "File not found");
+  });
+});
 
 router.get("/v1/frameworks", async (req, res) => {
   try {
@@ -59,6 +98,33 @@ router.get("/v1/frameworks", async (req, res) => {
   }
 });
 
+// POST /v1/frameworks — create a new framework (D-07)
+router.post("/v1/frameworks", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const { name, version, type, description } = req.body;
+
+    if (!name || typeof name !== "string" || name.trim().length < 3 || name.trim().length > 100) {
+      badRequest(res, "name is required and must be 3-100 characters");
+      return;
+    }
+
+    const [framework] = await db.insert(frameworksTable).values({
+      tenantId,
+      name: name.trim(),
+      version: version ?? null,
+      type: type ?? null,
+      description: description ?? null,
+    }).returning();
+
+    await recordAudit(req, "create", "framework", framework.id);
+    res.status(201).json(framework);
+  } catch (err) {
+    console.error("Create framework error:", err);
+    serverError(res);
+  }
+});
+
 router.get("/v1/frameworks/:id", async (req, res) => {
   try {
     const [framework] = await db.select().from(frameworksTable)
@@ -79,6 +145,306 @@ router.get("/v1/frameworks/:id", async (req, res) => {
     res.json({ ...framework, requirements });
   } catch (err) {
     console.error("Get framework error:", err);
+    serverError(res);
+  }
+});
+
+// POST /v1/frameworks/:id/import/preview — parse file and return diff without writing (D-04, D-06)
+router.post("/v1/frameworks/:id/import/preview", requireRole("admin", "risk_manager"), importUpload, async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const frameworkId = p(req, "id");
+
+    const [framework] = await db.select({ id: frameworksTable.id })
+      .from(frameworksTable)
+      .where(and(eq(frameworksTable.id, frameworkId), eq(frameworksTable.tenantId, tenantId)))
+      .limit(1);
+    if (!framework) { notFound(res, "Framework not found"); return; }
+
+    if (!req.file) { badRequest(res, "file is required"); return; }
+
+    const format = (req.query["format"] as string) || "csv";
+    let incoming;
+    try {
+      incoming = format === "json" ? parseJson(req.file.buffer) : parseCsv(req.file.buffer);
+    } catch (err) {
+      badRequest(res, (err as Error).message);
+      return;
+    }
+
+    const existingRows = await db.select({
+      code: frameworkRequirementsTable.code,
+      title: frameworkRequirementsTable.title,
+      description: frameworkRequirementsTable.description,
+    }).from(frameworkRequirementsTable)
+      .where(and(eq(frameworkRequirementsTable.frameworkId, frameworkId), eq(frameworkRequirementsTable.tenantId, tenantId)));
+
+    const existingNormalized = existingRows.map((r) => ({ ...r, description: r.description ?? undefined }));
+    const diff = computeDiff(existingNormalized, incoming);
+
+    res.json({
+      diff: {
+        new: diff.new,
+        modified: diff.modified,
+        unchanged: diff.unchanged,
+      },
+      warnings: diff.warnings,
+      totalIncoming: incoming.length,
+    });
+  } catch (err) {
+    console.error("Import preview error:", err);
+    serverError(res);
+  }
+});
+
+// POST /v1/frameworks/:id/import/apply — parse file and write requirements additively (D-04, D-05)
+router.post("/v1/frameworks/:id/import/apply", requireRole("admin", "risk_manager"), importUpload, async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const frameworkId = p(req, "id");
+
+    const [framework] = await db.select({ id: frameworksTable.id, name: frameworksTable.name })
+      .from(frameworksTable)
+      .where(and(eq(frameworksTable.id, frameworkId), eq(frameworksTable.tenantId, tenantId)))
+      .limit(1);
+    if (!framework) { notFound(res, "Framework not found"); return; }
+
+    if (!req.file) { badRequest(res, "file is required"); return; }
+
+    const format = (req.query["format"] as string) || "csv";
+    let incoming;
+    try {
+      incoming = format === "json" ? parseJson(req.file.buffer) : parseCsv(req.file.buffer);
+    } catch (err) {
+      badRequest(res, (err as Error).message);
+      return;
+    }
+
+    const existingRows = await db.select({
+      id: frameworkRequirementsTable.id,
+      code: frameworkRequirementsTable.code,
+      title: frameworkRequirementsTable.title,
+      description: frameworkRequirementsTable.description,
+    }).from(frameworkRequirementsTable)
+      .where(and(eq(frameworkRequirementsTable.frameworkId, frameworkId), eq(frameworkRequirementsTable.tenantId, tenantId)));
+
+    const existingNormalized = existingRows.map((r) => ({ ...r, description: r.description ?? undefined }));
+    const diff = computeDiff(existingNormalized, incoming);
+    const allWarnings: string[] = [...diff.warnings];
+    let newCount = 0;
+    let modifiedCount = 0;
+
+    // Execute in a transaction
+    await db.transaction(async (tx) => {
+      // Insert new requirements (parentId resolved in second pass)
+      if (diff.new.length > 0) {
+        await tx.insert(frameworkRequirementsTable).values(
+          diff.new.map((r) => ({
+            tenantId,
+            frameworkId,
+            code: r.code,
+            title: r.title,
+            description: r.description ?? null,
+            parentId: null as string | null,
+          }))
+        );
+        newCount = diff.new.length;
+      }
+
+      // Update modified requirements
+      for (const { incoming: mod } of diff.modified) {
+        await tx.update(frameworkRequirementsTable)
+          .set({ title: mod.title, description: mod.description ?? null, updatedAt: new Date() })
+          .where(and(
+            eq(frameworkRequirementsTable.frameworkId, frameworkId),
+            eq(frameworkRequirementsTable.tenantId, tenantId),
+            eq(frameworkRequirementsTable.code, mod.code),
+          ));
+        modifiedCount++;
+      }
+
+      // Second pass: resolve parent codes after all inserts
+      const allRequirements = await tx.select({
+        id: frameworkRequirementsTable.id,
+        code: frameworkRequirementsTable.code,
+      }).from(frameworkRequirementsTable)
+        .where(and(eq(frameworkRequirementsTable.frameworkId, frameworkId), eq(frameworkRequirementsTable.tenantId, tenantId)));
+
+      const codeToIdMap = new Map(allRequirements.map((r) => [r.code, r.id]));
+      const withParentCodes = incoming.filter((r) => r.parentCode);
+
+      const { resolved, warnings: resolveWarnings } = resolveParentCodes(withParentCodes, codeToIdMap);
+      allWarnings.push(...resolveWarnings);
+
+      for (const r of resolved) {
+        if (r.parentId) {
+          await tx.update(frameworkRequirementsTable)
+            .set({ parentId: r.parentId, updatedAt: new Date() })
+            .where(and(
+              eq(frameworkRequirementsTable.frameworkId, frameworkId),
+              eq(frameworkRequirementsTable.tenantId, tenantId),
+              eq(frameworkRequirementsTable.code, r.code),
+            ));
+        }
+      }
+    });
+
+    // Enqueue embedding generation for new/modified requirements (best-effort)
+    if (newCount > 0 || modifiedCount > 0) {
+      enqueueJob("embed", "generate_framework_requirement_embeddings", {
+        frameworkId,
+        tenantId,
+      }, tenantId).catch((err) => console.error("Embedding enqueue error:", err));
+    }
+
+    await recordAudit(req, "import", "framework", frameworkId, { newCount, modifiedCount });
+
+    res.json({
+      imported: {
+        new: newCount,
+        modified: modifiedCount,
+        unchanged: diff.unchanged.length,
+      },
+      warnings: allWarnings,
+    });
+  } catch (err) {
+    console.error("Import apply error:", err);
+    serverError(res);
+  }
+});
+
+// PUT /v1/frameworks/:id/threshold — update compliance threshold (D-08)
+router.put("/v1/frameworks/:id/threshold", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const frameworkId = p(req, "id");
+    const { threshold } = req.body;
+
+    if (threshold === undefined || threshold === null) {
+      badRequest(res, "threshold is required");
+      return;
+    }
+    const thresholdNum = Number(threshold);
+    if (isNaN(thresholdNum) || thresholdNum < 0 || thresholdNum > 100) {
+      badRequest(res, "threshold must be a number between 0 and 100");
+      return;
+    }
+
+    const [framework] = await db.update(frameworksTable)
+      .set({ complianceThreshold: String(thresholdNum), updatedAt: new Date() })
+      .where(and(eq(frameworksTable.id, frameworkId), eq(frameworksTable.tenantId, tenantId)))
+      .returning();
+
+    if (!framework) { notFound(res, "Framework not found"); return; }
+
+    // Trigger pipeline non-blocking
+    recalculateAndTriggerPipeline(frameworkId, tenantId).catch((err) =>
+      console.error("Pipeline error after threshold update:", err)
+    );
+
+    await recordAudit(req, "update_threshold", "framework", frameworkId, { threshold: thresholdNum });
+    res.json(framework);
+  } catch (err) {
+    console.error("Update threshold error:", err);
+    serverError(res);
+  }
+});
+
+// GET /v1/frameworks/:frameworkId/export/csv — export all requirements with compliance data (D-11, D-12)
+router.get("/v1/frameworks/:frameworkId/export/csv", async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const frameworkId = p(req, "frameworkId");
+
+    const [framework] = await db.select().from(frameworksTable)
+      .where(and(eq(frameworksTable.id, frameworkId), eq(frameworksTable.tenantId, tenantId))).limit(1);
+    if (!framework) { notFound(res, "Framework not found"); return; }
+
+    // Reuse gap-analysis query logic
+    const requirements = await db.select({
+      id: frameworkRequirementsTable.id,
+      code: frameworkRequirementsTable.code,
+      title: frameworkRequirementsTable.title,
+      description: frameworkRequirementsTable.description,
+      parentId: frameworkRequirementsTable.parentId,
+    }).from(frameworkRequirementsTable)
+      .where(and(eq(frameworkRequirementsTable.frameworkId, frameworkId), eq(frameworkRequirementsTable.tenantId, tenantId)))
+      .orderBy(frameworkRequirementsTable.code);
+
+    const reqIds = requirements.map((r) => r.id);
+    const mappings = reqIds.length > 0
+      ? await db.select({
+          requirementId: controlRequirementMapsTable.requirementId,
+          controlId: controlRequirementMapsTable.controlId,
+        }).from(controlRequirementMapsTable)
+          .where(and(eq(controlRequirementMapsTable.tenantId, tenantId), inArray(controlRequirementMapsTable.requirementId, reqIds)))
+      : [];
+
+    const controlIdSet = new Set<string>();
+    for (const m of mappings) controlIdSet.add(m.controlId);
+    const controlIds = Array.from(controlIdSet);
+
+    const controls = controlIds.length > 0
+      ? await db.select({ id: controlsTable.id, title: controlsTable.title, status: controlsTable.status })
+          .from(controlsTable)
+          .where(and(eq(controlsTable.tenantId, tenantId), sql`${controlsTable.id} = ANY(${controlIds})`))
+      : [];
+
+    const latestTests = controlIds.length > 0
+      ? await db.select({ controlId: controlTestsTable.controlId, result: controlTestsTable.result })
+          .from(controlTestsTable)
+          .where(and(eq(controlTestsTable.tenantId, tenantId), sql`${controlTestsTable.controlId} = ANY(${controlIds})`))
+          .orderBy(controlTestsTable.testedAt)
+      : [];
+
+    const latestResultByControl: Record<string, string> = {};
+    for (const t of latestTests) {
+      latestResultByControl[t.controlId] = t.result;
+    }
+
+    const controlMap = new Map(controls.map((c) => [c.id, c]));
+    const reqMappings = new Map<string, string[]>();
+    for (const m of mappings) {
+      if (!reqMappings.has(m.requirementId)) reqMappings.set(m.requirementId, []);
+      reqMappings.get(m.requirementId)!.push(m.controlId);
+    }
+
+    // Build CSV rows
+    const header = ["code", "title", "description", "parent_id", "status", "mapped_controls", "latest_test_result"];
+    const rows = requirements.map((req) => {
+      const cIds = reqMappings.get(req.id) || [];
+      let gapStatus = "gap";
+      let latestResult = "not_tested";
+
+      if (cIds.length > 0) {
+        const allPassed = cIds.every((cid) => latestResultByControl[cid] === "pass");
+        gapStatus = allPassed ? "covered" : "partial";
+        // Get the most recent test result across mapped controls
+        const results = cIds.map((cid) => latestResultByControl[cid]).filter(Boolean);
+        if (results.length > 0) latestResult = results[results.length - 1];
+      }
+
+      const mappedControlTitles = cIds.map((cid) => controlMap.get(cid)?.title ?? cid).join(" | ");
+
+      return [
+        req.code,
+        req.title,
+        req.description ?? "",
+        req.parentId ?? "",
+        gapStatus,
+        mappedControlTitles,
+        latestResult,
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    });
+
+    const csvContent = [header.join(","), ...rows].join("\n");
+    const filename = `${framework.name.replace(/[^a-z0-9]/gi, "-")}-compliance.csv`;
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(csvContent);
+  } catch (err) {
+    console.error("Export CSV error:", err);
     serverError(res);
   }
 });
@@ -229,6 +595,58 @@ router.post("/v1/controls/:id/requirements", requireRole("admin", "risk_manager"
   }
 });
 
+// POST /v1/controls/:id/auto-map-suggestions — pgvector similarity match (D-09)
+router.post("/v1/controls/:id/auto-map-suggestions", requireRole("admin", "risk_manager"), async (req, res) => {
+  try {
+    const tenantId = req.user!.tenantId;
+    const controlId = p(req, "id");
+
+    const [control] = await db.select({ id: controlsTable.id, title: controlsTable.title, description: controlsTable.description })
+      .from(controlsTable)
+      .where(and(eq(controlsTable.id, controlId), eq(controlsTable.tenantId, tenantId)))
+      .limit(1);
+    if (!control) { notFound(res, "Control not found"); return; }
+
+    const queryText = control.description || control.title;
+    let embedding: number[];
+    try {
+      embedding = await generateEmbedding(tenantId, queryText);
+    } catch (err) {
+      if (err instanceof LLMUnavailableError) {
+        res.json({ suggestions: [] });
+        return;
+      }
+      throw err;
+    }
+
+    const vectorStr = `[${embedding.join(",")}]`;
+    const THRESHOLD = 0.65;
+    const result = await db.execute(sql`
+      SELECT id, code, title, framework_id,
+             1 - (embedding <=> ${vectorStr}::vector) AS similarity
+      FROM framework_requirements
+      WHERE tenant_id = ${tenantId}
+        AND embedding IS NOT NULL
+        AND 1 - (embedding <=> ${vectorStr}::vector) > ${THRESHOLD}
+      ORDER BY similarity DESC
+      LIMIT 10
+    `);
+
+    const suggestions = (result.rows as { id: string; code: string; title: string; framework_id: string; similarity: number }[]).map((r) => ({
+      requirementId: r.id,
+      code: r.code,
+      title: r.title,
+      frameworkId: r.framework_id,
+      similarity: Number(r.similarity),
+    }));
+
+    res.json({ suggestions });
+  } catch (err) {
+    console.error("Auto-map suggestions error:", err);
+    serverError(res);
+  }
+});
+
 router.get("/v1/controls/:controlId/tests", async (req, res) => {
   try {
     const tests = await db.select().from(controlTestsTable)
@@ -241,25 +659,62 @@ router.get("/v1/controls/:controlId/tests", async (req, res) => {
   }
 });
 
-router.post("/v1/controls/:controlId/tests", requireRole("admin", "auditor"), async (req, res) => {
+// POST /v1/controls/:controlId/tests — create control test with optional evidence upload (D-02, D-13)
+router.post("/v1/controls/:controlId/tests", requireRole("admin", "auditor"), evidenceUpload, async (req, res) => {
   try {
     const controlId = p(req, "controlId");
-    if (!(await verifyControlOwnership(controlId, req.user!.tenantId, res))) return;
-    const { result, evidence, evidenceUrl, notes } = req.body;
+    const tenantId = req.user!.tenantId;
+    if (!(await verifyControlOwnership(controlId, tenantId, res))) return;
+
+    const { result, evidence, notes, evidenceExpiry } = req.body;
     if (!result) { badRequest(res, "result is required"); return; }
 
+    let evidenceUrl: string | null = null;
+    let evidenceFileName: string | null = null;
+    let evidenceMimeType: string | null = null;
+
+    if (req.file) {
+      evidenceUrl = `/uploads/evidence/${req.file.filename}`;
+      evidenceFileName = req.file.originalname;
+      evidenceMimeType = req.file.mimetype;
+    }
+
     const [test] = await db.insert(controlTestsTable).values({
-      tenantId: req.user!.tenantId,
+      tenantId,
       controlId,
       testerId: req.user!.id,
       result,
-      evidence,
-      evidenceUrl,
-      notes,
+      evidence: evidence ?? null,
+      evidenceUrl: evidenceUrl ?? (req.body.evidenceUrl ?? null),
+      evidenceFileName,
+      evidenceMimeType,
+      evidenceExpiry: evidenceExpiry ? new Date(evidenceExpiry) : null,
+      notes: notes ?? null,
       testedAt: new Date(),
     }).returning();
 
     await recordAudit(req, "create", "control_test", test.id);
+
+    // Trigger compliance pipeline for all frameworks this control maps to (D-02)
+    const mappings = await db.select({
+      requirementId: controlRequirementMapsTable.requirementId,
+    }).from(controlRequirementMapsTable)
+      .where(and(eq(controlRequirementMapsTable.controlId, controlId), eq(controlRequirementMapsTable.tenantId, tenantId)));
+
+    if (mappings.length > 0) {
+      const reqIds = mappings.map((m) => m.requirementId);
+      const frameworks = await db.select({ frameworkId: frameworkRequirementsTable.frameworkId })
+        .from(frameworkRequirementsTable)
+        .where(and(eq(frameworkRequirementsTable.tenantId, tenantId), inArray(frameworkRequirementsTable.id, reqIds)));
+
+      const uniqueFrameworkIds = [...new Set(frameworks.map((f) => f.frameworkId))];
+      for (const fwId of uniqueFrameworkIds) {
+        recalculateAndTriggerPipeline(fwId, tenantId).catch((err) =>
+          console.error("Pipeline error after control test:", err)
+        );
+      }
+    }
+
     res.status(201).json(test);
   } catch (err) {
     console.error("Create control test error:", err);
@@ -282,7 +737,11 @@ router.get("/v1/frameworks/:frameworkId/compliance-score", async (req, res) => {
 
     const totalRequirements = requirements.length;
     if (totalRequirements === 0) {
-      res.json({ frameworkId, frameworkName: framework.name, totalRequirements: 0, coveredRequirements: 0, score: 0 });
+      res.json({
+        frameworkId, frameworkName: framework.name, totalRequirements: 0,
+        coveredRequirements: 0, score: 0,
+        status: framework.complianceThreshold !== null ? getComplianceStatus(0, Number(framework.complianceThreshold)) : null,
+      });
       return;
     }
 
@@ -326,6 +785,9 @@ router.get("/v1/frameworks/:frameworkId/compliance-score", async (req, res) => {
     const effectivenessScore = controlIds.length > 0 ? Math.round((passedControls / controlIds.length) * 100) : 0;
     const score = Math.round((coverageScore * 0.6 + effectivenessScore * 0.4));
 
+    const threshold = framework.complianceThreshold !== null ? Number(framework.complianceThreshold) : null;
+    const status = threshold !== null ? getComplianceStatus(score, threshold) : null;
+
     res.json({
       frameworkId,
       frameworkName: framework.name,
@@ -336,6 +798,7 @@ router.get("/v1/frameworks/:frameworkId/compliance-score", async (req, res) => {
       score,
       totalControls: controlIds.length,
       passedControls,
+      status,
     });
   } catch (err) {
     console.error("Compliance score error:", err);

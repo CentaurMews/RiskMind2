@@ -41,7 +41,7 @@ export function parseCsv(fileBuffer: Buffer): RawRequirement[] {
   });
 
   if (result.errors.length > 0) {
-    const msgs = result.errors.map((e) => e.message).join("; ");
+    const msgs = result.errors.map((e: { message: string }) => e.message).join("; ");
     throw new Error(`CSV parse error: ${msgs}`);
   }
 
