@@ -254,7 +254,7 @@ export default function FrameworkDetail() {
         coveredRequirements: score.coveredRequirements || 0,
         totalControls: score.totalControls || 0,
         passedControls: score.passedControls || 0,
-        status: score.status,
+        status: scoreExt?.status,
       };
 
       const gapData = {
