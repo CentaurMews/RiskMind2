@@ -20,12 +20,15 @@ export const controlTestsTable = pgTable("control_tests", {
   result: controlTestResultEnum("control_test_result").notNull().default("not_tested"),
   evidence: text("evidence"),
   evidenceUrl: text("evidence_url"),
+  evidenceFileName: text("evidence_file_name"),
+  evidenceMimeType: text("evidence_mime_type"),
+  evidenceExpiry: timestamp("evidence_expiry", { withTimezone: true }),
   notes: text("notes"),
   testedAt: timestamp("tested_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const insertControlTestSchema = createInsertSchema(controlTestsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertControlTestSchema = createInsertSchema(controlTestsTable).omit({ id: true, createdAt: true, updatedAt: true, evidenceFileName: true, evidenceMimeType: true });
 export type InsertControlTest = z.infer<typeof insertControlTestSchema>;
 export type ControlTest = typeof controlTestsTable.$inferSelect;
