@@ -252,7 +252,13 @@ Plans:
   1. User can upload a CSV or JSON file of framework controls and see a diff preview before committing — import is additive (existing controls and mappings are preserved, not deleted)
   2. User can assign an assessment template to a compliance framework with questions mapped to control IDs — completing the assessment updates the compliance status of mapped controls
   3. User can set a compliance threshold (0-100%) per framework and the dashboard shows COMPLIANT, AT-RISK, or NON-COMPLIANT status based on current control scores against that threshold
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Schema migration + deps install + compliance-import.ts + compliance-pipeline.ts
+- [ ] 13-02-PLAN.md — API endpoints: import, threshold, pipeline hooks, evidence upload, auto-map
+- [ ] 13-03-PLAN.md — Frontend: import dialog, create framework, threshold editor, status labels
+- [ ] 13-04-PLAN.md — Frontend: PDF export, auto-map approval UI
 
 ### Phase 14: Foresight v2
 **Goal**: Users can run Monte Carlo risk simulations with FAIR-labeled inputs, view loss exceedance curves, save and compare named scenarios, and see simulation parameters calibrated from real OSINT data already in the system
@@ -264,7 +270,7 @@ Plans:
   3. User can save a simulation as a named scenario, clone it with modified parameters, and view a side-by-side comparison of two scenarios — each scenario can be linked to a risk register entry
   4. When CVE/NVD or MISP signal data exists in the system, the simulation parameter form offers "Calibrate from real data" — accepting the suggestion pre-fills inputs with OSINT-derived values and displays a "calibrated from real data" badge with a data freshness indicator
   5. Dashboard KPI section shows a top-N risks by expected annual loss (ALE) widget derived from saved simulation results
-**Plans**: TBD
+**Plans**: 4 plans
 
 ## Progress
 
@@ -285,7 +291,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 10. Assessment Engine | v2.0 | 4/4 | Complete    | 2026-03-23 |
 | 11. Vendor Lifecycle Redesign | v2.0 | 5/5 | Complete    | 2026-03-23 |
 | 12. Signal Integrations | v2.0 | 5/5 | Complete   | 2026-03-23 |
-| 13. Compliance Flow | v2.0 | 0/? | Not started | - |
+| 13. Compliance Flow | v2.0 | 0/4 | Not started | - |
 | 14. Foresight v2 | v2.0 | 0/? | Not started | - |
 
 ### Phase 15: Migrate Risk Heatmap from CSS Grid to Apache ECharts
