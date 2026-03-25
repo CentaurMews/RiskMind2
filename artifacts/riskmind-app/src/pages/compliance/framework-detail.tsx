@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRoute, Link } from "wouter";
-import { useGetFramework, useGetComplianceScore, useGetGapAnalysis, useAiGapRemediation } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useGetFramework, useGetComplianceScore, useGetGapAnalysis, useAiGapRemediation, useGetMe } from "@workspace/api-client-react";
 import type { GapRequirement } from "@workspace/api-client-react";
 import { InterviewDialog } from "@/components/ai-interview/interview-dialog";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -8,11 +9,43 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { ArrowLeft, Loader2, AlertTriangle, CheckCircle2, MinusCircle, ChevronRight, FlaskConical, Shield, Sparkles, Clock } from "lucide-react";
+import { ArrowLeft, Loader2, AlertTriangle, CheckCircle2, MinusCircle, ChevronRight, FlaskConical, Shield, Sparkles, Clock, Check, Download } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
+
+// Extended ComplianceScore type with status field added in Plan 02
+interface ComplianceScoreExtended {
+  frameworkId?: string;
+  frameworkName?: string;
+  totalRequirements?: number;
+  coveredRequirements?: number;
+  coverageScore?: number;
+  effectivenessScore?: number;
+  score?: number;
+  totalControls?: number;
+  passedControls?: number;
+  status?: "COMPLIANT" | "AT-RISK" | "NON-COMPLIANT" | null;
+}
+
+// Extended Framework type with complianceThreshold added in Plan 02
+interface FrameworkExtended {
+  id?: string;
+  name?: string;
+  version?: string | null;
+  type?: string | null;
+  description?: string | null;
+  createdAt?: string;
+  complianceThreshold?: number | null;
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  COMPLIANT: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-300",
+  "AT-RISK": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-300",
+  "NON-COMPLIANT": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-300",
+};
 
 function buildTree(requirements: GapRequirement[]): (GapRequirement & { children: GapRequirement[] })[] {
   const map = new Map<string, GapRequirement & { children: GapRequirement[] }>();
@@ -126,17 +159,32 @@ export default function FrameworkDetail() {
   const [remediations, setRemediations] = useState<RemediationStep[]>([]);
   const [assessingControl, setAssessingControl] = useState<{ id: string; title: string } | null>(null);
 
+  // Threshold editor state
+  const [thresholdValue, setThresholdValue] = useState<string>("");
+  const [isThresholdEditing, setIsThresholdEditing] = useState(false);
+  const [isSavingThreshold, setIsSavingThreshold] = useState(false);
+
+  const queryClient = useQueryClient();
+  const { data: user } = useGetMe({ query: { queryKey: ["/api/v1/auth/me"] } });
+  const canEdit = user?.role === "admin" || user?.role === "risk_manager";
+
   const { data: framework, isLoading: isFwLoading } = useGetFramework(id);
   const { data: score } = useGetComplianceScore(id);
   const { data: gaps } = useGetGapAnalysis(id);
 
   const remediationMutation = useAiGapRemediation();
 
+  // Cast to extended types that include fields added in Plan 02
+  const fw = framework as FrameworkExtended | undefined;
+  const scoreExt = score as ComplianceScoreExtended | undefined;
+
   if (isFwLoading) return <AppLayout><div className="p-8 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div></AppLayout>;
   if (!framework) return <AppLayout><div className="p-8 text-center text-muted-foreground">Framework not found</div></AppLayout>;
 
-  const coveragePercent = score?.coverageScore || 0;
-  const scoreValue = score?.score || 0;
+  const coveragePercent = scoreExt?.coverageScore || 0;
+  const scoreValue = scoreExt?.score || 0;
+  const complianceStatus = scoreExt?.status;
+  const currentThreshold = fw?.complianceThreshold;
   const summary = gaps?.summary;
   const requirements = gaps?.requirements || [];
   const tree = buildTree(requirements);
@@ -149,6 +197,44 @@ export default function FrameworkDetail() {
   };
 
   const gapRequirements = requirements.filter(r => r.status === "gap" || r.status === "partial");
+
+  async function handleSaveThreshold() {
+    const val = parseInt(thresholdValue, 10);
+    if (isNaN(val) || val < 0 || val > 100) {
+      toast({ variant: "destructive", title: "Threshold must be a number between 0 and 100." });
+      return;
+    }
+    setIsSavingThreshold(true);
+    try {
+      const res = await fetch(`/api/v1/frameworks/${id}/threshold`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ threshold: val }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Failed to save threshold" }));
+        throw new Error(err.message || "Failed to save threshold");
+      }
+      toast({ title: "Compliance threshold updated." });
+      setIsThresholdEditing(false);
+      queryClient.invalidateQueries({ queryKey: [`/api/v1/compliance/frameworks/${id}/score`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/v1/compliance/frameworks/${id}`] });
+    } catch (err) {
+      toast({ variant: "destructive", title: (err as Error).message || "Failed to update threshold." });
+    } finally {
+      setIsSavingThreshold(false);
+    }
+  }
+
+  function handleExportCsv() {
+    const link = document.createElement("a");
+    link.href = `/api/v1/frameworks/${id}/export/csv`;
+    link.download = `${framework?.name || "framework"}-export.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   const handleGetRemediation = () => {
     if (gapRequirements.length === 0) return;
@@ -180,11 +266,19 @@ export default function FrameworkDetail() {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <div className="flex items-center space-x-4 mb-4">
-          <Link href="/compliance">
-            <Button variant="outline" size="icon" className="h-8 w-8"><ArrowLeft className="h-4 w-4" /></Button>
-          </Link>
-          <div className="font-mono text-sm text-muted-foreground">{framework.name} {framework.version}</div>
+        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Link href="/compliance">
+              <Button variant="outline" size="icon" className="h-8 w-8"><ArrowLeft className="h-4 w-4" /></Button>
+            </Link>
+            <div className="font-mono text-sm text-muted-foreground">{framework.name} {framework.version}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportCsv}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -197,7 +291,17 @@ export default function FrameworkDetail() {
 
           <Card className="shadow-sm border-t-4 border-t-emerald-500">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Compliance Score</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-lg">Compliance Score</CardTitle>
+                {complianceStatus && (
+                  <Badge
+                    variant="outline"
+                    className={cn("text-[10px] uppercase font-bold", STATUS_BADGE[complianceStatus])}
+                  >
+                    {complianceStatus.replace("-", " ")}
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="flex items-end gap-2 mb-6">
@@ -214,7 +318,70 @@ export default function FrameworkDetail() {
                 </div>
                 <div className="flex justify-between text-xs font-medium text-muted-foreground">
                   <span>Mapped Controls</span>
-                  <span>{score?.totalControls || 0}</span>
+                  <span>{scoreExt?.totalControls || 0}</span>
+                </div>
+
+                {/* Threshold editor */}
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">Compliance Threshold</span>
+                    {canEdit && !isThresholdEditing && (
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => {
+                          setThresholdValue(String(currentThreshold ?? ""));
+                          setIsThresholdEditing(true);
+                        }}
+                      >
+                        {currentThreshold != null ? "Edit" : "Set"}
+                      </button>
+                    )}
+                  </div>
+                  {isThresholdEditing ? (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={thresholdValue}
+                          onChange={(e) => setThresholdValue(e.target.value)}
+                          className="w-full border border-input rounded-md px-2.5 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring pr-6"
+                          placeholder="0-100"
+                          autoFocus
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={handleSaveThreshold}
+                        disabled={isSavingThreshold}
+                      >
+                        {isSavingThreshold ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setIsThresholdEditing(false)}
+                        disabled={isSavingThreshold}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-sm font-mono font-medium">
+                      {currentThreshold != null ? `${currentThreshold}%` : (
+                        <span className="text-muted-foreground text-xs">Not set</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>

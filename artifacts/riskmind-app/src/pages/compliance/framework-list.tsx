@@ -1,11 +1,46 @@
-import { useListFrameworks, useGetComplianceScore, useGetMe, type Framework } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useListFrameworks, useGetMe, type Framework } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+import { ShieldCheck, ArrowRight, Loader2, Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { ImportFrameworkDialog } from "@/components/compliance/import-framework-dialog";
+import { CreateFrameworkDialog } from "@/components/compliance/create-framework-dialog";
+
+// Extended Framework type with fields added in Plan 02 (not yet in generated Orval types)
+type FrameworkWithCompliance = Framework & {
+  compliancePercentage?: number | null;
+  complianceThreshold?: number | null;
+};
+
+type ComplianceStatus = "COMPLIANT" | "AT-RISK" | "NON-COMPLIANT";
+
+function deriveComplianceStatus(
+  score: number | null | undefined,
+  threshold: number | null | undefined
+): ComplianceStatus | null {
+  if (score == null || threshold == null) return null;
+  if (score >= threshold) return "COMPLIANT";
+  if (score >= threshold - 15) return "AT-RISK";
+  return "NON-COMPLIANT";
+}
+
+const STATUS_BADGE: Record<ComplianceStatus, string> = {
+  COMPLIANT: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900 dark:text-emerald-300",
+  "AT-RISK": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-300",
+  "NON-COMPLIANT": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-300",
+};
+
+const STATUS_LABEL: Record<ComplianceStatus, string> = {
+  COMPLIANT: "Compliant",
+  "AT-RISK": "At Risk",
+  "NON-COMPLIANT": "Non-Compliant",
+};
 
 function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
   const radius = (size - 8) / 2;
@@ -34,24 +69,41 @@ function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
   );
 }
 
-function FrameworkCard({ fw }: { fw: Framework }) {
+function FrameworkCard({
+  fw,
+  onImport,
+  canEdit,
+}: {
+  fw: FrameworkWithCompliance;
+  onImport: (id: string) => void;
+  canEdit: boolean;
+}) {
   const fwId = fw.id || "";
-  const { data: score } = useGetComplianceScore(fwId, { query: { queryKey: [`/api/v1/compliance/frameworks/${fwId}/score`], retry: false } });
-  const scoreValue = score?.score ?? 0;
+  const scoreValue = fw.compliancePercentage ?? 0;
+  const status = deriveComplianceStatus(fw.compliancePercentage, fw.complianceThreshold);
 
   return (
     <Card className="hover:shadow-md transition-shadow flex flex-col overflow-hidden group">
       <div className="h-2 w-full bg-sidebar group-hover:bg-primary transition-colors" />
       <CardHeader className="pb-2">
-        <CardTitle className="flex justify-between items-center">
-          {fw.name}
-          <div className="flex flex-col items-center gap-1">
+        <CardTitle className="flex justify-between items-start gap-2">
+          <span className="leading-tight">{fw.name}</span>
+          <div className="flex flex-col items-center gap-1 shrink-0">
             <ScoreRing score={scoreValue} />
-            <span className={cn("text-xs font-mono font-medium",
-              scoreValue >= 80 ? "text-emerald-600" : scoreValue >= 50 ? "text-amber-600" : "text-destructive"
-            )}>
-              {scoreValue >= 80 ? "Compliant" : scoreValue >= 50 ? "Partial" : "At Risk"}
-            </span>
+            {status ? (
+              <Badge
+                variant="outline"
+                className={cn("text-[10px] uppercase font-bold px-2 py-0.5", STATUS_BADGE[status])}
+              >
+                {STATUS_LABEL[status]}
+              </Badge>
+            ) : (
+              <span className={cn("text-xs font-mono font-medium",
+                scoreValue >= 80 ? "text-emerald-600" : scoreValue >= 50 ? "text-amber-600" : "text-destructive"
+              )}>
+                {scoreValue >= 80 ? "Compliant" : scoreValue >= 50 ? "Partial" : "At Risk"}
+              </span>
+            )}
           </div>
         </CardTitle>
         <p className="text-sm text-muted-foreground font-mono pt-1">Version: {fw.version || '-'}</p>
@@ -60,13 +112,26 @@ function FrameworkCard({ fw }: { fw: Framework }) {
         <p className="text-sm text-foreground/80 line-clamp-2 my-4">
           {fw.description}
         </p>
-        <div className="flex items-center justify-between mt-auto pt-4 border-t">
+        <div className="flex items-center justify-between mt-auto pt-4 border-t gap-2 flex-wrap">
           <span className="text-xs text-muted-foreground">Added {format(new Date(fw.createdAt || ''), 'MMM yyyy')}</span>
-          <Link href={`/compliance/${fw.id}`}>
-            <Button variant="ghost" size="sm" className="group-hover:bg-secondary">
-              Analyze Gaps <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          </Link>
+          <div className="flex items-center gap-1">
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={(e) => { e.preventDefault(); onImport(fwId); }}
+              >
+                <Upload className="h-3.5 w-3.5 mr-1" />
+                Import
+              </Button>
+            )}
+            <Link href={`/compliance/${fw.id}`}>
+              <Button variant="ghost" size="sm" className="group-hover:bg-secondary">
+                Analyze Gaps <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -76,15 +141,38 @@ function FrameworkCard({ fw }: { fw: Framework }) {
 export default function FrameworkList() {
   const { data: frameworks, isLoading } = useListFrameworks();
   const { data: user } = useGetMe({ query: { queryKey: ["/api/v1/auth/me"] } });
+  const queryClient = useQueryClient();
   const canEdit = user?.role === "admin" || user?.role === "risk_manager";
-  {/* canEdit gate: no create button present on this page — RBAC pattern available for future additions */}
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selectedFrameworkId, setSelectedFrameworkId] = useState<string>("");
+
+  function handleImport(frameworkId: string) {
+    setSelectedFrameworkId(frameworkId);
+    setImportOpen(true);
+  }
+
+  function handleSuccess() {
+    queryClient.invalidateQueries({ queryKey: ["/api/v1/compliance/frameworks"] });
+  }
 
   return (
     <AppLayout>
       <div className="p-8 max-w-7xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Compliance Frameworks</h1>
-          <p className="text-muted-foreground mt-1">Map internal controls to standard regulatory requirements.</p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Compliance Frameworks</h1>
+            <p className="text-muted-foreground mt-1">Map internal controls to standard regulatory requirements.</p>
+          </div>
+          {canEdit && (
+            <div className="flex gap-3">
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Framework
+              </Button>
+            </div>
+          )}
         </div>
 
         {isLoading ? (
@@ -95,12 +183,30 @@ export default function FrameworkList() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {frameworks?.data?.map((fw) => (
-              <FrameworkCard key={fw.id} fw={fw} />
+            {(frameworks?.data as FrameworkWithCompliance[] | undefined)?.map((fw) => (
+              <FrameworkCard
+                key={fw.id}
+                fw={fw}
+                onImport={handleImport}
+                canEdit={canEdit}
+              />
             ))}
           </div>
         )}
       </div>
+
+      <ImportFrameworkDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        frameworkId={selectedFrameworkId}
+        onSuccess={handleSuccess}
+      />
+
+      <CreateFrameworkDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSuccess={handleSuccess}
+      />
     </AppLayout>
   );
 }
