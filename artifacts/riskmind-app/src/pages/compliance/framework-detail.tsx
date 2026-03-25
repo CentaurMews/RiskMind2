@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { ArrowLeft, Loader2, AlertTriangle, CheckCircle2, MinusCircle, ChevronRight, FlaskConical, Shield, Sparkles, Clock, Check, Download } from "lucide-react";
+import { ArrowLeft, Loader2, AlertTriangle, CheckCircle2, MinusCircle, ChevronRight, FlaskConical, Shield, Sparkles, Clock, Check, Download, FileDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+
 
 // Extended ComplianceScore type with status field added in Plan 02
 interface ComplianceScoreExtended {
@@ -158,6 +159,7 @@ export default function FrameworkDetail() {
   const id = params?.id || "";
   const [remediations, setRemediations] = useState<RemediationStep[]>([]);
   const [assessingControl, setAssessingControl] = useState<{ id: string; title: string } | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Threshold editor state
   const [thresholdValue, setThresholdValue] = useState<string>("");
@@ -236,6 +238,71 @@ export default function FrameworkDetail() {
     document.body.removeChild(link);
   }
 
+  const handleExportPdf = async () => {
+    if (!score || !gaps) return;
+    setExporting(true);
+    try {
+      // Dynamic import to avoid loading PDF renderer on initial page load
+      const { pdf } = await import("@react-pdf/renderer");
+      const { default: CompliancePdfReport } = await import("@/components/compliance/compliance-pdf-report");
+
+      const scoreData = {
+        score: score.score || 0,
+        coverageScore: score.coverageScore || 0,
+        effectivenessScore: score.effectivenessScore || 0,
+        totalRequirements: score.totalRequirements || 0,
+        coveredRequirements: score.coveredRequirements || 0,
+        totalControls: score.totalControls || 0,
+        passedControls: score.passedControls || 0,
+        status: score.status,
+      };
+
+      const gapData = {
+        summary: {
+          total: gaps.summary?.total || 0,
+          covered: gaps.summary?.covered || 0,
+          partial: gaps.summary?.partial || 0,
+          gap: gaps.summary?.gap || 0,
+        },
+        requirements: (gaps.requirements || []).map((r) => ({
+          code: r.code || "",
+          title: r.title || "",
+          status: r.status || "gap",
+          controls: (r.controls || []).map((c) => ({
+            title: c.title,
+            testResult: c.testResult || "not_tested",
+          })),
+        })),
+      };
+
+      const blob = await pdf(
+        <CompliancePdfReport
+          frameworkName={framework.name || ""}
+          frameworkVersion={framework.version || undefined}
+          score={scoreData}
+          gaps={gapData}
+          generatedAt={new Date().toISOString()}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${framework.name}-compliance-report.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Export failed",
+        description: "Failed to generate PDF report.",
+      });
+      console.error(err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleGetRemediation = () => {
     if (gapRequirements.length === 0) return;
     const gapDescriptions = gapRequirements.map(r =>
@@ -277,6 +344,19 @@ export default function FrameworkDetail() {
             <Button variant="outline" size="sm" onClick={handleExportCsv}>
               <Download className="h-4 w-4 mr-2" />
               Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPdf}
+              disabled={exporting || !score || !gaps}
+            >
+              {exporting ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <FileDown className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Export PDF
             </Button>
           </div>
         </div>
