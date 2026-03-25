@@ -7,7 +7,7 @@ import {
   agentRunsTable,
   agentFindingsTable,
 } from "@workspace/db";
-import { complete, isAvailable, type LLMTaskType } from "./llm-service";
+import { complete, isAvailable, sanitizeForPrompt, type LLMTaskType } from "./llm-service";
 import { recordAuditDirect } from "./audit";
 import { invokeTool } from "./tool-registry";
 import { RiskSourceAggregator } from "../services/risk-source-aggregator";
@@ -606,26 +606,26 @@ ${JSON.stringify(summary, null, 2)}
 
 ## Local Analysis Already Performed
 ${localFindings.length} findings already detected locally:
-${localFindings.map(f => `- [${f.type}] ${f.title}`).join("\n")}
+${sanitizeForPrompt(localFindings.map(f => `- [${f.type}] ${f.title}`).join("\n"), "local_findings")}
 
 ## Detailed Data
 ### Open Risks (top 20)
-${JSON.stringify(data.risks.slice(0, 20), null, 2)}
+${sanitizeForPrompt(JSON.stringify(data.risks.slice(0, 20), null, 2), "risks_data", 8000)}
 
 ### KRI Values
-${JSON.stringify(data.kris, null, 2)}
+${sanitizeForPrompt(JSON.stringify(data.kris, null, 2), "kri_data", 4000)}
 
 ### Active Alerts
-${JSON.stringify(data.alerts.slice(0, 15), null, 2)}
+${sanitizeForPrompt(JSON.stringify(data.alerts.slice(0, 15), null, 2), "alerts_data", 4000)}
 
 ### Recent Signals (pending)
-${JSON.stringify(data.signals.filter(s => s.status === "pending").slice(0, 10), null, 2)}
+${sanitizeForPrompt(JSON.stringify(data.signals.filter(s => s.status === "pending").slice(0, 10), null, 2), "signals_data", 4000)}
 
 ### Vendor Status
-${JSON.stringify(data.vendors, null, 2)}
+${sanitizeForPrompt(JSON.stringify(data.vendors, null, 2), "vendor_data", 8000)}
 
 ### Compliance Gaps (unmapped requirements)
-${JSON.stringify(data.unmappedRequirements.slice(0, 20), null, 2)}
+${sanitizeForPrompt(JSON.stringify(data.unmappedRequirements.slice(0, 20), null, 2), "compliance_gaps", 4000)}
 
 ## Instructions
 Identify up to 5 additional cross-domain findings NOT already covered by the local analysis above. Focus on:
