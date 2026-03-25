@@ -310,7 +310,7 @@ router.get("/v1/frameworks/:frameworkId/compliance-score", async (req, res) => {
       }).from(controlTestsTable)
         .where(and(
           eq(controlTestsTable.tenantId, tenantId),
-          sql`${controlTestsTable.controlId} = ANY(${controlIds})`,
+          inArray(controlTestsTable.controlId, controlIds),
         ))
         .orderBy(controlTestsTable.testedAt);
 
