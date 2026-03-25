@@ -54,6 +54,18 @@ export interface StreamChunk {
   content: string;
 }
 
+/**
+ * Sanitize user-controlled strings before interpolating into LLM prompts.
+ * Wraps content in XML delimiters to prevent prompt injection, strips control
+ * characters, and truncates to a max length.
+ */
+export function sanitizeForPrompt(value: string, tag: string, maxLength = 2000): string {
+  const cleaned = value
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .slice(0, maxLength);
+  return `<${tag}>${cleaned}</${tag}>`;
+}
+
 interface ResolvedConfig {
   providerType: "openai_compat" | "anthropic";
   baseUrl: string | null;

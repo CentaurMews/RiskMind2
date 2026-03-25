@@ -27,7 +27,7 @@ import {
   getLifecycleFlow,
 } from "../lib/allowed-transitions";
 import type { VendorStatus, VendorTier } from "../lib/allowed-transitions";
-import { complete, LLMUnavailableError } from "../lib/llm-service";
+import { complete, LLMUnavailableError, sanitizeForPrompt } from "../lib/llm-service";
 import { enqueueJob } from "../lib/job-queue";
 
 const VALID_STATUSES: VendorStatus[] = ["identification", "due_diligence", "risk_assessment", "contracting", "onboarding", "monitoring", "offboarding"];
@@ -816,14 +816,14 @@ router.post("/v1/vendors/:vendorId/questionnaires/:qId/ai-questions", requireRol
 
     const prompt = `You are a vendor risk assessment expert. Given the following vendor profile and existing questionnaire, generate 3-5 contextual follow-up questions that dig deeper into potential risk areas.
 
-Vendor: ${vendor.name}
-Category: ${vendor.category || "General"}
-Description: ${vendor.description || "N/A"}
+Vendor: ${sanitizeForPrompt(vendor.name, "vendor_name")}
+Category: ${sanitizeForPrompt(vendor.category || "General", "category")}
+Description: ${sanitizeForPrompt(vendor.description || "N/A", "description")}
 
 Existing questions:
-- ${existingQuestions}
+${sanitizeForPrompt(existingQuestions, "existing_questions")}
 
-${answeredSummary ? `Responses so far:\n${answeredSummary}` : "No responses yet."}
+${answeredSummary ? `Responses so far:\n${sanitizeForPrompt(answeredSummary, "responses")}` : "No responses yet."}
 
 Generate 3-5 follow-up questions. For each question provide:
 - text: the question text
@@ -913,13 +913,14 @@ router.post("/v1/vendors/:vendorId/questionnaires/:qId/validate-answers", requir
       return q ? { questionId: qid, question: q.text, answer: val } : null;
     }).filter(Boolean);
 
+    const responsesText = qaPairs.map((qa: any) => `[${qa.questionId}] Q: ${qa.question}\nA: ${qa.answer}`).join("\n\n");
     const prompt = `You are a vendor risk assessment validator. Given the following vendor and their questionnaire responses, identify any answers that seem inconsistent with publicly known information or industry norms.
 
-Vendor: ${vendor.name}
-Category: ${vendor.category || "General"}
+Vendor: ${sanitizeForPrompt(vendor.name, "vendor_name")}
+Category: ${sanitizeForPrompt(vendor.category || "General", "category")}
 
 Responses:
-${qaPairs.map((qa: any) => `[${qa.questionId}] Q: ${qa.question}\nA: ${qa.answer}`).join("\n\n")}
+${sanitizeForPrompt(responsesText, "responses")}
 
 For each flagged answer, provide:
 - questionId: the question ID in brackets above
@@ -1364,7 +1365,7 @@ router.post("/v1/vendors/:vendorId/extract-subprocessors", requireRole("admin", 
     const prompt = `You are a third-party risk analyst extracting vendor relationships from a document.
 
 Document content (excerpt):
-${extractedText}
+${sanitizeForPrompt(extractedText, "document_content", 4000)}
 
 Identify any third-party service providers, cloud infrastructure vendors, payment processors, CDN providers,
 identity/authentication services, data processors, or technology partners mentioned.
