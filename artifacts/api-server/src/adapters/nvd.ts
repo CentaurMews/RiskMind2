@@ -81,7 +81,7 @@ async function fetchNvdPage(
   if (apiKey) headers["apiKey"] = apiKey;
 
   const url = `https://services.nvd.nist.gov/rest/json/cves/2.0?${p.toString()}`;
-  const res = await fetch(url, { headers });
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(20_000) });
   if (!res.ok) {
     throw new Error(`NVD API ${res.status}: ${await res.text()}`);
   }
@@ -187,7 +187,7 @@ const nvdAdapter: SignalFeedAdapter = {
 
       const res = await fetch(
         "https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1",
-        { headers }
+        { headers, signal: AbortSignal.timeout(20_000) }
       );
 
       if (res.ok) {

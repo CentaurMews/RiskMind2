@@ -64,7 +64,8 @@ async function resolveDomainToIPs(
   apiKey: string
 ): Promise<string[]> {
   const res = await fetch(
-    `https://api.shodan.io/dns/resolve?hostnames=${encodeURIComponent(domain)}&key=${apiKey}`
+    `https://api.shodan.io/dns/resolve?hostnames=${encodeURIComponent(domain)}&key=${apiKey}`,
+    { signal: AbortSignal.timeout(20_000) }
   );
   if (!res.ok) return [];
   const data = (await res.json()) as DnsResolveResponse;
@@ -77,7 +78,8 @@ async function queryHostData(
   apiKey: string
 ): Promise<ShodanHostResponse | null> {
   const res = await fetch(
-    `https://api.shodan.io/shodan/host/${ip}?key=${apiKey}`
+    `https://api.shodan.io/shodan/host/${ip}?key=${apiKey}`,
+    { signal: AbortSignal.timeout(20_000) }
   );
   if (res.status === 404) return null;
   if (!res.ok) {
@@ -198,7 +200,8 @@ const shodanAdapter: SignalFeedAdapter = {
 
     try {
       const res = await fetch(
-        `https://api.shodan.io/api-info?key=${cfg.apiKey}`
+        `https://api.shodan.io/api-info?key=${cfg.apiKey}`,
+        { signal: AbortSignal.timeout(20_000) }
       );
       if (res.ok) {
         const data = (await res.json()) as ShodanApiInfo;

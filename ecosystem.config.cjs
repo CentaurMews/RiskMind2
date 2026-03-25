@@ -16,6 +16,7 @@ module.exports = {
       restart_delay: 3000,
       kill_timeout: 10000,
       listen_timeout: 10000,
+      cron_restart: "0 4 * * *",
       error_file: "./logs/riskmind-error.log",
       out_file: "./logs/riskmind-out.log",
       log_date_format: "YYYY-MM-DD HH:mm:ss Z",
