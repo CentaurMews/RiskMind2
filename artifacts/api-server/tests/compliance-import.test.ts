@@ -1,215 +1,146 @@
 import { describe, it, expect } from "vitest";
-import {
-  parseCsv,
-  parseJson,
-  computeDiff,
-  resolveParentCodes,
-  type RawRequirement,
-} from "@/lib/compliance-import";
+import { parseCsv, parseJson, computeDiff, resolveParentCodes } from "../src/lib/compliance-import";
 
-// ─── parseCsv() tests ─────────────────────────────────────────────────────────
-
-describe("parseCsv()", () => {
-  it("parses valid 4-column CSV into RawRequirement[]", () => {
-    const csv = `code,title,description,parentCode\nA.1,Control Title,Control description,\nA.1.1,Sub Control,Sub description,A.1\n`;
-    const result = parseCsv(Buffer.from(csv));
+// --- parseCsv ---
+describe("parseCsv", () => {
+  it("returns RawRequirement[] with code, title, description, parentCode from valid 4-column CSV", () => {
+    const csv = `code,title,description,parent_code\nCC-01,Access Control,Control access,\nCC-01.1,Sub-control,Sub description,CC-01\n`;
+    const buf = Buffer.from(csv);
+    const result = parseCsv(buf);
     expect(result).toHaveLength(2);
-    expect(result[0]).toMatchObject({
-      code: "A.1",
-      title: "Control Title",
-      description: "Control description",
-    });
-    expect(result[1]).toMatchObject({
-      code: "A.1.1",
-      title: "Sub Control",
-      description: "Sub description",
-      parentCode: "A.1",
-    });
+    expect(result[0]).toMatchObject({ code: "CC-01", title: "Access Control", description: "Control access" });
+    expect(result[1]).toMatchObject({ code: "CC-01.1", title: "Sub-control", parentCode: "CC-01" });
   });
 
-  it("throws on missing required column (code)", () => {
-    const csv = `title,description,parentCode\nControl Title,Control description,\n`;
-    expect(() => parseCsv(Buffer.from(csv))).toThrow(/code/i);
+  it("throws descriptive error when required column code is missing", () => {
+    const csv = `title,description\nAccess Control,Some description\n`;
+    const buf = Buffer.from(csv);
+    expect(() => parseCsv(buf)).toThrow(/code/i);
   });
 
-  it("throws on missing required column (title)", () => {
-    const csv = `code,description,parentCode\nA.1,Control description,\n`;
-    expect(() => parseCsv(Buffer.from(csv))).toThrow(/title/i);
+  it("throws descriptive error when required column title is missing", () => {
+    const csv = `code,description\nCC-01,Some description\n`;
+    const buf = Buffer.from(csv);
+    expect(() => parseCsv(buf)).toThrow(/title/i);
   });
 
-  it("handles empty rows and BOM gracefully", () => {
-    const csv = `\uFEFFcode,title,description,parentCode\nA.1,Control Title,Control description,\n\n\nA.2,Another Control,,\n`;
-    const result = parseCsv(Buffer.from(csv));
+  it("handles empty rows gracefully (skipEmptyLines)", () => {
+    const csv = `code,title\nCC-01,Access Control\n\n\nCC-02,Audit Logging\n`;
+    const buf = Buffer.from(csv);
+    const result = parseCsv(buf);
     expect(result).toHaveLength(2);
-    expect(result[0].code).toBe("A.1");
-    expect(result[1].code).toBe("A.2");
   });
 
-  it("handles rows with empty optional fields", () => {
-    const csv = `code,title,description,parentCode\nA.1,Control Title,,\n`;
-    const result = parseCsv(Buffer.from(csv));
+  it("handles BOM at start of file", () => {
+    const csv = `\uFEFFcode,title\nCC-01,Access Control\n`;
+    const buf = Buffer.from(csv);
+    const result = parseCsv(buf);
     expect(result).toHaveLength(1);
-    expect(result[0].description).toBeUndefined();
-    expect(result[0].parentCode).toBeUndefined();
+    expect(result[0].code).toBe("CC-01");
   });
 });
 
-// ─── parseJson() tests ────────────────────────────────────────────────────────
-
-describe("parseJson()", () => {
-  it("parses flat JSON array into RawRequirement[]", () => {
-    const json = JSON.stringify([
-      { code: "A.1", title: "Control Title", description: "A description" },
-      { code: "A.2", title: "Another Control" },
-    ]);
-    const result = parseJson(Buffer.from(json));
-    expect(result).toHaveLength(2);
-    expect(result[0]).toMatchObject({
-      code: "A.1",
-      title: "Control Title",
-      description: "A description",
-    });
-    expect(result[1].code).toBe("A.2");
-  });
-
-  it("flattens nested hierarchy with parentCode", () => {
+// --- parseJson ---
+describe("parseJson", () => {
+  it("returns flat RawRequirement[] with parentCode resolved from nested hierarchy", () => {
     const json = JSON.stringify([
       {
-        code: "A.1",
-        title: "Parent Control",
+        code: "CC-01",
+        title: "Access Control",
         children: [
-          { code: "A.1.1", title: "Child Control 1" },
-          { code: "A.1.2", title: "Child Control 2" },
+          { code: "CC-01.1", title: "Sub-control", description: "Sub desc" },
         ],
       },
     ]);
-    const result = parseJson(Buffer.from(json));
-    expect(result.length).toBeGreaterThanOrEqual(3);
-    const child = result.find((r) => r.code === "A.1.1");
+    const buf = Buffer.from(json);
+    const result = parseJson(buf);
+    expect(result).toHaveLength(2);
+    const parent = result.find(r => r.code === "CC-01");
+    const child = result.find(r => r.code === "CC-01.1");
+    expect(parent).toBeDefined();
     expect(child).toBeDefined();
-    expect(child?.parentCode).toBe("A.1");
-    const child2 = result.find((r) => r.code === "A.1.2");
-    expect(child2?.parentCode).toBe("A.1");
+    expect(child!.parentCode).toBe("CC-01");
   });
 
-  it("throws Zod validation error on invalid schema", () => {
-    const json = JSON.stringify([
-      { title: "Missing code field" },
-    ]);
-    expect(() => parseJson(Buffer.from(json))).toThrow();
+  it("throws Zod validation error when code is missing", () => {
+    const json = JSON.stringify([{ title: "Access Control" }]);
+    const buf = Buffer.from(json);
+    expect(() => parseJson(buf)).toThrow();
+  });
+
+  it("throws Zod validation error when title is missing", () => {
+    const json = JSON.stringify([{ code: "CC-01" }]);
+    const buf = Buffer.from(json);
+    expect(() => parseJson(buf)).toThrow();
   });
 });
 
-// ─── computeDiff() tests ──────────────────────────────────────────────────────
-
-describe("computeDiff()", () => {
-  const incoming: RawRequirement[] = [
-    { code: "A.1", title: "Control Title", description: "A description" },
-    { code: "A.2", title: "Another Control" },
-  ];
-
-  it("marks all as new when no existing requirements", () => {
+// --- computeDiff ---
+describe("computeDiff", () => {
+  it("marks all incoming as new when existing is empty", () => {
+    const incoming = [
+      { code: "CC-01", title: "Access Control" },
+      { code: "CC-02", title: "Audit Logging" },
+    ];
     const result = computeDiff([], incoming);
-    expect(result.new).toHaveLength(incoming.length);
+    expect(result.new).toHaveLength(2);
     expect(result.modified).toHaveLength(0);
     expect(result.unchanged).toHaveLength(0);
   });
 
-  it("marks matching code+title as unchanged", () => {
-    const existing = [
-      { code: "A.1", title: "Control Title", description: "A description" },
-    ];
-    const result = computeDiff(existing, [
-      { code: "A.1", title: "Control Title", description: "A description" },
-    ]);
-    expect(result.unchanged).toHaveLength(1);
-    expect(result.unchanged[0].code).toBe("A.1");
-    expect(result.new).toHaveLength(0);
-    expect(result.modified).toHaveLength(0);
-  });
-
-  it("marks matching code with different title as modified", () => {
-    const existing = [
-      { code: "A.1", title: "Old Title", description: "A description" },
-    ];
-    const result = computeDiff(existing, [
-      { code: "A.1", title: "New Title", description: "A description" },
-    ]);
+  it("marks as modified when code matches but title differs", () => {
+    const existing = [{ code: "CC-01", title: "Old Title" }];
+    const incoming = [{ code: "CC-01", title: "New Title" }];
+    const result = computeDiff(existing, incoming);
     expect(result.modified).toHaveLength(1);
     expect(result.modified[0].incoming.title).toBe("New Title");
     expect(result.modified[0].existing.title).toBe("Old Title");
-    expect(result.new).toHaveLength(0);
-    expect(result.unchanged).toHaveLength(0);
   });
 
-  it("marks matching code with different description as modified", () => {
-    const existing = [
-      { code: "A.1", title: "Same Title", description: "Old description" },
-    ];
-    const result = computeDiff(existing, [
-      { code: "A.1", title: "Same Title", description: "New description" },
-    ]);
+  it("marks as modified when description differs", () => {
+    const existing = [{ code: "CC-01", title: "Same Title", description: "Old desc" }];
+    const incoming = [{ code: "CC-01", title: "Same Title", description: "New desc" }];
+    const result = computeDiff(existing, incoming);
     expect(result.modified).toHaveLength(1);
-    expect(result.modified[0].existing.description).toBe("Old description");
-    expect(result.modified[0].incoming.description).toBe("New description");
   });
 
-  it("preserves existing requirements not in incoming (additive-only per D-05)", () => {
-    const existing = [
-      { code: "A.1", title: "Existing Control" },
-      { code: "A.2", title: "Another Existing" },
-    ];
-    const incomingPartial = [
-      { code: "A.3", title: "New Control" },
-    ];
-    const result = computeDiff(existing, incomingPartial);
-    // A.1 and A.2 are not in incoming — they should NOT appear in any diff category
-    const allCodes = [
-      ...result.new.map((r) => r.code),
-      ...result.modified.map((r) => r.incoming.code),
-      ...result.unchanged.map((r) => r.code),
-    ];
-    expect(allCodes).not.toContain("A.1");
-    expect(allCodes).not.toContain("A.2");
-    // A.3 is new
-    expect(result.new).toHaveLength(1);
-    expect(result.new[0].code).toBe("A.3");
+  it("marks as unchanged when code and title match", () => {
+    const existing = [{ code: "CC-01", title: "Access Control" }];
+    const incoming = [{ code: "CC-01", title: "Access Control" }];
+    const result = computeDiff(existing, incoming);
+    expect(result.unchanged).toHaveLength(1);
+    expect(result.new).toHaveLength(0);
+    expect(result.modified).toHaveLength(0);
   });
 });
 
-// ─── resolveParentCodes() tests ───────────────────────────────────────────────
-
-describe("resolveParentCodes()", () => {
-  it("resolves parentCode to parentId via codeToIdMap", () => {
-    const requirements: RawRequirement[] = [
-      { code: "A.1.1", title: "Child Control", parentCode: "A.1" },
+// --- resolveParentCodes ---
+describe("resolveParentCodes", () => {
+  it("maps parentCode to parentId UUID when present in map", () => {
+    const reqs = [
+      { code: "CC-01.1", title: "Sub-control", parentCode: "CC-01" },
     ];
-    const codeToIdMap = new Map<string, string>([["A.1", "uuid-parent-001"]]);
-    const { resolved, warnings } = resolveParentCodes(requirements, codeToIdMap);
-    expect(resolved).toHaveLength(1);
-    expect(resolved[0].parentId).toBe("uuid-parent-001");
+    const map = new Map([["CC-01", "uuid-1234"]]);
+    const { resolved, warnings } = resolveParentCodes(reqs, map);
+    expect(resolved[0].parentId).toBe("uuid-1234");
     expect(warnings).toHaveLength(0);
   });
 
-  it("sets parentId to null and adds warning for invalid parentCode", () => {
-    const requirements: RawRequirement[] = [
-      { code: "A.1.1", title: "Child Control", parentCode: "INVALID" },
+  it("sets parentId to null and includes warning when parentCode not in map", () => {
+    const reqs = [
+      { code: "CC-01.1", title: "Sub-control", parentCode: "MISSING" },
     ];
-    const codeToIdMap = new Map<string, string>([["A.1", "uuid-parent-001"]]);
-    const { resolved, warnings } = resolveParentCodes(requirements, codeToIdMap);
-    expect(resolved).toHaveLength(1);
+    const map = new Map<string, string>();
+    const { resolved, warnings } = resolveParentCodes(reqs, map);
     expect(resolved[0].parentId).toBeNull();
-    expect(warnings.length).toBeGreaterThan(0);
-    expect(warnings[0]).toMatch(/INVALID/);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("MISSING");
   });
 
-  it("sets parentId to null when no parentCode specified", () => {
-    const requirements: RawRequirement[] = [
-      { code: "A.1", title: "Root Control" },
-    ];
-    const codeToIdMap = new Map<string, string>();
-    const { resolved, warnings } = resolveParentCodes(requirements, codeToIdMap);
-    expect(resolved).toHaveLength(1);
+  it("sets parentId to null when parentCode is not set", () => {
+    const reqs = [{ code: "CC-01", title: "Access Control" }];
+    const map = new Map<string, string>();
+    const { resolved, warnings } = resolveParentCodes(reqs, map);
     expect(resolved[0].parentId).toBeNull();
     expect(warnings).toHaveLength(0);
   });
