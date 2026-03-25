@@ -13,7 +13,7 @@ import {
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError } from "../lib/errors";
-import { streamComplete, complete, LLMUnavailableError } from "../lib/llm-service";
+import { streamComplete, complete, LLMUnavailableError, sanitizeForPrompt } from "../lib/llm-service";
 import { computeTierFromRiskScore } from "../lib/allowed-transitions";
 import { enqueueJob, registerWorker } from "../lib/job-queue";
 import {
@@ -532,7 +532,9 @@ router.post("/v1/assessments/:id/follow-up", requireRole("admin", "risk_manager"
 
     if (!questionId) { badRequest(res, "questionId is required"); return; }
 
-    const prompt = `You are evaluating assessment responses. The user just answered question '${questionText || questionId}' with '${answer !== undefined ? JSON.stringify(answer) : "not provided"}'. Based on this response and the context of the assessment, determine if a follow-up question would help clarify or explore the answer further. If yes, respond with a JSON object: { "text": "...", "type": "boolean|text|multiple_choice|numeric", "weight": 5, "required": false }. If no follow-up is needed, respond with null.`;
+    const sanitizedQuestion = sanitizeForPrompt(String(questionText || questionId), "question");
+    const sanitizedAnswer = sanitizeForPrompt(answer !== undefined ? JSON.stringify(answer) : "not provided", "answer");
+    const prompt = `You are evaluating assessment responses. The user just answered question ${sanitizedQuestion} with ${sanitizedAnswer}. Based on this response and the context of the assessment, determine if a follow-up question would help clarify or explore the answer further. If yes, respond with a JSON object: { "text": "...", "type": "boolean|text|multiple_choice|numeric", "weight": 5, "required": false }. If no follow-up is needed, respond with null.`;
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
