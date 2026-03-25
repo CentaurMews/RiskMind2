@@ -217,7 +217,7 @@ router.post("/v1/ai/interview/:sessionId/message", requireRole("admin", "risk_ma
     } catch (err) {
       console.error("Interview stream error:", err);
       transcript.push({ role: "assistant", content: `[error] ${err instanceof Error ? err.message : "Stream error"}`, timestamp: new Date().toISOString() });
-      await db.update(interviewSessionsTable).set({ transcript, updatedAt: new Date() }).where(eq(interviewSessionsTable.id, sessionId)).catch(() => {});
+      await db.update(interviewSessionsTable).set({ transcript, updatedAt: new Date() }).where(eq(interviewSessionsTable.id, sessionId)).catch(saveErr => console.error("[interview] transcript save failed:", saveErr.message));
       const errMsg = err instanceof Error ? err.message : "Stream error";
       res.write(`data: ${JSON.stringify({ type: "error", content: errMsg })}\n\n`);
     }

@@ -30,7 +30,7 @@ import { invokeTool } from "../lib/tool-registry";
 
 function rfc7807(status: number, title: string, detail: string, auditCtx?: { tenantId: string; userId: string; tool: string }) {
   if (auditCtx) {
-    audit(auditCtx.tenantId, auditCtx.userId, `mcp_denied`, auditCtx.tool, undefined, { status, title, detail }).catch(() => {});
+    audit(auditCtx.tenantId, auditCtx.userId, `mcp_denied`, auditCtx.tool, undefined, { status, title, detail }).catch(auditErr => console.error("[mcp] audit log failed:", auditErr.message));
   }
   return {
     content: [{ type: "text" as const, text: JSON.stringify({

@@ -112,7 +112,7 @@ async function claimAndProcessJob(queue: string, handler: JobHandler): Promise<b
 
     return true;
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    await client.query("ROLLBACK").catch(rollbackErr => console.error("[job-queue] ROLLBACK failed:", rollbackErr.message));
     throw err;
   } finally {
     client.release();
