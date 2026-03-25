@@ -22,7 +22,7 @@ import { captureSnapshotForTenant } from "../lib/risk-snapshot-scheduler";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
 import { badRequest, notFound, serverError } from "../lib/errors";
-import { complete, isAvailable, LLMUnavailableError } from "../lib/llm-service";
+import { complete, isAvailable, LLMUnavailableError, sanitizeForPrompt } from "../lib/llm-service";
 
 async function verifyRiskOwnership(riskId: string, tenantId: string, res: Response): Promise<boolean> {
   const [risk] = await db.select({ id: risksTable.id }).from(risksTable)
@@ -1334,14 +1334,17 @@ By approving this memorandum, the Risk Executive acknowledges awareness of this 
       const inherentScore = (risk.likelihood || 1) * (risk.impact || 1);
       const residualScore = risk.residualLikelihood && risk.residualImpact ? risk.residualLikelihood * risk.residualImpact : null;
 
+      const treatmentText = treatment
+        ? `Treatment Strategy: ${sanitizeForPrompt(treatment.strategy, "strategy")}\nTreatment Description: ${sanitizeForPrompt(treatment.description || "N/A", "treatment_description")}`
+        : "No specific treatment on record.";
       const prompt = `Draft a formal Risk Acceptance Memorandum for the following risk. The document should be professional, concise, and suitable for executive review and sign-off.
 
-Risk: ${risk.title}
-Category: ${risk.category}
-Description: ${risk.description || "N/A"}
+Risk: ${sanitizeForPrompt(risk.title, "risk_title")}
+Category: ${sanitizeForPrompt(risk.category, "category")}
+Description: ${sanitizeForPrompt(risk.description || "N/A", "description")}
 Inherent Risk Score: ${inherentScore}/25 (Likelihood: ${risk.likelihood}/5, Impact: ${risk.impact}/5)
 Residual Risk Score: ${residualScore !== null ? `${residualScore}/25` : "Not assessed"}
-${treatment ? `Treatment Strategy: ${treatment.strategy}\nTreatment Description: ${treatment.description || "N/A"}` : "No specific treatment on record."}
+${treatmentText}
 
 The memorandum must include: Executive Summary, Risk Description, Risk Scores, Business Justification for Acceptance, Residual Risk Statement, and an Approval section.`;
 
