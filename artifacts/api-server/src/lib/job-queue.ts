@@ -113,17 +113,19 @@ async function processNextJob(): Promise<boolean> {
 
 export function startJobProcessor(intervalMs = 5000) {
   if (pollInterval) return;
+  // Max jobs per tick prevents blocking the event loop when many jobs are queued
+  const MAX_JOBS_PER_TICK = 5;
   pollInterval = setInterval(async () => {
     try {
-      let processed = true;
-      while (processed) {
-        processed = await processNextJob();
+      for (let i = 0; i < MAX_JOBS_PER_TICK; i++) {
+        const processed = await processNextJob();
+        if (!processed) break;
       }
     } catch (err) {
       console.error("Job processor error:", err);
     }
   }, intervalMs);
-  console.log(`Job processor started (poll every ${intervalMs}ms)`);
+  console.log(`Job processor started (poll every ${intervalMs}ms, max ${MAX_JOBS_PER_TICK}/tick)`);
 }
 
 export function stopJobProcessor() {
