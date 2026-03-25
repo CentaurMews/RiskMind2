@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Ready to execute
-stopped_at: Completed 13-compliance-flow 13-01-PLAN.md
-last_updated: "2026-03-25T13:25:19.703Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 13-compliance-flow 13-03-PLAN.md
+last_updated: "2026-03-25T13:50:57.152Z"
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 34
-  completed_plans: 31
+  completed_plans: 33
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 13 (compliance-flow) — EXECUTING
-Plan: 3 of 5
+Plan: 5 of 5
 
 ## Performance Metrics
 
@@ -76,6 +76,9 @@ Plan: 3 of 5
 | Phase 19-demo-ready-seed-data P02 | 8 | 2 tasks | 1 files |
 | Phase 13-compliance-flow P00 | 180 | 2 tasks | 2 files |
 | Phase 13-compliance-flow P01 | 567 | 3 tasks | 7 files |
+| Phase 13 P02 | 25 | 2 tasks | 4 files |
+| Phase 13-compliance-flow P04 | 393 | 2 tasks | 5 files |
+| Phase 13-compliance-flow P03 | 7 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -170,6 +173,13 @@ Recent decisions affecting current work:
 - [Phase 13-compliance-flow]: papaparse default import lacks TS default export — project's skipLibCheck=true resolves at build time
 - [Phase 13-compliance-flow]: computeComplianceScore extracted from compliance.ts with identical formula so routes and pipeline stay in sync
 - [Phase 13-compliance-flow]: recalculateAndTriggerPipeline checks existing finding before inserting; alert deduplication via title+type+active check
+- [Phase 13]: Two-pass parent code resolution: insert all rows first, build codeToIdMap, update parentIds — avoids FK-ordering dependency
+- [Phase 13]: importUpload (memoryStorage) and evidenceUpload (diskStorage) are separate multer instances — evidence persists to disk, import only needs buffer
+- [Phase 13]: tsconfig types array extended with papaparse and multer — explicit types:[node] blocked third-party type resolution
+- [Phase 13-compliance-flow]: @react-pdf/renderer dynamically imported in handleExportPdf to avoid bloating initial bundle
+- [Phase 13-compliance-flow]: AutoMapApprovalDialog merges approved IDs with existingRequirementIds (deduped) rather than replacing to prevent accidental unmapping
+- [Phase 13-compliance-flow]: Client-side status derivation in FrameworkCard from list response fields avoids N+1 compliance-score API calls per card
+- [Phase 13-compliance-flow]: Local type extensions (FrameworkWithCompliance, ComplianceScoreExtended) for Plan 02 additions not yet in Orval-generated types
 
 ### Roadmap Evolution
 
@@ -195,7 +205,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T13:25:19.686Z
-Stopped at: Completed 13-compliance-flow 13-01-PLAN.md
+Last session: 2026-03-25T13:50:57.135Z
+Stopped at: Completed 13-compliance-flow 13-03-PLAN.md
 Resume file: None
 Next step: `/gsd:discuss-phase 13` (Compliance Flow) or `/gsd:discuss-phase 14` (Foresight v2)
