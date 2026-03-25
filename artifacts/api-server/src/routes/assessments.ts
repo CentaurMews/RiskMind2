@@ -1,11 +1,14 @@
 import { Router, type Request, type Response } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   db,
   assessmentsTable,
   assessmentTemplatesTable,
   vendorsTable,
   frameworksTable,
+  frameworkRequirementsTable,
+  controlRequirementMapsTable,
+  controlTestsTable,
 } from "@workspace/db";
 import { requireRole } from "../middlewares/rbac";
 import { recordAudit } from "../lib/audit";
@@ -19,6 +22,7 @@ import {
   type AssessmentResponses,
   type QuestionResponse,
 } from "../lib/assessment-engine";
+import { recalculateAndTriggerPipeline } from "../lib/compliance-pipeline";
 
 function p(req: Request, name: string): string {
   return String(req.params[name]);
@@ -423,6 +427,68 @@ router.post(
 
       // Update vendor risk score if this is a vendor-context assessment
       await updateVendorRiskScoreFromAssessment(assessment, tenantId);
+
+      // Trigger compliance recalculation for framework-context assessments (per D-02, D-10)
+      if (assessment.contextType === "framework" && assessment.contextId) {
+        recalculateAndTriggerPipeline(assessment.contextId, tenantId).catch((err) =>
+          console.error("Compliance pipeline error:", err)
+        );
+
+        // D-10: Create control tests from section scores for questions with requirementCode
+        try {
+          const sectionScores = scoreResult.sections;
+          for (const section of sectionScores) {
+            // Find questions in this section that have requirementCode
+            const sectionDef = templateQuestions.sections?.find((s) => s.name === section.name);
+            if (!sectionDef) continue;
+
+            for (const question of sectionDef.questions) {
+              const requirementCode = (question as { requirementCode?: string }).requirementCode;
+              if (!requirementCode) continue;
+
+              // Find requirement by code + frameworkId
+              const [reqRow] = await db
+                .select({ id: frameworkRequirementsTable.id })
+                .from(frameworkRequirementsTable)
+                .where(
+                  and(
+                    eq(frameworkRequirementsTable.frameworkId, assessment.contextId!),
+                    eq(frameworkRequirementsTable.tenantId, tenantId),
+                    eq(frameworkRequirementsTable.code, requirementCode),
+                  )
+                )
+                .limit(1);
+              if (!reqRow) continue;
+
+              // Find controls mapped to this requirement
+              const ctrlMappings = await db
+                .select({ controlId: controlRequirementMapsTable.controlId })
+                .from(controlRequirementMapsTable)
+                .where(
+                  and(
+                    eq(controlRequirementMapsTable.requirementId, reqRow.id),
+                    eq(controlRequirementMapsTable.tenantId, tenantId),
+                  )
+                );
+
+              const testResult = section.score >= 50 ? "pass" : "fail";
+              const submitterId = req.user!.id;
+              for (const mapping of ctrlMappings) {
+                await db.insert(controlTestsTable).values({
+                  tenantId,
+                  controlId: mapping.controlId,
+                  testerId: submitterId,
+                  result: testResult,
+                  notes: `Auto-generated from assessment section "${section.name}" (score: ${section.score})`,
+                  testedAt: new Date(),
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Assessment-to-control linkage error:", err);
+        }
+      }
 
       const job = await enqueueJob(
         "ai-assess",
