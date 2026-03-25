@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
-status: Milestone complete
-stopped_at: Phase 13 context gathered
-last_updated: "2026-03-25T12:39:42.815Z"
+status: Ready to execute
+stopped_at: Completed 13-compliance-flow 13-00-PLAN.md
+last_updated: "2026-03-25T13:18:32.881Z"
 progress:
   total_phases: 11
   completed_phases: 9
-  total_plans: 29
-  completed_plans: 29
+  total_plans: 34
+  completed_plans: 30
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** A working, demo-ready enterprise risk management platform powered by intelligent AI routing at https://app.riskmind.net
-**Current focus:** Phase 19 — demo-ready-seed-data
+**Current focus:** Phase 13 — compliance-flow
 
 ## Current Position
 
-Phase: 19
-Plan: Not started
+Phase: 13 (compliance-flow) — EXECUTING
+Plan: 2 of 5
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Plan: Not started
 | Phase 18-comprehensive-demo-seed-data P03 | 300 | 2 tasks | 1 files |
 | Phase 19-demo-ready-seed-data P01 | 4 | 2 tasks | 2 files |
 | Phase 19-demo-ready-seed-data P02 | 8 | 2 tasks | 1 files |
+| Phase 13-compliance-flow P00 | 180 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,8 @@ Recent decisions affecting current work:
 - [Phase 19-demo-ready-seed-data]: complianceThreshold only set when value is null to avoid overwriting existing thresholds
 - [Phase 19-demo-ready-seed-data]: controlDefs defined at module level so both seedControls and seedControlRequirementMaps share isoCode without parameter duplication
 - [Phase 19-demo-ready-seed-data]: seedCompletedAssessments calls seedPrebuiltTemplates internally to ensure DPIA template exists before querying
+- [Phase 13-compliance-flow]: vi.mock('@workspace/db') with chained mockReturnValueOnce used to simulate Drizzle query builder chains for unit-testing DB-dependent pipeline functions without a real database
+- [Phase 13-compliance-flow]: computeDiff additive-only invariant (D-05): existing items absent from incoming must not appear in any diff category — enforced in tests
 
 ### Roadmap Evolution
 
@@ -188,7 +191,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T12:39:42.806Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-compliance-flow/13-CONTEXT.md
+Last session: 2026-03-25T13:18:32.870Z
+Stopped at: Completed 13-compliance-flow 13-00-PLAN.md
+Resume file: None
 Next step: `/gsd:discuss-phase 13` (Compliance Flow) or `/gsd:discuss-phase 14` (Foresight v2)

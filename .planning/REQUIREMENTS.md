@@ -29,9 +29,9 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 
 ### Compliance Flow
 
-- [ ] **COMP-01**: User can import compliance framework controls via CSV or JSON with validation and duplicate detection
-- [ ] **COMP-02**: User can assign assessment templates to a compliance framework, mapping questions to control IDs, with responses updating control compliance status
-- [ ] **COMP-03**: User can configure per-framework compliance thresholds (0-100%) with dashboard showing COMPLIANT/AT-RISK/NON-COMPLIANT status
+- [x] **COMP-01**: User can import compliance framework controls via CSV or JSON with validation and duplicate detection
+- [x] **COMP-02**: User can assign assessment templates to a compliance framework, mapping questions to control IDs, with responses updating control compliance status
+- [x] **COMP-03**: User can configure per-framework compliance thresholds (0-100%) with dashboard showing COMPLIANT/AT-RISK/NON-COMPLIANT status
 
 ### Signal Integrations
 
@@ -93,9 +93,9 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 | VNDR-05 | Phase 11 | Complete |
 | VNDR-06 | Phase 11 | Complete |
 | VNDR-07 | Phase 11 | Complete |
-| COMP-01 | Phase 13 | Pending |
-| COMP-02 | Phase 13 | Pending |
-| COMP-03 | Phase 13 | Pending |
+| COMP-01 | Phase 13 | Complete |
+| COMP-02 | Phase 13 | Complete |
+| COMP-03 | Phase 13 | Complete |
 | SGNL-01 | Phase 12 | Complete |
 | SGNL-02 | Phase 12 | Complete |
 | SGNL-03 | Phase 12 | Complete |
