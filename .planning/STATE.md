@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Enterprise Parity & Agent-Ready Foundation
-status: Defining requirements
-stopped_at: ""
-last_updated: "2026-03-26T12:00:00.000Z"
+status: "Roadmap defined, ready for `/gsd:plan-phase 20`"
+stopped_at: v2.1 roadmap created — Phases 20-28 defined
+last_updated: "2026-03-26T13:11:14.001Z"
+last_activity: 2026-03-26
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 14
+  completed_phases: 6
+  total_plans: 26
+  completed_plans: 26
 ---
 
 # Project State
@@ -19,14 +20,32 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** A working, demo-ready enterprise risk management platform powered by intelligent AI routing at https://app.riskmind.net
-**Current focus:** Defining requirements for v2.1
+**Current focus:** v2.1 — Enterprise Parity & Agent-Ready Foundation (Phase 20 ready to plan)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 20 (Infrastructure Primitives) — not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-26 — Milestone v2.1 started
+Status: Roadmap defined, ready for `/gsd:plan-phase 20`
+Last activity: 2026-03-26
+
+## Milestone Summary
+
+**v2.1 phases (9 total):**
+
+| Phase | Name | Requirements | Depends on |
+|-------|------|--------------|------------|
+| 20 | Infrastructure Primitives | INFRA-01–06 | Phase 19 |
+| 21 | Policy Management | POL-01–07 | Phase 20 |
+| 22 | Evidence Collection | EVID-01–04 | Phase 20 |
+| 23 | Audit Hub | AUDIT-01–05 | Phase 22 |
+| 24 | Cross-Framework Control Mapping | XMAP-01–04 | Phase 23 |
+| 25 | Notifications & Escalations | NOTIF-01–04 | Phase 20 |
+| 26 | Executive Reporting | REPORT-01–04 | Phase 25 |
+| 27 | AI Governance | AIGOV-01–05 | Phase 20 |
+| 28 | v2.1 UI Layer | (all of 20-27 API surfaces) | Phase 27 |
+
+**Coverage:** 39/39 v2.1 requirements mapped ✓
 
 ## Performance Metrics
 
@@ -126,7 +145,7 @@ Recent decisions affecting current work:
 - [Phase 11-vendor-lifecycle-redesign]: riskScore = 100 - assessment.overall (higher = worse risk) — inverts compliance score to risk score
 - [Phase 11-vendor-lifecycle-redesign]: overrideTier respected in risk score hook — tier auto-updated only when no manual override is set
 - [Phase 11-vendor-lifecycle-redesign]: aliasedTable (not alias) is the Drizzle 0.45 export for table aliases — alias is absent from the main drizzle-orm index
-- [Phase 11-vendor-lifecycle-redesign]: concentration-risk route placed before /:id route pattern to prevent Express path conflict in org-dependencies router
+- [Phase 11-vendor-lifecycle-redesign]: concentration-risk route defined before /:id route pattern to prevent Express path conflict in org-dependencies router
 - [Phase 11-vendor-lifecycle-redesign]: scoreThreshold nullable in monitoring_configs — null means no threshold alerting for that tier; vendor-monitor worker skips alert insertion when null
 - [Phase 11]: fetch() used directly for wizard API calls since Orval generated client does not yet include wizard endpoints added in Phase 11-01
 - [Phase 11]: Step components defined as separate functions in same file for co-location without cross-file coupling in vendor-onboard.tsx
@@ -195,18 +214,33 @@ Recent decisions affecting current work:
 - [Phase 14-foresight-v2]: CalibrationPanel uses wouter Link (not react-router-dom) — app uses wouter for routing
 - [Phase 14-foresight-v2]: loss-exceedance-chart.tsx scaffold created by Plan 14-03 to unblock parallel builds — Plan 14-02 replaces with full ECharts implementation
 - [Phase 14-foresight-v2]: AleWidget placed in 3-column grid row alongside KriWidget (2-col) rather than separate row — co-locates quantitative widgets
+- [v2.1 Architecture]: API-first for all v2.1 features — every feature gets complete API before UI; agents will be primary consumers
+- [v2.1 Architecture]: Single `approval_requests` table with `context_type` enum — generic approval engine (Phase 20) prevents per-feature approval tables; must be built before Policy, Evidence, Vendor workflows
+- [v2.1 Architecture]: `emitEvent()` writes to job queue only — never calls external HTTP inside a transaction; synchronous webhook delivery in request path is an unrecoverable anti-pattern
+- [v2.1 Architecture]: `policy_versions` is a separate append-only child table — storing policy content in-place destroys audit history; immutable version table required from first migration
+- [v2.1 Architecture]: SHA-256 `content_hash` on evidence records computed at collection time and made immutable — PATCH /evidence/:id returns 400 if attempting to change content_hash or collected_at
+- [v2.1 Architecture]: `ai_systems` table distinct from `llm_configs` — EU AI Act Article 49 registers AI *systems* (business applications), not underlying model configs; `ai_system_model_history` tracks which llm_configs powered a system over time
+- [v2.1 Architecture]: `notifications` table distinct from existing `alerts` table — different consumers, lifecycle, and UI surfaces
+- [v2.1 Architecture]: `audit_records` table (Audit Hub) distinct from existing `audit_events` system changelog — auditors see compliance-material events only
+- [v2.1 Architecture]: Multi-entity uses expand-migrate-contract — entity_id added as nullable FK first, backfill via job queue, NOT NULL only after all rows populated
+- [v2.1 Architecture]: SLA notifications are event-driven via scheduled jobs at entity creation time — never a cron polling scan of all tables
+- [v2.1 Stack]: nodemailer ^8.0.4 + @react-email/components ^1.0.10 + @react-email/render ^1.0.10 for email delivery — zero new infrastructure dependencies beyond these three packages
+- [v2.1 Stack]: @react-pdf/renderer ^4.3.2 for PDF generation (server-side only) — already in workspace; validate ESM/esbuild compatibility with `external` flag before Phase 26 full implementation
+- [v2.1 Stack]: No Redis/BullMQ, no XState, no Puppeteer, no MJML — existing job queue handles retry/backoff; 4-state approval machine is a pure function; structured PDFs need no headless Chrome
 
 ### Roadmap Evolution
 
 - Phase 15 added: Migrate Risk Heatmap from CSS Grid to Apache ECharts (GH #83)
 - Phase 19 added: Demo-Ready Seed Data — vendors, assessment templates, completed assessments, compliance frameworks, controls
+- Phases 20-28 added: v2.1 Enterprise Parity & Agent-Ready Foundation (2026-03-26)
 
 ### Pending Todos
 
-- Verify `p-ratelimit ^1.2.0` version on npm registry before Phase 12 install
-- Measure actual Monte Carlo benchmark (10k iterations) on this codebase before Phase 14 — research estimate is ~200ms, not a measured run
-- Audit existing recharts v2.x usage before Phase 14 upgrade to v3.8 — review axis/tooltip prop changes
-- Grep all `questionnaires` table consumers before Phase 10 — create compatibility view before migrating source of truth
+- Validate `@react-pdf/renderer` ESM/esbuild compatibility (add `external` flag to build.ts) before Phase 26 full implementation — open GitHub issue #2624
+- Source ISO 42001 Annex A full control IDs + titles from published standard text before Phase 27 framework bundle JSON is authored
+- Source NIST AI RMF 1.0 sub-category content from published standard before Phase 27
+- Confirm EU AI Act Article 49 registration obligations by risk tier (HIGH vs LIMITED) before Phase 27 UI labels/tooltips are written
+- Prototype scoped JWT auditor token validation logic (`auditorMiddleware` — claims structure, expiry, scope check against audit_request_id) before Phase 23 schema is finalized
 
 ### Blockers/Concerns
 
@@ -220,7 +254,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T06:27:50.622Z
-Stopped at: Checkpoint: 14-foresight-v2 14-04-PLAN.md Task 2 — awaiting human verify
+Last session: 2026-03-26T12:00:00.000Z
+Stopped at: v2.1 roadmap created — Phases 20-28 defined
 Resume file: None
-Next step: `/gsd:discuss-phase 13` (Compliance Flow) or `/gsd:discuss-phase 14` (Foresight v2)
+Next step: `/gsd:plan-phase 20` (Infrastructure Primitives)
