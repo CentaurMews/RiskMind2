@@ -240,8 +240,8 @@ export function ScenarioForm({
   const [iterationCount, setIterationCount] = useState("50000");
   const [fair, setFair] = useState<FAIRState>(parseParamsFromScenario(scenario));
 
-  const { data: risksData } = useListRisks();
-  const risks = risksData ?? [];
+  const { data: risksResponse } = useListRisks();
+  const risks = Array.isArray(risksResponse) ? risksResponse : (risksResponse as { data?: { id: string; title: string }[] })?.data ?? [];
 
   // Track whether values were calibrated
   const [calibrationResult, setCalibrationResult] =
