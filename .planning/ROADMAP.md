@@ -350,14 +350,36 @@ Plans:
 
 **API-first constraint:** Every feature gets a complete, tested API before any UI component starts. All phases 20-27 are API-only. Phase 28 is the unified UI layer.
 
+<!-- ═══ EXECUTION WAVES ═══════════════════════════════════════════════════
+  Wave 1 (sequential — foundation): Phase 20
+  Wave 2 (parallel — 4 tracks):     Phase 21 + 22 + 25 + 27
+  Wave 3 (parallel — 2 tracks):     Phase 23 + 26
+  Wave 4 (sequential):              Phase 24
+  Wave 5 (sequential — UI layer):   Phase 28
+
+  After Phase 20 ships, run: /gsd:execute-phase 21, 22, 25, 27 in parallel
+  After 22 + 25 ship, run: /gsd:execute-phase 23, 26 in parallel
+  After 23 ships, run: /gsd:execute-phase 24
+  After ALL APIs done, run: /gsd:execute-phase 28 (unified UI layer)
+═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- Wave 1: Foundation (must complete first) -->
 - [ ] **Phase 20: Infrastructure Primitives** - Event bus, approval engine, task system, multi-entity schema
+
+<!-- Wave 2: Parallel tracks A/B/C/D (all depend on Phase 20 only) -->
 - [ ] **Phase 21: Policy Management** - Versioned policies, lifecycle, AI generation, approval flow, attestation
 - [ ] **Phase 22: Evidence Collection** - Evidence records, file upload, expiry tracking, control linkage
-- [ ] **Phase 23: Audit Hub** - Audit workspaces, evidence requests, bundle generation, auditor share links
-- [ ] **Phase 24: Cross-Framework Control Mapping** - Control-to-framework join, evidence reuse, gap analysis
 - [ ] **Phase 25: Notifications & Escalations** - In-app + email delivery, preferences, escalation chains, digests
-- [ ] **Phase 26: Executive Reporting** - Async PDF generation, compliance posture, risk summary, scheduling
 - [ ] **Phase 27: AI Governance** - AI system registry, EU AI Act classification, ISO 42001 + NIST AI RMF bundles
+
+<!-- Wave 3: Parallel (23 after 22, 26 after 25) -->
+- [ ] **Phase 23: Audit Hub** - Audit workspaces, evidence requests, bundle generation, auditor share links
+- [ ] **Phase 26: Executive Reporting** - Async PDF generation, compliance posture, risk summary, scheduling
+
+<!-- Wave 4: Sequential (24 after 23) -->
+- [ ] **Phase 24: Cross-Framework Control Mapping** - Control-to-framework join, evidence reuse, gap analysis
+
+<!-- Wave 5: UI layer (after all API phases 20-27 complete) -->
 - [ ] **Phase 28: v2.1 UI Layer** - All frontend pages for phases 20-27 after APIs complete and Orval regenerated
 
 ## Phase Details
