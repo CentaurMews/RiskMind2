@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to plan
-stopped_at: Completed 13-compliance-flow 13-03-PLAN.md
-last_updated: "2026-03-25T14:00:54.723Z"
+stopped_at: Phase 14 context gathered
+last_updated: "2026-03-26T04:46:19.595Z"
 progress:
   total_phases: 11
   completed_phases: 10
@@ -205,7 +205,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T13:50:57.135Z
-Stopped at: Completed 13-compliance-flow 13-03-PLAN.md
-Resume file: None
+Last session: 2026-03-26T04:46:19.565Z
+Stopped at: Phase 14 context gathered
+Resume file: .planning/phases/14-foresight-v2/14-CONTEXT.md
 Next step: `/gsd:discuss-phase 13` (Compliance Flow) or `/gsd:discuss-phase 14` (Foresight v2)
