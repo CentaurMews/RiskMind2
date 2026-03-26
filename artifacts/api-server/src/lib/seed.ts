@@ -28,6 +28,8 @@ import {
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { hashPassword } from "./password";
 import { seedPrebuiltTemplates } from "@workspace/db/seed/prebuilt-templates";
+import { foresightScenariosTable, foresightSimulationsTable } from "@workspace/db/schema";
+import { runSimulation, type FAIRParams } from "./monte-carlo";
 
 // Framework requirement data inlined from scripts/src/framework-data/
 
@@ -1951,6 +1953,82 @@ async function seedRiskSnapshots(tenantId: string): Promise<void> {
   console.log(`[Seed] Created ${snapshots.length} risk snapshots (90 days of historical data)`);
 }
 
+// ─── Phase 14: Foresight scenarios + simulations ─────────────────────────────
+
+async function seedForesightScenarios(tenantId: string, risks: { id: string; title: string }[]): Promise<void> {
+  const existing = await db.execute(
+    sql`SELECT count(*)::int AS cnt FROM foresight_scenarios WHERE tenant_id = ${tenantId}`
+  );
+  if ((existing.rows[0] as { cnt: number }).cnt > 0) {
+    console.log("[Seed] Foresight scenarios already seeded, skipping");
+    return;
+  }
+
+  const scenarioDefs: { name: string; description: string; riskTitle: string; params: FAIRParams; calibratedFrom: string | null }[] = [
+    {
+      name: "Cloud Provider Outage Impact",
+      description: "Quantified risk of major cloud provider (AWS/Azure) experiencing extended outage affecting business operations. Models frequency of significant outages and associated revenue loss.",
+      riskTitle: "Cloud Provider Outage",
+      params: {
+        tef: { min: 1, mode: 3, max: 8 },
+        vulnerability: { min: 0.3, mode: 0.5, max: 0.8 },
+        lossMagnitude: { min: 50000, mode: 250000, max: 1500000 },
+      },
+      calibratedFrom: "sentinel",
+    },
+    {
+      name: "Ransomware Attack Scenario",
+      description: "FAIR-modeled ransomware risk incorporating threat frequency from MISP intelligence feeds and loss estimates from industry benchmarks. Includes ransom, recovery, and business interruption costs.",
+      riskTitle: "Ransomware",
+      params: {
+        tef: { min: 2, mode: 6, max: 15 },
+        vulnerability: { min: 0.1, mode: 0.25, max: 0.5 },
+        lossMagnitude: { min: 100000, mode: 500000, max: 5000000 },
+      },
+      calibratedFrom: "misp",
+    },
+    {
+      name: "Data Breach — PII Exposure",
+      description: "Models probability and financial impact of a personal data breach affecting customer records. Calibrated from NVD vulnerability data and regulatory fine benchmarks (GDPR/PDPL).",
+      riskTitle: "Data Breach",
+      params: {
+        tef: { min: 1, mode: 4, max: 12 },
+        vulnerability: { min: 0.15, mode: 0.35, max: 0.6 },
+        lossMagnitude: { min: 200000, mode: 1000000, max: 8000000 },
+      },
+      calibratedFrom: "nvd",
+    },
+  ];
+
+  for (const def of scenarioDefs) {
+    const risk = risks.find((r) => r.title.toLowerCase().includes(def.riskTitle.toLowerCase()));
+
+    const [scenario] = await db.insert(foresightScenariosTable).values({
+      tenantId,
+      name: def.name,
+      description: def.description,
+      riskId: risk?.id ?? null,
+      parameters: def.params,
+      calibratedFrom: def.calibratedFrom,
+    }).returning();
+
+    // Run actual Monte Carlo simulation
+    const results = runSimulation(def.params, 50000);
+
+    await db.insert(foresightSimulationsTable).values({
+      tenantId,
+      scenarioId: scenario.id,
+      status: "completed",
+      iterationCount: 50000,
+      inputParameters: def.params,
+      results,
+      completedAt: new Date(),
+    });
+  }
+
+  console.log(`[Seed] Created ${scenarioDefs.length} foresight scenarios with completed simulations for tenant ${tenantId}`);
+}
+
 // --------------------------------------------------------------------------
 // Main seed entry point
 // --------------------------------------------------------------------------
@@ -2558,6 +2636,9 @@ async function seedExpandedDataForExistingTenant(tenantId: string): Promise<void
     if (realVendors2.length > 0 && isoFw) {
       await seedCompletedAssessments(tenantId, realVendors2, isoFw.id);
     }
+
+    // Phase 14: Foresight scenarios with completed simulations
+    await seedForesightScenarios(tenantId, risks);
   } catch (err) {
     console.error("[Seed] Expanded seed failed:", err);
   }
@@ -2767,6 +2848,9 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
     await seedControlRequirementMaps(tenant.id, controls);
     await seedControlTests(tenant.id, controls, [adminUser, rmUser, roUser]);
     await seedCompletedAssessments(tenant.id, realVendors, isoFramework.id);
+
+    // Phase 14: Foresight scenarios with completed simulations
+    await seedForesightScenarios(tenant.id, risks);
 
     console.log(`[Seed] Done — Acme Corp demo dataset created. Login: any-user@acme.com / Ballpen-Kiosk-0!`);
   } catch (err) {
