@@ -1,30 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Core Platform Features
-status: Phase complete — ready for verification
-stopped_at: "Checkpoint: 14-foresight-v2 14-04-PLAN.md Task 2 — awaiting human verify"
-last_updated: "2026-03-26T06:27:50.632Z"
+milestone: v2.1
+milestone_name: Enterprise Parity & Agent-Ready Foundation
+status: Defining requirements
+stopped_at: ""
+last_updated: "2026-03-26T12:00:00.000Z"
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 38
-  completed_plans: 38
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-23)
+See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** A working, demo-ready enterprise risk management platform powered by intelligent AI routing at https://app.riskmind.net
-**Current focus:** Phase 14 — foresight-v2
+**Current focus:** Defining requirements for v2.1
 
 ## Current Position
 
-Phase: 14 (foresight-v2) — EXECUTING
-Plan: 4 of 4
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-26 — Milestone v2.1 started
 
 ## Performance Metrics
 

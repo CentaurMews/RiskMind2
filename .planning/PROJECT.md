@@ -8,20 +8,33 @@ RiskMind is an AI-native multi-organization enterprise risk management platform 
 
 A working, demo-ready enterprise risk management platform that an internal organization can use to manage real risks, vendors, and compliance — powered by intelligent AI routing and accessible via https://app.riskmind.net.
 
-## Current Milestone: v2.0 — Core Platform Features
+## Current Milestone: v2.1 — Enterprise Parity & Agent-Ready Foundation
 
-**Goal:** Transform RiskMind from a demo-ready platform into a full-featured enterprise risk management system with AI-driven assessments, redesigned vendor lifecycle, compliance workflows, real signal integrations, and predictive foresight capabilities.
+**Goal:** Close competitive gaps against Vanta/Drata/Optro with policy management, evidence collection, audit hub, cross-framework control mapping, executive reporting, and notifications — plus AI governance, multi-entity schema foundation, and agent-ready infrastructure preparing for the Paperclip-inspired agentic GRC layer.
 
 **Target features:**
-- Assessment Engine — AI-driven, non-deterministic questionnaires shared by vendor and compliance flows (foundation layer)
-- Vendor Lifecycle Redesign — wizard onboarding, enrichment, continuous monitoring, 4th party risk
-- Compliance Flow — framework import, assessment via shared engine, compliance thresholds
-- Signal Integrations — Sentinel (SIEM), Shodan, CVE/NVD, MISP, email ingestion (all real feeds)
-- Foresight v2 — Monte Carlo simulation, real OSINT data feeds, scenario modeling
+- Policy Management — templates, AI generation, versioning, approvals, linked to controls/frameworks
+- Evidence Collection — structured evidence records tied to controls, auto-collected flag, expiry tracking
+- Audit Hub — central workspace for audit requests, evidence bundles, timelines, auditor access
+- Cross-Framework Control Mapping — single control maps to N frameworks, reduces duplicate work
+- Executive Reporting — PDF compliance reports, board-ready risk summaries, evidence packs
+- Notifications & Escalations — SLA-based alerts, email delivery, overdue tracking, escalation chains
+- AI Governance — ISO 42001/NIST AI RMF framework support + AI model/system registry with EU AI Act classification
+- Multi-Entity Schema — entities table, entity_id on core tables, backward-compatible (full UI in future milestone)
+- Webhook/Event System — internal event bus for state changes (new signal, assessment due, policy expired)
+- Approval Workflow Engine — generic approve/reject/escalate pattern (policies, evidence, vendor onboarding)
+- Task/Work Item System — assignable work units with owners, SLA, status (foundation for agent tickets)
 
 ## Planned Milestones
 
-**v2.1 — i18n & Social Auth**
+**v2.2 — Agentic GRC Department**
+- Paperclip-inspired, RiskMind-native agent orchestration (Option D)
+- Agent roles: CISO, Compliance Manager, TPRM Manager, Risk Analyst, Reporting
+- External communication channels (email, Teams, WhatsApp)
+- Human-in-the-loop approval flows, budget enforcement, audit trail
+- Multi-entity management UI + consolidated group dashboards
+
+**v2.3 — i18n & Social Auth**
 - Multi-language support (EN, ES, AR with RTL)
 - Social login implementation (Microsoft, Google OAuth)
 - User self-registration workflow
@@ -69,14 +82,27 @@ A working, demo-ready enterprise risk management platform that an internal organ
 - ✓ Clickable KPI cards navigating to list pages — v1.2
 - ✓ Mobile responsive heatmap, scroll shadows, touch targets — v1.2
 - ✓ Real tenant name in header (removed Replit UUID) — v1.2
+- ✓ Assessment Engine — AI-driven questionnaires, scoring, branching, follow-up, templates — v2.0
+- ✓ Vendor Lifecycle Redesign — wizard onboarding, 4th party risk, continuous monitoring — v2.0
+- ✓ Signal Integrations — NVD, Shodan, Sentinel, MISP, email (real feeds, dedup) — v2.0
+- ✓ Compliance Flow — framework import, assessment linkage, thresholds — v2.0
+- ✓ Foresight v2 — Monte Carlo, loss exceedance, OSINT calibration, scenarios — v2.0
+- ✓ ECharts risk dashboard — heatmap, parallel coordinates, domain cards, snapshots — v2.0
+- ✓ Demo seed data — realistic data across all pages — v2.0
 
 ### Active
 
-- [ ] Assessment Engine — AI-driven, non-deterministic questionnaires shared by vendor + compliance
-- [ ] Vendor Lifecycle Redesign — wizard onboarding, enrichment, monitoring, 4th party risk
-- [ ] Compliance Flow — framework import, assessment, thresholds
-- [ ] Signal Integrations — Sentinel, Shodan, CVE/NVD, MISP, email
-- [ ] Foresight v2 — Monte Carlo, OSINT, scenario modeling
+- [ ] Policy Management — templates, AI generation, versioning, approvals, control linkage
+- [ ] Evidence Collection — structured records, control linkage, auto-collection, expiry
+- [ ] Audit Hub — audit workspace, evidence bundles, timelines, auditor access
+- [ ] Cross-Framework Control Mapping — single control maps to N frameworks
+- [ ] Executive Reporting — PDF reports, board-ready summaries, evidence packs
+- [ ] Notifications & Escalations — SLA-based, email, overdue tracking, escalation chains
+- [ ] AI Governance — ISO 42001/NIST AI RMF + AI model registry with EU AI Act classification
+- [ ] Multi-Entity Schema — entities table, entity_id on core tables (foundation only)
+- [ ] Webhook/Event System — internal event bus for state changes
+- [ ] Approval Workflow Engine — generic approve/reject/escalate pattern
+- [ ] Task/Work Item System — assignable work with owners, SLA, status
 
 ### Out of Scope
 
@@ -113,8 +139,13 @@ A working, demo-ready enterprise risk management platform that an internal organ
 | ⌘K command palette with pgvector semantic search | Differentiator, shows AI-native identity | ✓ Good |
 | Defer Foresight to v2 | Monte Carlo + OSINT needs deep planning | ✓ Good — now building in v2.0 |
 | Intelligent model routing | Auto-discover + benchmark + per-task assignment | ✓ Good — shipped v1.1 |
-| Assessment Engine as shared foundation | Vendor + compliance both need questionnaires — build once | — Pending |
-| Real OSINT feeds for Foresight | Live API calls to threat intel sources, not simulated | — Pending |
+| Assessment Engine as shared foundation | Vendor + compliance both need questionnaires — build once | ✓ Good — shipped v2.0 |
+| Real OSINT feeds for Foresight | Live API calls to threat intel sources, not simulated | ✓ Good — shipped v2.0 |
+| API-first for all v2.1 features | Every feature gets complete API before UI — agents will be consumers | — Pending |
+| Paperclip-inspired, RiskMind-native (Option D) | Study Paperclip patterns, build native module — single system, no external dependency | — Pending |
+| Multi-entity: schema now, full features later (Option C) | Add entity tables/columns now, avoid costly retrofits later | — Pending |
+| Workflow Builder deferred to agentic layer | Agents replace no-code workflows — build agent orchestration instead | — Pending |
+| Generic approval workflow pattern | One approval_requests table with context_type — reusable across policies, evidence, vendors, agents | — Pending |
 
 ## Evolution
 
@@ -134,4 +165,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 19 (Demo-Ready Seed Data) completed*
+*Last updated: 2026-03-26 after milestone v2.1 started*
