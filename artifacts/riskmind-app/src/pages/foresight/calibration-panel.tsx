@@ -22,7 +22,7 @@ import type {
   CalibrationResult,
   TriangularParam,
 } from "@workspace/api-client-react";
-import { Link } from "react-router-dom";
+import { Link } from "wouter";
 
 interface CalibrationPanelProps {
   /** Called when calibration completes — parent can pre-fill scenario form */

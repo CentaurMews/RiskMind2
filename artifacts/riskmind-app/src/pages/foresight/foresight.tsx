@@ -1,84 +1,139 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dice5, Globe, Brain, GitBranch } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Plus, BarChart3, GitCompare, Zap } from "lucide-react";
+import { useListForesightScenarios } from "@workspace/api-client-react";
+import type { ForesightScenario, CalibrationResult } from "@workspace/api-client-react";
+import { ScenarioList } from "./scenario-list";
+import { ScenarioForm } from "./scenario-form";
+import { CalibrationPanel } from "./calibration-panel";
+import { ScenarioCompare } from "./scenario-compare";
 
-interface FeatureCardProps {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-}
-
-const features: FeatureCardProps[] = [
-  {
-    icon: Dice5,
-    title: "Monte Carlo Simulation",
-    description:
-      "Model risk scenarios with statistical confidence. Run thousands of simulations to understand probability distributions of risk outcomes.",
-  },
-  {
-    icon: Globe,
-    title: "OSINT Risk Horizon",
-    description:
-      "Enrich your risk landscape with external intelligence. Automated monitoring of threat feeds, regulatory changes, and industry signals.",
-  },
-  {
-    icon: Brain,
-    title: "Agent Intelligence Feed",
-    description:
-      "Your autonomous risk agent's findings in one actionable inbox. Approve, dismiss, or escalate AI-detected risks with full transparency.",
-  },
-  {
-    icon: GitBranch,
-    title: "What-If Scenario Builder",
-    description:
-      "Explore hypothetical scenarios interactively. 'What if this vendor fails?' See cascading impacts across your risk landscape instantly.",
-  },
-];
-
-function FeatureCard({ icon: Icon, title, description }: FeatureCardProps) {
-  return (
-    <Card className="relative overflow-hidden bg-gradient-to-br from-muted/40 to-card hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
-      <CardContent className="p-6">
-        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center mb-4">
-          <Icon className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <p className="font-semibold text-base text-foreground/80">{title}</p>
-        <p className="text-sm text-muted-foreground leading-relaxed mt-1">
-          {description}
-        </p>
-        <div className="flex justify-end mt-4">
-          <span className="text-xs font-mono text-muted-foreground/60 border border-muted rounded-full px-2 py-0.5">
-            Coming in v2
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+type ActiveTab = "scenarios" | "compare" | "calibration";
 
 export default function Foresight() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("scenarios");
+  const [showScenarioForm, setShowScenarioForm] = useState(false);
+  const [editingScenario, setEditingScenario] = useState<
+    ForesightScenario | undefined
+  >(undefined);
+
+  // Pre-filled calibration values to pass to scenario form
+  const [pendingCalibration, setPendingCalibration] =
+    useState<CalibrationResult | null>(null);
+
+  const { data: scenarios = [] } = useListForesightScenarios();
+
+  const handleCreateNew = () => {
+    setEditingScenario(undefined);
+    setPendingCalibration(null);
+    setShowScenarioForm(true);
+  };
+
+  const handleEdit = (scenario: ForesightScenario) => {
+    setEditingScenario(scenario);
+    setPendingCalibration(null);
+    setShowScenarioForm(true);
+  };
+
+  const handleFormClose = () => {
+    setShowScenarioForm(false);
+    setEditingScenario(undefined);
+    setPendingCalibration(null);
+  };
+
+  /** Called from CalibrationPanel when user clicks "Apply to New Scenario" */
+  const handleApplyCalibration = (result: CalibrationResult) => {
+    setPendingCalibration(result);
+    setEditingScenario(undefined);
+    setShowScenarioForm(true);
+    setActiveTab("scenarios");
+  };
+
   return (
     <AppLayout>
-      <div className="p-8 max-w-5xl mx-auto">
-        <div className="mb-12">
-          <h1 className="text-3xl font-bold tracking-tight">Foresight</h1>
-          <p className="text-muted-foreground mt-2 max-w-xl">
-            Advanced predictive capabilities are coming in the next release.
-            Here's what's on the horizon.
-          </p>
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        {/* Page header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Foresight</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Monte Carlo risk simulation and quantitative analysis
+            </p>
+          </div>
+          <Button onClick={handleCreateNew}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Scenario
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {features.map((f) => (
-            <FeatureCard key={f.title} {...f} />
-          ))}
-        </div>
+        {/* Tabs */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as ActiveTab)}
+          className="w-full"
+        >
+          <TabsList className="bg-muted/50 p-1 w-full justify-start h-12 rounded-lg">
+            <TabsTrigger
+              value="scenarios"
+              className="data-[state=active]:shadow-sm rounded-md gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Scenarios
+            </TabsTrigger>
+            <TabsTrigger
+              value="compare"
+              className="data-[state=active]:shadow-sm rounded-md gap-2"
+            >
+              <GitCompare className="h-4 w-4" />
+              Compare
+            </TabsTrigger>
+            <TabsTrigger
+              value="calibration"
+              className="data-[state=active]:shadow-sm rounded-md gap-2"
+            >
+              <Zap className="h-4 w-4" />
+              Calibration
+            </TabsTrigger>
+          </TabsList>
 
-        <p className="text-center text-xs text-muted-foreground/50 mt-12 font-mono tracking-widest uppercase">
-          v2 — Planned
-        </p>
+          {/* Scenarios tab */}
+          <TabsContent value="scenarios" className="mt-6">
+            <ScenarioList onCreateNew={handleCreateNew} onEdit={handleEdit} />
+          </TabsContent>
+
+          {/* Compare tab */}
+          <TabsContent value="compare" className="mt-6">
+            <ScenarioCompare scenarios={scenarios} />
+          </TabsContent>
+
+          {/* Calibration tab */}
+          <TabsContent value="calibration" className="mt-6">
+            <CalibrationPanel
+              onApplyToNewScenario={handleApplyCalibration}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Scenario create/edit slide-over */}
+      <Sheet open={showScenarioForm} onOpenChange={setShowScenarioForm}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>
+              {editingScenario ? "Edit Scenario" : "New Scenario"}
+            </SheetTitle>
+          </SheetHeader>
+          <ScenarioForm
+            scenario={editingScenario}
+            calibrationResult={pendingCalibration}
+            onSuccess={handleFormClose}
+            onCancel={handleFormClose}
+          />
+        </SheetContent>
+      </Sheet>
     </AppLayout>
   );
 }
