@@ -272,6 +272,12 @@ Plans:
   5. Dashboard KPI section shows a top-N risks by expected annual loss (ALE) widget derived from saved simulation results
 **Plans**: 4 plans
 
+Plans:
+- [ ] 14-01-PLAN.md — Monte Carlo engine, foresight API routes, job worker, OpenAPI spec + Orval codegen
+- [ ] 14-02-PLAN.md — Foresight page (tabs, scenario list, FAIR parameter form), loss exceedance chart
+- [ ] 14-03-PLAN.md — OSINT calibration panel, scenario comparison view, form integration
+- [ ] 14-04-PLAN.md — Dashboard ALE widget + end-to-end verification
+
 ## Progress
 
 **Execution Order:**
@@ -292,7 +298,7 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 11. Vendor Lifecycle Redesign | v2.0 | 5/5 | Complete    | 2026-03-23 |
 | 12. Signal Integrations | v2.0 | 5/5 | Complete   | 2026-03-23 |
 | 13. Compliance Flow | v2.0 | 4/5 | Complete    | 2026-03-25 |
-| 14. Foresight v2 | v2.0 | 0/? | Not started | - |
+| 14. Foresight v2 | v2.0 | 0/4 | Not started | - |
 
 ### Phase 15: Migrate Risk Heatmap from CSS Grid to Apache ECharts
 
