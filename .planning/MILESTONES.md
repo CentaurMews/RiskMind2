@@ -33,6 +33,8 @@
 - OSINT calibration panel with sample-size/freshness badge and one-click FAIR pre-fill, plus two-scenario comparison with overlaid loss exceedance curves and parameter delta table
 - ALE dashboard widget with top-5 scenario rankings, USD compact formatting, and empty state linking to Foresight — deployed via PM2
 
+**Last phase number:** 19
+
 ---
 
 ## v1.0 — Demo-Ready Deployment (2026-03-18)
