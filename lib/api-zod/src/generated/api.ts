@@ -2254,10 +2254,346 @@ export const GetJobStatusResponse = zod.object({
 });
 
 /**
- * @summary Get simulation by ID (not implemented)
+ * @summary Get top 5 scenarios by expected annual loss
  */
-export const GetSimulationParams = zod.object({
+export const GetForesightScenariosTopAleResponseItem = zod.object({
+  scenarioId: zod.string().uuid(),
+  scenarioName: zod.string(),
+  riskId: zod.string().uuid().nullish(),
+  ale: zod.number(),
+});
+export const GetForesightScenariosTopAleResponse = zod.array(
+  GetForesightScenariosTopAleResponseItem,
+);
+
+/**
+ * @summary List foresight scenarios
+ */
+export const ListForesightScenariosResponseItem = zod.object({
+  id: zod.string().uuid(),
+  tenantId: zod.string().uuid(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  riskId: zod.string().uuid().nullish(),
+  parameters: zod.object({}).passthrough(),
+  calibratedFrom: zod.string().nullish(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+  latestSimulation: zod
+    .object({
+      id: zod.string().uuid(),
+      tenantId: zod.string().uuid(),
+      scenarioId: zod.string().uuid(),
+      status: zod.enum(["pending", "running", "completed", "failed"]),
+      iterationCount: zod.number(),
+      results: zod
+        .object({
+          ale: zod.number().describe("Annual Loss Expectancy in dollars"),
+          percentiles: zod.object({
+            p5: zod.number().optional(),
+            p10: zod.number().optional(),
+            p25: zod.number().optional(),
+            p50: zod.number().optional(),
+            p75: zod.number().optional(),
+            p90: zod.number().optional(),
+            p95: zod.number().optional(),
+            p99: zod.number().optional(),
+          }),
+          histogram: zod.array(
+            zod.object({
+              min: zod.number(),
+              max: zod.number(),
+              count: zod.number(),
+            }),
+          ),
+          iterations: zod.number(),
+          durationMs: zod.number(),
+        })
+        .nullish(),
+      inputParameters: zod.object({}).passthrough(),
+      completedAt: zod.date().nullish(),
+      createdAt: zod.date(),
+      updatedAt: zod.date(),
+    })
+    .nullish(),
+});
+export const ListForesightScenariosResponse = zod.array(
+  ListForesightScenariosResponseItem,
+);
+
+/**
+ * @summary Create a new foresight scenario
+ */
+export const CreateForesightScenarioBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  riskId: zod.string().uuid().optional(),
+  parameters: zod.object({}).passthrough().optional(),
+});
+
+/**
+ * @summary Get foresight scenario by ID (includes simulations)
+ */
+export const GetForesightScenarioParams = zod.object({
   id: zod.coerce.string().uuid(),
+});
+
+export const GetForesightScenarioResponse = zod
+  .object({
+    id: zod.string().uuid(),
+    tenantId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    riskId: zod.string().uuid().nullish(),
+    parameters: zod.object({}).passthrough(),
+    calibratedFrom: zod.string().nullish(),
+    createdAt: zod.date(),
+    updatedAt: zod.date(),
+    latestSimulation: zod
+      .object({
+        id: zod.string().uuid(),
+        tenantId: zod.string().uuid(),
+        scenarioId: zod.string().uuid(),
+        status: zod.enum(["pending", "running", "completed", "failed"]),
+        iterationCount: zod.number(),
+        results: zod
+          .object({
+            ale: zod.number().describe("Annual Loss Expectancy in dollars"),
+            percentiles: zod.object({
+              p5: zod.number().optional(),
+              p10: zod.number().optional(),
+              p25: zod.number().optional(),
+              p50: zod.number().optional(),
+              p75: zod.number().optional(),
+              p90: zod.number().optional(),
+              p95: zod.number().optional(),
+              p99: zod.number().optional(),
+            }),
+            histogram: zod.array(
+              zod.object({
+                min: zod.number(),
+                max: zod.number(),
+                count: zod.number(),
+              }),
+            ),
+            iterations: zod.number(),
+            durationMs: zod.number(),
+          })
+          .nullish(),
+        inputParameters: zod.object({}).passthrough(),
+        completedAt: zod.date().nullish(),
+        createdAt: zod.date(),
+        updatedAt: zod.date(),
+      })
+      .nullish(),
+  })
+  .and(
+    zod.object({
+      simulations: zod
+        .array(
+          zod.object({
+            id: zod.string().uuid(),
+            tenantId: zod.string().uuid(),
+            scenarioId: zod.string().uuid(),
+            status: zod.enum(["pending", "running", "completed", "failed"]),
+            iterationCount: zod.number(),
+            results: zod
+              .object({
+                ale: zod.number().describe("Annual Loss Expectancy in dollars"),
+                percentiles: zod.object({
+                  p5: zod.number().optional(),
+                  p10: zod.number().optional(),
+                  p25: zod.number().optional(),
+                  p50: zod.number().optional(),
+                  p75: zod.number().optional(),
+                  p90: zod.number().optional(),
+                  p95: zod.number().optional(),
+                  p99: zod.number().optional(),
+                }),
+                histogram: zod.array(
+                  zod.object({
+                    min: zod.number(),
+                    max: zod.number(),
+                    count: zod.number(),
+                  }),
+                ),
+                iterations: zod.number(),
+                durationMs: zod.number(),
+              })
+              .nullish(),
+            inputParameters: zod.object({}).passthrough(),
+            completedAt: zod.date().nullish(),
+            createdAt: zod.date(),
+            updatedAt: zod.date(),
+          }),
+        )
+        .optional(),
+    }),
+  );
+
+/**
+ * @summary Update a foresight scenario
+ */
+export const UpdateForesightScenarioParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateForesightScenarioBody = zod.object({
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  riskId: zod.string().uuid().nullish(),
+  parameters: zod.object({}).passthrough().optional(),
+});
+
+export const UpdateForesightScenarioResponse = zod.object({
+  id: zod.string().uuid(),
+  tenantId: zod.string().uuid(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  riskId: zod.string().uuid().nullish(),
+  parameters: zod.object({}).passthrough(),
+  calibratedFrom: zod.string().nullish(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+  latestSimulation: zod
+    .object({
+      id: zod.string().uuid(),
+      tenantId: zod.string().uuid(),
+      scenarioId: zod.string().uuid(),
+      status: zod.enum(["pending", "running", "completed", "failed"]),
+      iterationCount: zod.number(),
+      results: zod
+        .object({
+          ale: zod.number().describe("Annual Loss Expectancy in dollars"),
+          percentiles: zod.object({
+            p5: zod.number().optional(),
+            p10: zod.number().optional(),
+            p25: zod.number().optional(),
+            p50: zod.number().optional(),
+            p75: zod.number().optional(),
+            p90: zod.number().optional(),
+            p95: zod.number().optional(),
+            p99: zod.number().optional(),
+          }),
+          histogram: zod.array(
+            zod.object({
+              min: zod.number(),
+              max: zod.number(),
+              count: zod.number(),
+            }),
+          ),
+          iterations: zod.number(),
+          durationMs: zod.number(),
+        })
+        .nullish(),
+      inputParameters: zod.object({}).passthrough(),
+      completedAt: zod.date().nullish(),
+      createdAt: zod.date(),
+      updatedAt: zod.date(),
+    })
+    .nullish(),
+});
+
+/**
+ * @summary Delete a foresight scenario
+ */
+export const DeleteForesightScenarioParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Clone a foresight scenario
+ */
+export const CloneForesightScenarioParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Create and enqueue a Monte Carlo simulation (async, returns 202)
+ */
+export const createForesightSimulationBodyIterationCountDefault = 10000;
+export const createForesightSimulationBodyIterationCountMax = 500000;
+
+export const CreateForesightSimulationBody = zod.object({
+  scenarioId: zod.string().uuid(),
+  iterationCount: zod
+    .number()
+    .min(1)
+    .max(createForesightSimulationBodyIterationCountMax)
+    .default(createForesightSimulationBodyIterationCountDefault),
+});
+
+/**
+ * @summary Get simulation status and results
+ */
+export const GetForesightSimulationParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetForesightSimulationResponse = zod.object({
+  id: zod.string().uuid(),
+  tenantId: zod.string().uuid(),
+  scenarioId: zod.string().uuid(),
+  status: zod.enum(["pending", "running", "completed", "failed"]),
+  iterationCount: zod.number(),
+  results: zod
+    .object({
+      ale: zod.number().describe("Annual Loss Expectancy in dollars"),
+      percentiles: zod.object({
+        p5: zod.number().optional(),
+        p10: zod.number().optional(),
+        p25: zod.number().optional(),
+        p50: zod.number().optional(),
+        p75: zod.number().optional(),
+        p90: zod.number().optional(),
+        p95: zod.number().optional(),
+        p99: zod.number().optional(),
+      }),
+      histogram: zod.array(
+        zod.object({
+          min: zod.number(),
+          max: zod.number(),
+          count: zod.number(),
+        }),
+      ),
+      iterations: zod.number(),
+      durationMs: zod.number(),
+    })
+    .nullish(),
+  inputParameters: zod.object({}).passthrough(),
+  completedAt: zod.date().nullish(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+/**
+ * @summary Calibrate FAIR parameters from tenant signal data (90-day window)
+ */
+export const PostForesightCalibrateResponse = zod.object({
+  tef: zod
+    .object({
+      min: zod.number(),
+      mode: zod.number(),
+      max: zod.number(),
+    })
+    .nullish(),
+  vulnerability: zod
+    .object({
+      min: zod.number(),
+      mode: zod.number(),
+      max: zod.number(),
+    })
+    .nullish(),
+  lossMagnitude: zod
+    .object({
+      min: zod.number(),
+      mode: zod.number(),
+      max: zod.number(),
+    })
+    .nullish(),
+  sampleSize: zod.number(),
+  dataFreshness: zod.string(),
+  message: zod.string().nullish(),
 });
 
 /**
@@ -3229,4 +3565,490 @@ export const McpSseStreamHeader = zod.object({
  */
 export const McpSessionTeardownHeader = zod.object({
   "mcp-session-id": zod.string().uuid(),
+});
+
+/**
+ * Returns all assessment templates for the tenant, optionally filtered by contextType.
+ * @summary List assessment templates
+ */
+export const ListAssessmentTemplatesQueryParams = zod.object({
+  contextType: zod.enum(["vendor", "framework"]).optional(),
+});
+
+export const ListAssessmentTemplatesResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        tenantId: zod.string().uuid().optional(),
+        title: zod.string().optional(),
+        description: zod.string().nullish(),
+        isPrebuilt: zod.boolean().optional(),
+        questions: zod
+          .object({})
+          .passthrough()
+          .optional()
+          .describe(
+            "AssessmentTemplateQuestions JSONB — contains sections with questions",
+          ),
+        contextType: zod.enum(["vendor", "framework"]).optional(),
+        version: zod.number().optional(),
+        isActive: zod.boolean().optional(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * Creates a new assessment template with questions JSONB.
+ * @summary Create assessment template
+ */
+export const CreateAssessmentTemplateBody = zod.object({
+  title: zod.string(),
+  description: zod.string().optional(),
+  questions: zod
+    .object({
+      sections: zod.array(zod.object({}).passthrough()),
+      version: zod.number().optional(),
+    })
+    .describe("AssessmentTemplateQuestions — must have sections array"),
+  contextType: zod.enum(["vendor", "framework"]),
+});
+
+/**
+ * @summary Get assessment template by ID
+ */
+export const GetAssessmentTemplateParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetAssessmentTemplateResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  isPrebuilt: zod.boolean().optional(),
+  questions: zod
+    .object({})
+    .passthrough()
+    .optional()
+    .describe(
+      "AssessmentTemplateQuestions JSONB — contains sections with questions",
+    ),
+  contextType: zod.enum(["vendor", "framework"]).optional(),
+  version: zod.number().optional(),
+  isActive: zod.boolean().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * Updates a template. Pre-built templates ([PREBUILT] prefix) cannot be modified.
+ * @summary Update assessment template
+ */
+export const UpdateAssessmentTemplateParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateAssessmentTemplateBody = zod.object({
+  title: zod.string().optional(),
+  description: zod.string().optional(),
+  questions: zod.object({}).passthrough().optional(),
+});
+
+export const UpdateAssessmentTemplateResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  title: zod.string().optional(),
+  description: zod.string().nullish(),
+  isPrebuilt: zod.boolean().optional(),
+  questions: zod
+    .object({})
+    .passthrough()
+    .optional()
+    .describe(
+      "AssessmentTemplateQuestions JSONB — contains sections with questions",
+    ),
+  contextType: zod.enum(["vendor", "framework"]).optional(),
+  version: zod.number().optional(),
+  isActive: zod.boolean().optional(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+});
+
+/**
+ * Deletes a template. Pre-built templates cannot be deleted.
+ * @summary Delete assessment template
+ */
+export const DeleteAssessmentTemplateParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const DeleteAssessmentTemplateResponse = zod.object({
+  deleted: zod.boolean().optional(),
+  id: zod.string().optional(),
+});
+
+/**
+ * Creates an editable copy of any template (including pre-built ones).
+ * @summary Clone assessment template
+ */
+export const CloneAssessmentTemplateParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
+ * Returns all assessments for the tenant, optionally filtered by status or contextType.
+ * @summary List assessments
+ */
+export const ListAssessmentsQueryParams = zod.object({
+  status: zod.enum(["draft", "active", "completed", "abandoned"]).optional(),
+  contextType: zod.enum(["vendor", "framework"]).optional(),
+});
+
+export const ListAssessmentsResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid().optional(),
+        tenantId: zod.string().uuid().optional(),
+        templateId: zod.string().uuid().optional(),
+        templateTitle: zod.string().nullish(),
+        contextType: zod.enum(["vendor", "framework"]).optional(),
+        contextId: zod.string().uuid().nullish(),
+        status: zod
+          .enum(["draft", "active", "completed", "abandoned"])
+          .optional(),
+        score: zod.string().nullish(),
+        createdAt: zod.date().optional(),
+        updatedAt: zod.date().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * Creates a new assessment from a template, linked to a vendor or framework.
+ * @summary Create assessment
+ */
+export const CreateAssessmentBody = zod.object({
+  templateId: zod.string().uuid(),
+  contextType: zod.enum(["vendor", "framework"]),
+  contextId: zod.string().uuid(),
+});
+
+/**
+ * Returns assessment with full template data.
+ * @summary Get assessment by ID
+ */
+export const GetAssessmentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetAssessmentResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  templateId: zod.string().uuid().optional(),
+  contextType: zod.enum(["vendor", "framework"]).optional(),
+  contextId: zod.string().uuid().nullish(),
+  status: zod.enum(["draft", "active", "completed", "abandoned"]).optional(),
+  responses: zod
+    .object({})
+    .passthrough()
+    .optional()
+    .describe(
+      "AssessmentResponses JSONB — currentSectionIndex, responses map, aiFollowUps, completedSections",
+    ),
+  score: zod.string().nullish().describe("Numeric score 0-100"),
+  aiSummary: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+  template: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      tenantId: zod.string().uuid().optional(),
+      title: zod.string().optional(),
+      description: zod.string().nullish(),
+      isPrebuilt: zod.boolean().optional(),
+      questions: zod
+        .object({})
+        .passthrough()
+        .optional()
+        .describe(
+          "AssessmentTemplateQuestions JSONB — contains sections with questions",
+        ),
+      contextType: zod.enum(["vendor", "framework"]).optional(),
+      version: zod.number().optional(),
+      isActive: zod.boolean().optional(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+    })
+    .nullish(),
+});
+
+/**
+ * Saves current session responses JSONB. Rejected if assessment is completed or abandoned.
+ * @summary Save assessment session progress
+ */
+export const UpdateAssessmentResponsesParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateAssessmentResponsesBody = zod.object({
+  currentSectionIndex: zod.number().optional(),
+  responses: zod.record(zod.string(), zod.object({}).passthrough()).optional(),
+  aiFollowUps: zod.array(zod.object({}).passthrough()).optional(),
+  completedSections: zod.array(zod.string()).optional(),
+});
+
+export const UpdateAssessmentResponsesResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  templateId: zod.string().uuid().optional(),
+  contextType: zod.enum(["vendor", "framework"]).optional(),
+  contextId: zod.string().uuid().nullish(),
+  status: zod.enum(["draft", "active", "completed", "abandoned"]).optional(),
+  responses: zod
+    .object({})
+    .passthrough()
+    .optional()
+    .describe(
+      "AssessmentResponses JSONB — currentSectionIndex, responses map, aiFollowUps, completedSections",
+    ),
+  score: zod.string().nullish().describe("Numeric score 0-100"),
+  aiSummary: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+  template: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      tenantId: zod.string().uuid().optional(),
+      title: zod.string().optional(),
+      description: zod.string().nullish(),
+      isPrebuilt: zod.boolean().optional(),
+      questions: zod
+        .object({})
+        .passthrough()
+        .optional()
+        .describe(
+          "AssessmentTemplateQuestions JSONB — contains sections with questions",
+        ),
+      contextType: zod.enum(["vendor", "framework"]).optional(),
+      version: zod.number().optional(),
+      isActive: zod.boolean().optional(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+    })
+    .nullish(),
+});
+
+/**
+ * Computes score via weighted algorithm, sets status to completed, and enqueues AI summary job.
+ * @summary Submit and score assessment
+ */
+export const SubmitAssessmentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const SubmitAssessmentResponse = zod.object({
+  assessmentId: zod.string().uuid().optional(),
+  score: zod
+    .object({
+      overall: zod.number().optional(),
+      sections: zod.array(zod.object({}).passthrough()).optional(),
+    })
+    .optional(),
+  jobId: zod.string().uuid().optional(),
+  assessment: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      tenantId: zod.string().uuid().optional(),
+      templateId: zod.string().uuid().optional(),
+      contextType: zod.enum(["vendor", "framework"]).optional(),
+      contextId: zod.string().uuid().nullish(),
+      status: zod
+        .enum(["draft", "active", "completed", "abandoned"])
+        .optional(),
+      responses: zod
+        .object({})
+        .passthrough()
+        .optional()
+        .describe(
+          "AssessmentResponses JSONB — currentSectionIndex, responses map, aiFollowUps, completedSections",
+        ),
+      score: zod.string().nullish().describe("Numeric score 0-100"),
+      aiSummary: zod.string().nullish(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+      template: zod
+        .object({
+          id: zod.string().uuid().optional(),
+          tenantId: zod.string().uuid().optional(),
+          title: zod.string().optional(),
+          description: zod.string().nullish(),
+          isPrebuilt: zod.boolean().optional(),
+          questions: zod
+            .object({})
+            .passthrough()
+            .optional()
+            .describe(
+              "AssessmentTemplateQuestions JSONB — contains sections with questions",
+            ),
+          contextType: zod.enum(["vendor", "framework"]).optional(),
+          version: zod.number().optional(),
+          isActive: zod.boolean().optional(),
+          createdAt: zod.date().optional(),
+          updatedAt: zod.date().optional(),
+        })
+        .nullish(),
+    })
+    .optional(),
+});
+
+/**
+ * Streams an AI-generated follow-up question based on a specific answer. Returns text/event-stream.
+ * @summary Generate AI follow-up question (SSE)
+ */
+export const GetAssessmentFollowUpParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetAssessmentFollowUpBody = zod.object({
+  questionId: zod.string(),
+  questionText: zod.string().optional(),
+  answer: zod.unknown().optional().describe("The answer given to the question"),
+  sectionResponses: zod.object({}).passthrough().optional(),
+});
+
+/**
+ * Sets assessment status to abandoned. Cannot abandon a completed assessment.
+ * @summary Abandon assessment
+ */
+export const AbandonAssessmentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AbandonAssessmentResponse = zod.object({
+  id: zod.string().uuid().optional(),
+  tenantId: zod.string().uuid().optional(),
+  templateId: zod.string().uuid().optional(),
+  contextType: zod.enum(["vendor", "framework"]).optional(),
+  contextId: zod.string().uuid().nullish(),
+  status: zod.enum(["draft", "active", "completed", "abandoned"]).optional(),
+  responses: zod
+    .object({})
+    .passthrough()
+    .optional()
+    .describe(
+      "AssessmentResponses JSONB — currentSectionIndex, responses map, aiFollowUps, completedSections",
+    ),
+  score: zod.string().nullish().describe("Numeric score 0-100"),
+  aiSummary: zod.string().nullish(),
+  createdAt: zod.date().optional(),
+  updatedAt: zod.date().optional(),
+  template: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      tenantId: zod.string().uuid().optional(),
+      title: zod.string().optional(),
+      description: zod.string().nullish(),
+      isPrebuilt: zod.boolean().optional(),
+      questions: zod
+        .object({})
+        .passthrough()
+        .optional()
+        .describe(
+          "AssessmentTemplateQuestions JSONB — contains sections with questions",
+        ),
+      contextType: zod.enum(["vendor", "framework"]).optional(),
+      version: zod.number().optional(),
+      isActive: zod.boolean().optional(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+    })
+    .nullish(),
+});
+
+/**
+ * Returns completed assessment with full score breakdown computed via weighted algorithm.
+ * @summary Get assessment results
+ */
+export const GetAssessmentResultsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetAssessmentResultsResponse = zod.object({
+  assessment: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      tenantId: zod.string().uuid().optional(),
+      templateId: zod.string().uuid().optional(),
+      contextType: zod.enum(["vendor", "framework"]).optional(),
+      contextId: zod.string().uuid().nullish(),
+      status: zod
+        .enum(["draft", "active", "completed", "abandoned"])
+        .optional(),
+      responses: zod
+        .object({})
+        .passthrough()
+        .optional()
+        .describe(
+          "AssessmentResponses JSONB — currentSectionIndex, responses map, aiFollowUps, completedSections",
+        ),
+      score: zod.string().nullish().describe("Numeric score 0-100"),
+      aiSummary: zod.string().nullish(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+      template: zod
+        .object({
+          id: zod.string().uuid().optional(),
+          tenantId: zod.string().uuid().optional(),
+          title: zod.string().optional(),
+          description: zod.string().nullish(),
+          isPrebuilt: zod.boolean().optional(),
+          questions: zod
+            .object({})
+            .passthrough()
+            .optional()
+            .describe(
+              "AssessmentTemplateQuestions JSONB — contains sections with questions",
+            ),
+          contextType: zod.enum(["vendor", "framework"]).optional(),
+          version: zod.number().optional(),
+          isActive: zod.boolean().optional(),
+          createdAt: zod.date().optional(),
+          updatedAt: zod.date().optional(),
+        })
+        .nullish(),
+    })
+    .optional(),
+  score: zod
+    .object({
+      overall: zod.number().optional(),
+      sections: zod.array(zod.object({}).passthrough()).optional(),
+    })
+    .optional(),
+  template: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      tenantId: zod.string().uuid().optional(),
+      title: zod.string().optional(),
+      description: zod.string().nullish(),
+      isPrebuilt: zod.boolean().optional(),
+      questions: zod
+        .object({})
+        .passthrough()
+        .optional()
+        .describe(
+          "AssessmentTemplateQuestions JSONB — contains sections with questions",
+        ),
+      contextType: zod.enum(["vendor", "framework"]).optional(),
+      version: zod.number().optional(),
+      isActive: zod.boolean().optional(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+    })
+    .optional(),
 });

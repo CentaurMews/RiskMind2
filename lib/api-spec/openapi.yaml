@@ -1929,38 +1929,200 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /v1/foresight/simulations:
+  /v1/foresight/scenarios/top-ale:
     get:
-      operationId: listSimulations
+      operationId: getForesightScenariosTopAle
       tags: [foresight]
-      summary: List Monte Carlo simulations (not implemented)
+      summary: Get top 5 scenarios by expected annual loss
       security:
         - bearerAuth: []
       responses:
-        "501":
-          description: Not implemented
-    post:
-      operationId: createSimulation
-      tags: [foresight]
-      summary: Create Monte Carlo simulation (not implemented)
-      security:
-        - bearerAuth: []
-      responses:
-        "501":
-          description: Not implemented
+        "200":
+          description: Top ALE scenarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopAleItem"
 
-  /v1/foresight/simulations/{id}:
+  /v1/foresight/scenarios:
     get:
-      operationId: getSimulation
+      operationId: listForesightScenarios
       tags: [foresight]
-      summary: Get simulation by ID (not implemented)
+      summary: List foresight scenarios
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Scenario list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ForesightScenario"
+    post:
+      operationId: createForesightScenario
+      tags: [foresight]
+      summary: Create a new foresight scenario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateForesightScenarioRequest"
+      responses:
+        "201":
+          description: Scenario created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForesightScenario"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /v1/foresight/scenarios/{id}:
+    get:
+      operationId: getForesightScenario
+      tags: [foresight]
+      summary: Get foresight scenario by ID (includes simulations)
       security:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/id"
       responses:
-        "501":
-          description: Not implemented
+        "200":
+          description: Scenario with simulations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ForesightScenario"
+                  - type: object
+                    properties:
+                      simulations:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ForesightSimulation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateForesightScenario
+      tags: [foresight]
+      summary: Update a foresight scenario
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateForesightScenarioRequest"
+      responses:
+        "200":
+          description: Updated scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForesightScenario"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteForesightScenario
+      tags: [foresight]
+      summary: Delete a foresight scenario
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/foresight/scenarios/{id}/clone:
+    post:
+      operationId: cloneForesightScenario
+      tags: [foresight]
+      summary: Clone a foresight scenario
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "201":
+          description: Cloned scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForesightScenario"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/foresight/simulations:
+    post:
+      operationId: createForesightSimulation
+      tags: [foresight]
+      summary: Create and enqueue a Monte Carlo simulation (async, returns 202)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateForesightSimulationRequest"
+      responses:
+        "202":
+          description: Simulation accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForesightSimulation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/foresight/simulations/{id}:
+    get:
+      operationId: getForesightSimulation
+      tags: [foresight]
+      summary: Get simulation status and results
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Simulation with results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForesightSimulation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/foresight/calibrate:
+    post:
+      operationId: postForesightCalibrate
+      tags: [foresight]
+      summary: Calibrate FAIR parameters from tenant signal data (90-day window)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Calibration result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalibrationResult"
 
   /v1/foresight/risk-graph:
     get:
@@ -5837,3 +5999,224 @@ components:
                 type: object
         template:
           $ref: "#/components/schemas/AssessmentTemplate"
+
+    # ─── Foresight schemas ──────────────────────────────────────────────────
+
+    TriangularParam:
+      type: object
+      required: [min, mode, max]
+      properties:
+        min:
+          type: number
+        mode:
+          type: number
+        max:
+          type: number
+
+    FAIRParams:
+      type: object
+      required: [tef, vulnerability, lossMagnitude]
+      properties:
+        tef:
+          $ref: "#/components/schemas/TriangularParam"
+        vulnerability:
+          $ref: "#/components/schemas/TriangularParam"
+        lossMagnitude:
+          $ref: "#/components/schemas/TriangularParam"
+
+    HistogramBin:
+      type: object
+      required: [min, max, count]
+      properties:
+        min:
+          type: number
+        max:
+          type: number
+        count:
+          type: integer
+
+    SimulationResults:
+      type: object
+      required: [ale, percentiles, histogram, iterations, durationMs]
+      properties:
+        ale:
+          type: number
+          description: Annual Loss Expectancy in dollars
+        percentiles:
+          type: object
+          properties:
+            p5:
+              type: number
+            p10:
+              type: number
+            p25:
+              type: number
+            p50:
+              type: number
+            p75:
+              type: number
+            p90:
+              type: number
+            p95:
+              type: number
+            p99:
+              type: number
+        histogram:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistogramBin"
+        iterations:
+          type: integer
+        durationMs:
+          type: number
+
+    ForesightScenario:
+      type: object
+      required: [id, tenantId, name, parameters, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        riskId:
+          type: string
+          format: uuid
+          nullable: true
+        parameters:
+          type: object
+        calibratedFrom:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        latestSimulation:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ForesightSimulation"
+
+    ForesightSimulation:
+      type: object
+      required: [id, tenantId, scenarioId, status, iterationCount, inputParameters, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        scenarioId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        iterationCount:
+          type: integer
+        results:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/SimulationResults"
+        inputParameters:
+          type: object
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CalibrationResult:
+      type: object
+      required: [sampleSize, dataFreshness]
+      properties:
+        tef:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TriangularParam"
+        vulnerability:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TriangularParam"
+        lossMagnitude:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TriangularParam"
+        sampleSize:
+          type: integer
+        dataFreshness:
+          type: string
+        message:
+          type: string
+          nullable: true
+
+    TopAleItem:
+      type: object
+      required: [scenarioId, scenarioName, ale]
+      properties:
+        scenarioId:
+          type: string
+          format: uuid
+        scenarioName:
+          type: string
+        riskId:
+          type: string
+          format: uuid
+          nullable: true
+        ale:
+          type: number
+
+    CreateForesightScenarioRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        riskId:
+          type: string
+          format: uuid
+        parameters:
+          type: object
+
+    UpdateForesightScenarioRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        riskId:
+          type: string
+          format: uuid
+          nullable: true
+        parameters:
+          type: object
+
+    CreateForesightSimulationRequest:
+      type: object
+      required: [scenarioId]
+      properties:
+        scenarioId:
+          type: string
+          format: uuid
+        iterationCount:
+          type: integer
+          minimum: 1
+          maximum: 500000
+          default: 10000

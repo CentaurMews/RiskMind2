@@ -1347,6 +1347,326 @@ export interface AgentConfig {
 }
 
 /**
+ * AssessmentTemplateQuestions JSONB — contains sections with questions
+ */
+export type AssessmentTemplateQuestions = { [key: string]: unknown };
+
+export type AssessmentTemplateContextType =
+  (typeof AssessmentTemplateContextType)[keyof typeof AssessmentTemplateContextType];
+
+export const AssessmentTemplateContextType = {
+  vendor: "vendor",
+  framework: "framework",
+} as const;
+
+export interface AssessmentTemplate {
+  id?: string;
+  tenantId?: string;
+  title?: string;
+  description?: string | null;
+  isPrebuilt?: boolean;
+  /** AssessmentTemplateQuestions JSONB — contains sections with questions */
+  questions?: AssessmentTemplateQuestions;
+  contextType?: AssessmentTemplateContextType;
+  version?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type CreateAssessmentTemplateRequestQuestionsSectionsItem = {
+  [key: string]: unknown;
+};
+
+/**
+ * AssessmentTemplateQuestions — must have sections array
+ */
+export type CreateAssessmentTemplateRequestQuestions = {
+  sections: CreateAssessmentTemplateRequestQuestionsSectionsItem[];
+  version?: number;
+};
+
+export type CreateAssessmentTemplateRequestContextType =
+  (typeof CreateAssessmentTemplateRequestContextType)[keyof typeof CreateAssessmentTemplateRequestContextType];
+
+export const CreateAssessmentTemplateRequestContextType = {
+  vendor: "vendor",
+  framework: "framework",
+} as const;
+
+export interface CreateAssessmentTemplateRequest {
+  title: string;
+  description?: string;
+  /** AssessmentTemplateQuestions — must have sections array */
+  questions: CreateAssessmentTemplateRequestQuestions;
+  contextType: CreateAssessmentTemplateRequestContextType;
+}
+
+export type UpdateAssessmentTemplateRequestQuestions = {
+  [key: string]: unknown;
+};
+
+export interface UpdateAssessmentTemplateRequest {
+  title?: string;
+  description?: string;
+  questions?: UpdateAssessmentTemplateRequestQuestions;
+}
+
+export type AssessmentContextType =
+  (typeof AssessmentContextType)[keyof typeof AssessmentContextType];
+
+export const AssessmentContextType = {
+  vendor: "vendor",
+  framework: "framework",
+} as const;
+
+export type AssessmentStatus =
+  (typeof AssessmentStatus)[keyof typeof AssessmentStatus];
+
+export const AssessmentStatus = {
+  draft: "draft",
+  active: "active",
+  completed: "completed",
+  abandoned: "abandoned",
+} as const;
+
+/**
+ * AssessmentResponses JSONB — currentSectionIndex, responses map, aiFollowUps, completedSections
+ */
+export type AssessmentResponses = { [key: string]: unknown };
+
+export interface Assessment {
+  id?: string;
+  tenantId?: string;
+  templateId?: string;
+  contextType?: AssessmentContextType;
+  contextId?: string | null;
+  status?: AssessmentStatus;
+  /** AssessmentResponses JSONB — currentSectionIndex, responses map, aiFollowUps, completedSections */
+  responses?: AssessmentResponses;
+  /** Numeric score 0-100 */
+  score?: string | null;
+  aiSummary?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  template?: AssessmentTemplate | null;
+}
+
+export type AssessmentSummaryContextType =
+  (typeof AssessmentSummaryContextType)[keyof typeof AssessmentSummaryContextType];
+
+export const AssessmentSummaryContextType = {
+  vendor: "vendor",
+  framework: "framework",
+} as const;
+
+export type AssessmentSummaryStatus =
+  (typeof AssessmentSummaryStatus)[keyof typeof AssessmentSummaryStatus];
+
+export const AssessmentSummaryStatus = {
+  draft: "draft",
+  active: "active",
+  completed: "completed",
+  abandoned: "abandoned",
+} as const;
+
+export interface AssessmentSummary {
+  id?: string;
+  tenantId?: string;
+  templateId?: string;
+  templateTitle?: string | null;
+  contextType?: AssessmentSummaryContextType;
+  contextId?: string | null;
+  status?: AssessmentSummaryStatus;
+  score?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type CreateAssessmentRequestContextType =
+  (typeof CreateAssessmentRequestContextType)[keyof typeof CreateAssessmentRequestContextType];
+
+export const CreateAssessmentRequestContextType = {
+  vendor: "vendor",
+  framework: "framework",
+} as const;
+
+export interface CreateAssessmentRequest {
+  templateId: string;
+  contextType: CreateAssessmentRequestContextType;
+  contextId: string;
+}
+
+export type AssessmentResponsesUpdateResponses = {
+  [key: string]: { [key: string]: unknown };
+};
+
+export type AssessmentResponsesUpdateAiFollowUpsItem = {
+  [key: string]: unknown;
+};
+
+export interface AssessmentResponsesUpdate {
+  currentSectionIndex?: number;
+  responses?: AssessmentResponsesUpdateResponses;
+  aiFollowUps?: AssessmentResponsesUpdateAiFollowUpsItem[];
+  completedSections?: string[];
+}
+
+export type AssessmentSubmitResultScoreSectionsItem = {
+  [key: string]: unknown;
+};
+
+export type AssessmentSubmitResultScore = {
+  overall?: number;
+  sections?: AssessmentSubmitResultScoreSectionsItem[];
+};
+
+export interface AssessmentSubmitResult {
+  assessmentId?: string;
+  score?: AssessmentSubmitResultScore;
+  jobId?: string;
+  assessment?: Assessment;
+}
+
+export type AssessmentResultsScoreSectionsItem = { [key: string]: unknown };
+
+export type AssessmentResultsScore = {
+  overall?: number;
+  sections?: AssessmentResultsScoreSectionsItem[];
+};
+
+export interface AssessmentResults {
+  assessment?: Assessment;
+  score?: AssessmentResultsScore;
+  template?: AssessmentTemplate;
+}
+
+export interface TriangularParam {
+  min: number;
+  mode: number;
+  max: number;
+}
+
+export interface FAIRParams {
+  tef: TriangularParam;
+  vulnerability: TriangularParam;
+  lossMagnitude: TriangularParam;
+}
+
+export interface HistogramBin {
+  min: number;
+  max: number;
+  count: number;
+}
+
+export type SimulationResultsPercentiles = {
+  p5?: number;
+  p10?: number;
+  p25?: number;
+  p50?: number;
+  p75?: number;
+  p90?: number;
+  p95?: number;
+  p99?: number;
+};
+
+export interface SimulationResults {
+  /** Annual Loss Expectancy in dollars */
+  ale: number;
+  percentiles: SimulationResultsPercentiles;
+  histogram: HistogramBin[];
+  iterations: number;
+  durationMs: number;
+}
+
+export type ForesightScenarioParameters = { [key: string]: unknown };
+
+export type ForesightSimulationStatus =
+  (typeof ForesightSimulationStatus)[keyof typeof ForesightSimulationStatus];
+
+export const ForesightSimulationStatus = {
+  pending: "pending",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export type ForesightSimulationInputParameters = { [key: string]: unknown };
+
+export interface ForesightSimulation {
+  id: string;
+  tenantId: string;
+  scenarioId: string;
+  status: ForesightSimulationStatus;
+  iterationCount: number;
+  results?: SimulationResults | null;
+  inputParameters: ForesightSimulationInputParameters;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ForesightScenario {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string | null;
+  riskId?: string | null;
+  parameters: ForesightScenarioParameters;
+  calibratedFrom?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  latestSimulation?: ForesightSimulation | null;
+}
+
+export interface CalibrationResult {
+  tef?: TriangularParam | null;
+  vulnerability?: TriangularParam | null;
+  lossMagnitude?: TriangularParam | null;
+  sampleSize: number;
+  dataFreshness: string;
+  message?: string | null;
+}
+
+export interface TopAleItem {
+  scenarioId: string;
+  scenarioName: string;
+  riskId?: string | null;
+  ale: number;
+}
+
+export type CreateForesightScenarioRequestParameters = {
+  [key: string]: unknown;
+};
+
+export interface CreateForesightScenarioRequest {
+  name: string;
+  description?: string;
+  riskId?: string;
+  parameters?: CreateForesightScenarioRequestParameters;
+}
+
+export type UpdateForesightScenarioRequestParameters = {
+  [key: string]: unknown;
+};
+
+export interface UpdateForesightScenarioRequest {
+  name?: string;
+  description?: string;
+  riskId?: string | null;
+  parameters?: UpdateForesightScenarioRequestParameters;
+}
+
+export interface CreateForesightSimulationRequest {
+  scenarioId: string;
+  /**
+   * @minimum 1
+   * @maximum 500000
+   */
+  iterationCount?: number;
+}
+
+/**
  * Resource not found
  */
 export type NotFoundResponse = RFC7807Error;
@@ -1530,6 +1850,10 @@ export const ListAlertsStatus = {
   resolved: "resolved",
   escalated: "escalated",
 } as const;
+
+export type GetForesightScenario200 = ForesightScenario & {
+  simulations?: ForesightSimulation[];
+};
 
 export type TestLlmProvider200 = {
   success?: boolean;
@@ -1792,4 +2116,64 @@ export type McpStreamableHttpBody = {
   id?: string | number;
   method: McpStreamableHttpBodyMethod;
   params?: McpStreamableHttpBodyParams;
+};
+
+export type ListAssessmentTemplatesParams = {
+  contextType?: ListAssessmentTemplatesContextType;
+};
+
+export type ListAssessmentTemplatesContextType =
+  (typeof ListAssessmentTemplatesContextType)[keyof typeof ListAssessmentTemplatesContextType];
+
+export const ListAssessmentTemplatesContextType = {
+  vendor: "vendor",
+  framework: "framework",
+} as const;
+
+export type ListAssessmentTemplates200 = {
+  data?: AssessmentTemplate[];
+};
+
+export type DeleteAssessmentTemplate200 = {
+  deleted?: boolean;
+  id?: string;
+};
+
+export type ListAssessmentsParams = {
+  status?: ListAssessmentsStatus;
+  contextType?: ListAssessmentsContextType;
+};
+
+export type ListAssessmentsStatus =
+  (typeof ListAssessmentsStatus)[keyof typeof ListAssessmentsStatus];
+
+export const ListAssessmentsStatus = {
+  draft: "draft",
+  active: "active",
+  completed: "completed",
+  abandoned: "abandoned",
+} as const;
+
+export type ListAssessmentsContextType =
+  (typeof ListAssessmentsContextType)[keyof typeof ListAssessmentsContextType];
+
+export const ListAssessmentsContextType = {
+  vendor: "vendor",
+  framework: "framework",
+} as const;
+
+export type ListAssessments200 = {
+  data?: AssessmentSummary[];
+};
+
+export type GetAssessmentFollowUpBodySectionResponses = {
+  [key: string]: unknown;
+};
+
+export type GetAssessmentFollowUpBody = {
+  questionId: string;
+  questionText?: string;
+  /** The answer given to the question */
+  answer?: unknown;
+  sectionResponses?: GetAssessmentFollowUpBodySectionResponses;
 };
