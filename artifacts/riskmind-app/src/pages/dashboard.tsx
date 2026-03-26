@@ -16,6 +16,7 @@ import { HeatmapGrid } from "@/components/dashboard/heatmap-grid";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { KriWidget } from "@/components/dashboard/kri-widget";
 import { ExecutiveSummary } from "@/components/dashboard/executive-summary";
+import { AleWidget } from "@/components/dashboard/ale-widget";
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -150,8 +151,13 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* KRI Widget */}
-        <KriWidget />
+        {/* KRI Widget + ALE Widget */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <KriWidget />
+          </div>
+          <AleWidget />
+        </div>
 
         {/* Recent Alerts Table */}
         <Card>
