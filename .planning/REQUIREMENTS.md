@@ -44,7 +44,7 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 ### Foresight
 
 - [x] **FRST-01**: User can run Monte Carlo simulations with FAIR-labeled inputs (TEF, TC, CS, DIFF) for 10k-100k iterations, producing ALE and percentile breakdown
-- [ ] **FRST-02**: User can view loss exceedance curve visualization with configurable confidence interval markers (50th, 90th, 99th percentile)
+- [x] **FRST-02**: User can view loss exceedance curve visualization with configurable confidence interval markers (50th, 90th, 99th percentile)
 - [x] **FRST-03**: User can create, save, clone, and compare named risk scenarios with parameter sets linked to risk register entries
 - [x] **FRST-04**: System suggests simulation parameters from real OSINT data (CVE/NVD frequency, MISP threat data, Shodan exposure) with "calibrated from real data" indicator
 - [x] **FRST-05**: Dashboard shows top-N risks by expected annual loss (ALE) widget integrated with existing KPI section
@@ -102,7 +102,7 @@ Requirements for Core Platform Features milestone. Each maps to roadmap phases.
 | SGNL-04 | Phase 12 | Complete |
 | SGNL-05 | Phase 12 | Complete |
 | FRST-01 | Phase 14 | Complete |
-| FRST-02 | Phase 14 | Pending |
+| FRST-02 | Phase 14 | Complete |
 | FRST-03 | Phase 14 | Complete |
 | FRST-04 | Phase 14 | Complete |
 | FRST-05 | Phase 14 | Complete |

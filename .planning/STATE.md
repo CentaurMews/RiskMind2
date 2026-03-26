@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Core Platform Features
 status: Ready to execute
-stopped_at: Completed 14-foresight-v2 14-01-PLAN.md
-last_updated: "2026-03-26T05:49:09.067Z"
+stopped_at: Completed 14-foresight-v2 14-02-PLAN.md
+last_updated: "2026-03-26T05:59:29.183Z"
 progress:
   total_phases: 11
   completed_phases: 10
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 14 (foresight-v2) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Plan: 2 of 4
 | Phase 13-compliance-flow P04 | 393 | 2 tasks | 5 files |
 | Phase 13-compliance-flow P03 | 7 | 2 tasks | 4 files |
 | Phase 14-foresight-v2 P01 | 317 | 2 tasks | 65 files |
+| Phase 14-foresight-v2 P02 | 50 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -184,6 +185,9 @@ Recent decisions affecting current work:
 - [Phase 14-foresight-v2]: sampleTriangular inverse CDF with min===max guard — prevents NaN in degenerate distribution
 - [Phase 14-foresight-v2]: monte-carlo worker registered in ai-workers.ts for co-location with ai-triage/ai-enrich workers
 - [Phase 14-foresight-v2]: top-ale route defined before /:id route to prevent Express path conflict
+- [Phase 14-foresight-v2]: refetchInterval as function checking latestSimulation.status — no external state for detecting active simulations
+- [Phase 14-foresight-v2]: buildExceedanceCurve two points per bin for accurate step-wise curve shape matching histogram piecewise-constant density
+- [Phase 14-foresight-v2]: TriangularInput clamps adjacent sliders on change to enforce min<=mode<=max invariant without form-level validation
 
 ### Roadmap Evolution
 
@@ -209,7 +213,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T05:49:09.051Z
-Stopped at: Completed 14-foresight-v2 14-01-PLAN.md
+Last session: 2026-03-26T05:59:29.165Z
+Stopped at: Completed 14-foresight-v2 14-02-PLAN.md
 Resume file: None
 Next step: `/gsd:discuss-phase 13` (Compliance Flow) or `/gsd:discuss-phase 14` (Foresight v2)
