@@ -236,7 +236,7 @@ export function ScenarioForm({
 
   const [name, setName] = useState(scenario?.name ?? "");
   const [description, setDescription] = useState(scenario?.description ?? "");
-  const [riskId, setRiskId] = useState(scenario?.riskId ?? "");
+  const [riskId, setRiskId] = useState(scenario?.riskId ?? "__none__");
   const [iterationCount, setIterationCount] = useState("50000");
   const [fair, setFair] = useState<FAIRState>(parseParamsFromScenario(scenario));
 
@@ -356,7 +356,7 @@ export function ScenarioForm({
         data: {
           name: name.trim(),
           description: description.trim() || undefined,
-          riskId: riskId || null,
+          riskId: riskId === "__none__" ? null : riskId,
           parameters,
         },
       });
@@ -365,7 +365,7 @@ export function ScenarioForm({
         data: {
           name: name.trim(),
           description: description.trim() || undefined,
-          riskId: riskId || undefined,
+          riskId: riskId === "__none__" ? undefined : riskId,
           parameters,
         },
       });
@@ -434,7 +434,7 @@ export function ScenarioForm({
                 <SelectValue placeholder="Select a risk..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {risks.map((r) => (
                   <SelectItem key={r.id ?? ""} value={r.id ?? ""}>
                     {r.title}
