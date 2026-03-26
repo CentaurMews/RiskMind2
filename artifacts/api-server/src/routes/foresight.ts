@@ -84,6 +84,10 @@ router.get("/v1/foresight/scenarios", async (req, res) => {
       scenarioId: string;
       id: string;
       status: string;
+      iterationCount: number;
+      results: unknown;
+      inputParameters: unknown;
+      completedAt: Date | null;
       createdAt: Date;
     }> = [];
 
@@ -94,6 +98,10 @@ router.get("/v1/foresight/scenarios", async (req, res) => {
           id: foresightSimulationsTable.id,
           scenarioId: foresightSimulationsTable.scenarioId,
           status: foresightSimulationsTable.status,
+          iterationCount: foresightSimulationsTable.iterationCount,
+          results: foresightSimulationsTable.results,
+          inputParameters: foresightSimulationsTable.inputParameters,
+          completedAt: foresightSimulationsTable.completedAt,
           createdAt: foresightSimulationsTable.createdAt,
         })
         .from(foresightSimulationsTable)
