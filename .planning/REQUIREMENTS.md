@@ -227,51 +227,51 @@ Requirements for Enterprise Parity & Agent-Ready Foundation milestone. Each maps
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
-| INFRA-04 | — | Pending |
-| INFRA-05 | — | Pending |
-| INFRA-06 | — | Pending |
-| POL-01 | — | Pending |
-| POL-02 | — | Pending |
-| POL-03 | — | Pending |
-| POL-04 | — | Pending |
-| POL-05 | — | Pending |
-| POL-06 | — | Pending |
-| POL-07 | — | Pending |
-| EVID-01 | — | Pending |
-| EVID-02 | — | Pending |
-| EVID-03 | — | Pending |
-| EVID-04 | — | Pending |
-| AUDIT-01 | — | Pending |
-| AUDIT-02 | — | Pending |
-| AUDIT-03 | — | Pending |
-| AUDIT-04 | — | Pending |
-| AUDIT-05 | — | Pending |
-| XMAP-01 | — | Pending |
-| XMAP-02 | — | Pending |
-| XMAP-03 | — | Pending |
-| XMAP-04 | — | Pending |
-| NOTIF-01 | — | Pending |
-| NOTIF-02 | — | Pending |
-| NOTIF-03 | — | Pending |
-| NOTIF-04 | — | Pending |
-| REPORT-01 | — | Pending |
-| REPORT-02 | — | Pending |
-| REPORT-03 | — | Pending |
-| REPORT-04 | — | Pending |
-| AIGOV-01 | — | Pending |
-| AIGOV-02 | — | Pending |
-| AIGOV-03 | — | Pending |
-| AIGOV-04 | — | Pending |
-| AIGOV-05 | — | Pending |
+| INFRA-01 | Phase 20 | Pending |
+| INFRA-02 | Phase 20 | Pending |
+| INFRA-03 | Phase 20 | Pending |
+| INFRA-04 | Phase 20 | Pending |
+| INFRA-05 | Phase 20 | Pending |
+| INFRA-06 | Phase 20 | Pending |
+| POL-01 | Phase 21 | Pending |
+| POL-02 | Phase 21 | Pending |
+| POL-03 | Phase 21 | Pending |
+| POL-04 | Phase 21 | Pending |
+| POL-05 | Phase 21 | Pending |
+| POL-06 | Phase 21 | Pending |
+| POL-07 | Phase 21 | Pending |
+| EVID-01 | Phase 22 | Pending |
+| EVID-02 | Phase 22 | Pending |
+| EVID-03 | Phase 22 | Pending |
+| EVID-04 | Phase 22 | Pending |
+| AUDIT-01 | Phase 23 | Pending |
+| AUDIT-02 | Phase 23 | Pending |
+| AUDIT-03 | Phase 23 | Pending |
+| AUDIT-04 | Phase 23 | Pending |
+| AUDIT-05 | Phase 23 | Pending |
+| XMAP-01 | Phase 24 | Pending |
+| XMAP-02 | Phase 24 | Pending |
+| XMAP-03 | Phase 24 | Pending |
+| XMAP-04 | Phase 24 | Pending |
+| NOTIF-01 | Phase 25 | Pending |
+| NOTIF-02 | Phase 25 | Pending |
+| NOTIF-03 | Phase 25 | Pending |
+| NOTIF-04 | Phase 25 | Pending |
+| REPORT-01 | Phase 26 | Pending |
+| REPORT-02 | Phase 26 | Pending |
+| REPORT-03 | Phase 26 | Pending |
+| REPORT-04 | Phase 26 | Pending |
+| AIGOV-01 | Phase 27 | Pending |
+| AIGOV-02 | Phase 27 | Pending |
+| AIGOV-03 | Phase 27 | Pending |
+| AIGOV-04 | Phase 27 | Pending |
+| AIGOV-05 | Phase 27 | Pending |
 
 **Coverage:**
 - v2.1 requirements: 39 total
-- Mapped to phases: 0
-- Unmapped: 39 ⚠️ (awaiting roadmap)
+- Mapped to phases: 39
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 — initial v2.1 requirements defined*
+*Last updated: 2026-03-26 — v2.1 traceability updated with phase assignments (Phases 20-27)*
