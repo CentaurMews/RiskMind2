@@ -1,247 +1,208 @@
 # Stack Research
 
-**Domain:** RiskMind v2.0 — Assessment Engine, Vendor Lifecycle Redesign, Compliance Flow, Signal Integrations (Sentinel/Shodan/CVE/MISP/Email), Foresight v2 (Monte Carlo + OSINT)
-**Researched:** 2026-03-23
-**Confidence:** HIGH for most areas (verified against official docs and npm registry); MEDIUM for Sentinel SDK (perpetual beta); LOW for MISP Node.js (no maintained package exists)
+**Domain:** RiskMind v2.1 — Policy Management, Evidence Collection, Audit Hub, Executive PDF Reporting, AI Governance (ISO 42001 / NIST AI RMF / EU AI Act), Multi-Entity Schema, Webhook/Event System, Approval Workflows, Task/Work Items, Notifications with Email Delivery
+**Researched:** 2026-03-26
+**Confidence:** HIGH for all core additions (verified against npm registry and official docs); MEDIUM for @react-pdf/renderer ESM edge cases (open issues, workaround known)
 
 ---
 
-> **Scope note:** This document covers ONLY new dependencies and integration patterns required for v2.0. The existing validated stack (Express 5, React 19 + Vite 7, Drizzle ORM, Zod v4, shadcn/ui, Tailwind v4, pgvector, openai ^6.29, @anthropic-ai/sdk ^0.78, recharts ^2.x, react-hook-form, node-cron equivalent via in-process polling) is already installed and not re-documented here.
+> **Scope note:** This document covers ONLY new dependencies required for v2.1. The existing validated stack is already installed: Express 5, React 19 + Vite 7, Drizzle ORM, Zod 3.25.76 (catalog), drizzle-zod ^0.8.3, shadcn/ui, Tailwind v4, pgvector, openai ^6.29, @anthropic-ai/sdk ^0.78, multer ^2.1.1, node-cron ^4.2.1, papaparse, imapflow/mailparser (email ingestion), PostgreSQL-backed job queue (custom, no Redis). Do not re-add or replace these.
 
 ---
 
-## New Dependencies Required
+## Recommended Stack
 
-### Signal Integrations
+### Core Technologies (New for v2.1)
 
-| Package | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `imapflow` | ^1.2.9 | IMAP email ingestion — connect to inbox, idle for new messages, fetch/parse raw emails | Actively maintained (last published 6 days ago), TypeScript-native, supports IDLE push for zero-poll email monitoring. node-imap is unmaintained. |
-| `mailparser` | ^3.9.4 | Parse raw MIME email into structured object (subject, from, body, attachments) | Maintained by Nodemailer team, 3.9.3+ patches XSS in `textToHtml()`. Handles 100MB+ messages as stream. 782 dependents. |
-| `@azure/arm-securityinsight` | ^1.0.0-beta.6 | Microsoft Sentinel management plane — read incidents, alerts, security events | Official Azure SDK. Still beta but stable since 2022; no GA release planned. Pair with `@azure/identity` for auth. |
-| `@azure/identity` | ^4.13.0 | Azure credential management — `ClientSecretCredential` for service principal auth to Sentinel | Required by all Azure SDKs. `DefaultAzureCredential` is overkill for server-to-server; use `ClientSecretCredential` directly. |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| nodemailer | ^8.0.4 | Outbound email (notifications, escalations, evidence expiry) | Zero runtime deps, industry standard, SMTP + OAuth2, ships its own TypeScript types in v8. Already used pattern-side (imapflow reads, nodemailer sends). |
+| @react-email/components | ^1.0.10 | Typed React components for email templates | Cross-client compatible (Gmail, Outlook). Reuses React knowledge already in the codebase. Works server-side via @react-email/render. Backed by Resend team, actively maintained. |
+| @react-email/render | ^1.0.10 | Render React email components to HTML string on the API server | `renderAsync()` produces HTML string passed directly to nodemailer `html:` field. No extra template engine needed. |
+| @react-pdf/renderer | ^4.3.2 | Server-side PDF generation for executive reports | Already installed in frontend. Move renderToBuffer() call to API server for generating compliance PDFs, board summaries, evidence packs. Avoids puppeteer (no headless Chrome, no 200MB binary). |
 
-**Shodan:** Do NOT add a package. `shodan-client` npm is 6 years unmaintained (v3.2.0, 2019). Use Node.js built-in `fetch` directly against `https://api.shodan.io/` — the REST API is simple enough (3-4 endpoints used: `/shodan/host/{ip}`, `/shodan/host/search`, `/dns/resolve`).
+### Supporting Libraries (New for v2.1)
 
-**NVD/CVE:** Do NOT add a package. No maintained Node.js wrapper exists for NVD API v2. Use built-in `fetch` with a rate limiter (see below). NVD API v2 base URL: `https://services.nvd.nist.gov/rest/json/cves/2.0`. Rate limit: 50 req/30 sec with API key.
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| @types/nodemailer | ^7.0.11 | TypeScript types for nodemailer | Install as devDependency in api-server. Nodemailer v8 ships types, but @types/nodemailer 7.x provides supplemental DefinitelyTyped coverage for edge cases. |
+| crypto (Node built-in) | built-in | HMAC-SHA256 signing for outbound webhook payloads | No installation needed. `createHmac('sha256', secret)` signs webhook body. Standard pattern used by GitHub, Stripe. Use `timingSafeEqual` for verification. |
 
-**MISP:** Do NOT add a package. No maintained Node.js MISP client exists on npm. MISP exposes a documented REST API (`/events`, `/attributes/restSearch`) with Bearer token auth. Use built-in `fetch`. MISP has an OpenAPI spec available for reference.
+### What is NOT Needed (Do Not Add)
 
-### Rate Limiting (for External API Calls)
-
-| Package | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `p-ratelimit` | ^1.2.0 | Throttle outbound HTTP calls to rate-limited APIs (NVD: 50/30s, Shodan: varies by plan, MISP: configurable) | TypeScript-native, wraps any async function, configurable interval + concurrency. Avoid `bottleneck` — last updated 2019, maintenance inactive. |
-
-### Scheduled Polling (Signal Feeds)
-
-**node-cron is already available** — confirm before adding. The existing `ai-enrichment` service uses in-process scheduling. If `node-cron` is not already installed: add `node-cron@^4.2.1` with `@types/node-cron`. This handles cron-style polling for Shodan, CVE/NVD, MISP, and Sentinel feeds.
-
-**Do NOT add BullMQ or Redis** — the existing pattern of in-process scheduled jobs (proven by the enrichment queue) is sufficient. BullMQ requires Redis, adding a new infrastructure dependency that the deployment does not have. Signal polling jobs are low-frequency (hourly to daily) and do not require distributed queue semantics.
-
-### Foresight v2 — Monte Carlo
-
-| Package | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `simple-statistics` | ^7.8.8 | Statistical distributions (normal, lognormal, PERT, triangular), random sampling, percentile calculations | Zero dependencies, includes TypeScript types, runs in Node and browser. Version 7.8.8 is current. Purpose-built for exactly these distribution functions. |
-
-**No other Monte Carlo library needed.** Monte Carlo simulation for risk is straightforward: sample N times from `simple-statistics` distributions, compute loss distribution, extract P50/P90/P99 percentiles. This is custom business logic, not a pre-packaged simulation framework.
-
-### Frontend Additions
-
-| Package | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `recharts` | ^3.8.0 | Upgrade from 2.x (already installed at ^2.15.4) — histogram / density charts for Monte Carlo loss distribution | v3 brings improved TypeScript types and composable API. Already used; upgrade is low-risk. Check 3.0 migration guide for breaking changes in axis/tooltip props. |
-
-**Assessment Engine (wizard stepper):** No new packages needed. React Hook Form (already installed) + Zod v4 + shadcn/ui Dialog/Stepper primitives handle multi-step questionnaire flows. The AI branching logic is server-side (LLM decides next question), so the frontend is a simple step renderer, not a declarative form engine like SurveyJS.
+| Avoid | Why | What to Use Instead |
+|-------|-----|---------------------|
+| BullMQ / Redis | BullMQ requires Redis, adding an entire infrastructure dependency. The existing PostgreSQL-backed job queue (`job-queue.ts`) already handles retry, exponential backoff, dead-letter, FOR UPDATE SKIP LOCKED — production-quality. | Extend existing `enqueueJob()` / `registerWorker()` pattern with new queue names: `notification`, `webhook-delivery`, `evidence-expiry-check`. |
+| xstate / state machine library | The approval workflow is a simple 4-state machine (pending → approved / rejected / escalated). The codebase already uses the database-as-state-machine pattern (vendor lifecycle in `allowed-transitions.ts`). Adding XState for 4 states is over-engineering. | Store `status` as a Drizzle enum column. Write a pure `canTransition(from, to)` function (same pattern as `getAllowedTransitions`). |
+| puppeteer / playwright | Spawns a 200MB headless Chromium process. Overkill for structured compliance PDFs. Deployment adds binary management complexity. | @react-pdf/renderer (already installed in frontend, move server-side use to api-server). |
+| MJML / Handlebars for email | Two separate template compilation steps for a problem already solved by @react-email. The team knows React; maintaining MJML markup in parallel is unnecessary complexity. | @react-email/components + @react-email/render on the server. |
+| EventEmitter2 / mitt for event bus | The webhook/event system needs persistence (audit trail, retry), not just in-memory pub/sub. An in-memory emitter loses events on restart and has no delivery guarantee. | Write events to a `domain_events` table via `enqueueJob('webhook-delivery', ...)`. Workers read and dispatch. This integrates with the existing job queue. |
+| Temporal / Dapr / workflow engines | Enterprise orchestration platforms. The approval workflow is not a distributed saga — it's a single `approval_requests` row with a status column. These add enormous operational overhead. | Plain Drizzle schema with status transitions enforced in service layer. |
+| @react-pdf/renderer on frontend | PDF generation is a server concern (auth, data access, file streaming). Keeping it frontend-only means the user's browser generates the PDF — impossible for scheduled/automated report delivery. | Import `@react-pdf/renderer` in api-server; stream result as `application/pdf` response. |
 
 ---
 
-## Recommended Stack — Full Picture
+## Architecture Decisions by Feature
 
-### New Backend Packages
+### Email Notifications and Escalations
 
-| Package | Version | Install In | Notes |
-|---------|---------|-----------|-------|
-| `imapflow` | ^1.2.9 | `artifacts/api-server` | IMAP ingestion. Has built-in TypeScript types. |
-| `mailparser` | ^3.9.4 | `artifacts/api-server` | MIME parsing. Patch CVE-2026-3455 — use >=3.9.3. |
-| `@azure/arm-securityinsight` | ^1.0.0-beta.6 | `artifacts/api-server` | Sentinel SDK. Beta but stable since 2022. |
-| `@azure/identity` | ^4.13.0 | `artifacts/api-server` | Azure auth. Already used by Azure SDKs ecosystem. |
-| `p-ratelimit` | ^1.2.0 | `artifacts/api-server` | Rate limit NVD/Shodan/MISP outbound calls. |
-| `simple-statistics` | ^7.8.8 | `artifacts/api-server` | Monte Carlo sampling + distribution math. |
-| `node-cron` | ^4.2.1 | `artifacts/api-server` | Cron scheduling for signal feed polling (if not already present). |
+**Stack:** `nodemailer ^8.0.4` + `@react-email/render ^1.0.10` + `@react-email/components ^1.0.10` + existing job queue.
 
-### New Frontend Packages
+**Pattern:**
+1. API route or job handler calls `enqueueJob('notification', 'email', { to, templateName, data })`.
+2. Notification worker renders template via `renderAsync(<SLABreachEmail {...data} />)` and calls `transporter.sendMail({ html })`.
+3. SMTP config stored per-tenant in `notification_configs` table (similar to `llm_configs`, AES-256-GCM encrypted credentials).
+4. Escalation chains stored as JSON array of user IDs in `escalation_policies` table. Job re-enqueues with next escalation target after SLA window.
 
-| Package | Version | Install In | Notes |
-|---------|---------|-----------|-------|
-| `recharts` | ^3.8.0 | `artifacts/riskmind-app` | Upgrade from 2.x. Required for histogram/density charts in Foresight v2. |
+**Why not send inline:** Email delivery must be async. Network failures and SMTP rate limits should not block API responses.
+
+### Executive PDF Reporting
+
+**Stack:** `@react-pdf/renderer ^4.3.2` (api-server side) — already in pnpm workspace, no new install needed.
+
+**Pattern:**
+1. POST `/reports/generate` enqueues a job.
+2. Worker calls `renderToBuffer(<ComplianceReportPDF data={...} />)` and stores result in `uploads/reports/` (same disk pattern as evidence uploads).
+3. GET `/reports/:id/download` serves the file with `Content-Type: application/pdf`.
+
+**ESM caveat:** `@react-pdf/renderer` has known ESM issues when bundled with esbuild in browser mode. The api-server uses `tsx` at dev time and esbuild for production build. Import it in a file that is NOT part of the browser bundle. The api-server is server-only so this is safe. If esbuild throws on the import, add `external: ['@react-pdf/renderer']` to `build.ts`.
+
+### Webhook / Event System
+
+**Stack:** No new library. Database-backed event bus using existing job queue.
+
+**Schema additions:**
+- `webhook_endpoints` table: `id, tenant_id, url, events (text[]), secret (encrypted), active`.
+- `domain_events` table: `id, tenant_id, event_type, entity_type, entity_id, payload (jsonb), created_at`. Insert-only audit trail.
+
+**Pattern:**
+1. Service emits an event by inserting into `domain_events` AND enqueueing `webhook-delivery` jobs for each matching `webhook_endpoints` row.
+2. Webhook delivery worker POSTs to endpoint URL with HMAC-SHA256 signature header (`X-RiskMind-Signature`). Retry 5× with exponential backoff. Dead-letters after max attempts.
+3. HMAC signing uses Node built-in `crypto.createHmac('sha256', secret).update(body).digest('hex')`.
+
+### Approval Workflow Engine
+
+**Stack:** No new library. Database state machine, same pattern as vendor lifecycle.
+
+**Schema:** Single `approval_requests` table with `context_type` enum (`policy`, `evidence`, `vendor_onboarding`, `agent_action`) + `context_id` + `status` enum (`pending`, `approved`, `rejected`, `escalated`) + `assignee_id` + `due_at` + `resolved_by` + `resolution_note`.
+
+**Transition function:** `canApprovalTransition(from: ApprovalStatus, to: ApprovalStatus): boolean` — 10 lines, no library needed.
+
+**Why not XState:** The entire state machine fits in one function with 4 states. XState adds a 41KB dependency and a new mental model for a problem that is purely persistence-driven, not UI-driven.
+
+### Policy Management (Versioning)
+
+**Stack:** No new library. Drizzle schema with `version integer`, `parent_id uuid` self-reference, and `status` enum (`draft`, `review`, `approved`, `superseded`, `archived`).
+
+**Pattern:** On approval, set old version to `superseded`, create new row with incremented version. All versions retained for audit. Linked to `controls` via `policy_control_maps` join table.
+
+### Evidence Collection (File Storage)
+
+**Stack:** Existing `multer ^2.1.1` disk storage — already configured in `compliance.ts` with `uploads/evidence/`. No new library.
+
+**New schema fields needed:** `evidence_records` table with `control_id`, `source_type` enum (`manual`, `auto_collected`, `api_imported`), `expires_at`, `file_path`, `mime_type`, `checksum`, `entity_id` (for multi-entity).
+
+**No S3/MinIO for v2.1:** The platform is a single dedicated server with local disk. Adding object storage is a v3.x concern. Multer disk storage to `uploads/evidence/` is sufficient and consistent with the existing pattern.
+
+### Multi-Entity Schema
+
+**Stack:** No new library. Drizzle schema migration only.
+
+**Pattern:**
+- Add `entities` table: `id, tenant_id, name, type (subsidiary|branch|partner), parent_entity_id`.
+- Add `entity_id uuid` nullable FK to: `risks`, `vendors`, `policies`, `evidence_records`, `tasks`.
+- Null `entity_id` means tenant-root scope (backward compatible — no existing rows break).
+- Add to Drizzle schema files, run `drizzle-kit push`.
+
+### Task / Work Item System
+
+**Stack:** No new library. Drizzle schema only.
+
+**Schema:** `tasks` table with `id, tenant_id, entity_id, title, description, assignee_id, created_by, status` enum (`open`, `in_progress`, `blocked`, `done`, `cancelled`), `priority` enum (`low`, `medium`, `high`, `critical`), `due_at`, `context_type` (optional FK hint: `risk`, `policy`, `evidence`, `vendor`, `audit`), `context_id`, `sla_hours`.
+
+**Why not a task library:** Tasks are domain objects with tenant/entity scoping and SLA enforcement. Any task library (Linear-style) adds UI without fitting the existing data model.
+
+### AI Governance — Model Registry
+
+**Stack:** No new library. Drizzle schema + existing LLM routing infrastructure.
+
+**Schema:** `ai_model_registry` table with `id, tenant_id, entity_id, name, provider, model_id, use_cases (text[]), risk_level` enum (`minimal`, `limited`, `high`, `unacceptable` — EU AI Act Annex III tiers), `deployment_context`, `training_data_description`, `bias_assessment`, `human_oversight_required boolean`, `framework_mappings (jsonb)` (ISO 42001 control refs, NIST AI RMF functions), `last_reviewed_at`, `review_cycle_days`, `created_at`.
+
+**Framework support:** ISO 42001 and NIST AI RMF imported as framework records in the existing `frameworks`/`framework_requirements` tables. No new framework import mechanism needed — re-use compliance framework import pipeline.
 
 ---
 
 ## Installation
 
 ```bash
-# Backend — api-server
-cd /home/dante/RiskMind2/artifacts/api-server
-pnpm add imapflow mailparser @azure/arm-securityinsight @azure/identity p-ratelimit simple-statistics node-cron
+# api-server (in artifacts/api-server/)
+pnpm add nodemailer @react-email/render @react-email/components
 
-# Backend dev types
-pnpm add -D @types/node-cron
+# api-server dev dependencies
+pnpm add -D @types/nodemailer
 
-# Frontend — riskmind-app (upgrade recharts)
-cd /home/dante/RiskMind2/artifacts/riskmind-app
-pnpm add recharts@^3.8.0
+# @react-pdf/renderer is already in artifacts/riskmind-app/
+# Import it in api-server directly (it is a workspace dep via pnpm workspace hoisting)
+# If it needs to be explicit in api-server package.json:
+pnpm add @react-pdf/renderer
 ```
 
----
-
-## Integration Patterns by Feature Area
-
-### Assessment Engine
-
-No new packages. Architecture is:
-- Server: New `assessment-engine` service. LLM generates next question based on prior answers (`complete()` from existing `llm-service.ts`). State stored in new `assessments` + `assessment_responses` DB tables.
-- Frontend: Step-by-step renderer. React Hook Form handles input. TanStack Query polls for AI-generated next question. shadcn/ui Progress + Dialog cover the shell.
-- Shared between Vendor onboarding and Compliance control assessment — parameterized by `assessmentType` enum.
-
-### Vendor Lifecycle Redesign
-
-No new packages. Wizard onboarding uses existing multi-step form pattern (React Hook Form + Zod + shadcn/ui). 4th party risk uses a graph query on the existing vendor relationships schema. Continuous monitoring hooks into the signal polling scheduler already established for Signal Integrations.
-
-### Compliance Flow
-
-No new packages. Framework import is a JSON/CSV upload parsed with built-in `JSON.parse` or existing CSV-to-JSON logic. Assessment uses the shared Assessment Engine. Thresholds are stored config values evaluated server-side.
-
-### Signal Integrations
-
-**Microsoft Sentinel:**
-- Auth: `ClientSecretCredential` from `@azure/identity` — tenants configure `tenantId`, `clientId`, `clientSecret`, `subscriptionId`, `resourceGroup`, `workspaceName` in settings.
-- Fetch: Use `@azure/arm-securityinsight` `SecurityInsights` client → `incidents.list()` / `incidents.listAlerts()` — or fall back to direct HTTP against Management API (`management.azure.com/subscriptions/.../providers/Microsoft.SecurityInsights/incidents?api-version=2024-09-01`) if SDK coverage is inadequate.
-- Polling: `node-cron` job per tenant with Sentinel configured, every 15 minutes.
-
-**Shodan:**
-- Auth: API key stored per-tenant in existing `signal_source_configs` (or new `integration_configs` table), AES-256-GCM encrypted (same pattern as LLM API keys).
-- Fetch: `fetch('https://api.shodan.io/shodan/host/{ip}?key={apiKey}')` — JSON response, no SDK.
-- Rate limit: Wrap calls with `p-ratelimit` — Shodan free tier: 1 req/sec, paid varies.
-- Trigger: On-demand (vendor enrichment) + daily scheduled sweep of monitored vendor IPs.
-
-**NVD/CVE:**
-- Auth: Optional API key (50 req/30s with key vs 5 req/30s without) — configure via environment variable `NVD_API_KEY`.
-- Fetch: `fetch('https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={vendor}')` — paginated.
-- Rate limit: `p-ratelimit` with `{ interval: 30000, rate: 45 }` (leave headroom below 50 limit).
-- Polling: Daily cron, incremental via `lastModStartDate` / `lastModEndDate` query params.
-
-**MISP:**
-- Auth: Bearer token (`Authorization: key {apikey}` header) — per-tenant config, encrypted.
-- Fetch: `fetch('https://{mispUrl}/events/index', { headers: { 'Authorization': 'key {token}', 'Accept': 'application/json' } })`
-- Polling: Configurable interval (default: hourly) via `node-cron`. Filter by `timestamp` to fetch only new events.
-
-**Email Ingestion:**
-- Connect: `imapflow` with IMAP credentials (host, port, user, password/OAuth2 token) — per-tenant config, encrypted.
-- Strategy: IDLE-based push when mailbox supports it (zero polling overhead), fallback to `node-cron` poll every 5 minutes.
-- Parse: `mailparser` `simpleParser(rawEmail)` → extract subject, from, body, attachments.
-- Extract signals: Pass parsed email body through existing LLM triage pipeline (`complete()`) to extract risk signals.
-
-### Foresight v2 — Monte Carlo
-
-- Simulation engine lives in a new `foresight-simulation.ts` service (server-side).
-- Input: Risk register entries with `likelihood` and `impact` fields + scenario parameters (distribution type, iterations).
-- Distributions: `simple-statistics` provides `randomNormal()`, `randomLogNormal()` via seeded sampling. For triangular distribution (PERT), implement manually — formula is trivial (2 lines).
-- Iterations: 10,000 default, 100,000 max. Node.js handles synchronously in ~50ms for 10k iterations — no worker thread needed.
-- Output: Array of simulated total loss values → compute P50/P90/P99 with `simple-statistics` `quantile()`.
-- Storage: Persist simulation run metadata + percentile results in new `foresight_simulations` table. Raw iteration arrays are NOT stored (too large).
-- Chart: Upgrade recharts to v3.8 for histogram / AreaChart showing loss distribution curve.
+**Note:** All new schema tables are pure Drizzle migrations — no package installs required.
 
 ---
 
 ## Alternatives Considered
 
-| Recommended | Alternative | Why Not |
-|-------------|-------------|---------|
-| `imapflow` | `node-imap` | node-imap last committed 2020, unmaintained. imapflow is its spiritual successor from the same ecosystem (Nodemailer team). |
-| `imapflow` | EmailEngine (SaaS) | SaaS dependency, cost, vendor lock-in. imapflow gives full control. |
-| Direct `fetch` for Shodan | `shodan-client` npm | shodan-client v3.2.0, last published 6 years ago. Dead package. |
-| Direct `fetch` for NVD | `nvdlib` Python wrapper | Python library, wrong language. No maintained Node.js equivalent exists. |
-| Direct `fetch` for MISP | PyMISP | Python only. No Node.js official client. |
-| `@azure/arm-securityinsight` | Direct HTTP to Sentinel API | SDK handles auth token refresh and retry logic. Worth the dependency given the complexity of Azure ARM auth. |
-| `p-ratelimit` | `bottleneck` | Bottleneck is v2.19.5, last published 2019 (7 years ago). Maintenance inactive. Same result, better maintenance posture with p-ratelimit. |
-| `simple-statistics` | `jstat` | jStat last major update 2020, TypeScript types are external and outdated. simple-statistics has inline types and active maintenance. |
-| `simple-statistics` | Custom statistical code | Re-implementing normal distribution CDF and inverse CDF is error-prone. Use the library. |
-| `recharts` upgrade to v3 | Stay on v2.15.4 | v3 adds histogram-friendly APIs and better TypeScript types needed for Foresight distribution charts. Migration effort is low — axis and tooltip prop changes documented in migration guide. |
-| `node-cron` | BullMQ + Redis | BullMQ requires Redis. No Redis in current deployment. Signal polling is low-frequency (15min–daily). node-cron in-process is proven (used by existing enrichment jobs). Adding Redis is infrastructure overkill for this use case. |
-| In-process Monte Carlo (Node.js) | Worker threads | 10k iterations in simple-statistics takes ~50ms synchronously. No blocking concern. Worker threads add complexity for no measurable benefit at this scale. |
-| Assessment Engine custom-built | SurveyJS | SurveyJS is a full platform with its own form builder UI, rendering engine, and data model. RiskMind's assessment engine needs AI-driven dynamic branching where the LLM decides question order — SurveyJS's deterministic branching logic doesn't fit. Build the engine; use shadcn/ui for rendering. |
-
----
-
-## What NOT to Add
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `shodan-client` | 6 years unmaintained, npm health score poor | Built-in `fetch` against `api.shodan.io` |
-| `bottleneck` | 7 years unmaintained (last release 2019) | `p-ratelimit` |
-| `BullMQ` / `bull` | Requires Redis infrastructure not present in deployment | `node-cron` in-process scheduling |
-| `Redis` | No Redis in current deployment; adds ops burden | Not needed — see BullMQ above |
-| `jstat` | Outdated TypeScript types, infrequent updates | `simple-statistics` |
-| `SurveyJS` | Deterministic form engine doesn't support AI-driven branching | Custom assessment engine + shadcn/ui components |
-| `axios` | Node.js 20 has `fetch` built-in | `globalThis.fetch` |
-| `node-fetch` | Same as above | `globalThis.fetch` |
-| Any Python MISP/NVD wrappers | Wrong runtime | Direct `fetch` with `p-ratelimit` |
-| `langchain` / `llamaindex` | Heavy abstraction over APIs already called directly | Existing `llm-service.ts` with openai + anthropic SDKs |
-| `@microsoft/microsoft-graph-client` | Graph API requires different permission scope from ARM API; adds auth complexity for minimal gain | `@azure/arm-securityinsight` + ARM API |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| nodemailer ^8 | Resend / SendGrid SDK | If the team wants managed email delivery with analytics and wants to avoid managing SMTP credentials. Reasonable choice for SaaS. For self-hosted / enterprise, SMTP is simpler and has no vendor lock-in. |
+| @react-email/render | MJML + Handlebars | If the team is not using React on the server and needs a purely HTML-driven template language. Not applicable here — api-server can import React. |
+| @react-pdf/renderer (server) | puppeteer | If PDFs must pixel-match a web UI design or require complex CSS/JS rendering. Acceptable tradeoff if already using headless Chrome for other purposes. Not justified here. |
+| Database-backed event bus (existing job queue) | BullMQ + Redis | If the platform scales to multiple API server processes needing shared queue. For the current single-server deployment, adding Redis is pure overhead. Revisit at v3.x if horizontal scaling is needed. |
+| Database state machine (approval workflow) | XState v5 | If the workflow has complex parallel states, guards, or spawns child actors. Appropriate for v2.2 agentic orchestration where Paperclip-style agent state machines may warrant XState. |
 
 ---
 
 ## Version Compatibility
 
-| Package | Version | Compatible With | Notes |
-|---------|---------|-----------------|-------|
-| `imapflow` | ^1.2.9 | Node.js 20, TypeScript 5.9 | Built-in types, no `@types/` needed |
-| `mailparser` | ^3.9.4 | Node.js 20, TypeScript 5.9 | Requires `@types/mailparser` from npm (separate package) — check if bundled |
-| `@azure/arm-securityinsight` | ^1.0.0-beta.6 | Node.js 20, `@azure/identity` ^4.x | Beta API — no breaking changes expected but pin the version |
-| `@azure/identity` | ^4.13.0 | Node.js 20, Express 5 | Use `ClientSecretCredential` for server-to-server; not `DefaultAzureCredential` (which chain-tries many envs) |
-| `p-ratelimit` | ^1.2.0 | Node.js 20, TypeScript 5.9, ESM | Pure promise wrapper, ESM-compatible |
-| `simple-statistics` | ^7.8.8 | Node.js 20, TypeScript 5.9, browser | Zero dependencies, includes TypeScript definitions |
-| `recharts` | ^3.8.0 | React 19, TypeScript 5.9 | v3 migration guide documents axis/tooltip prop changes from v2. Check `recharts/recharts/wiki/3.0-migration-guide` before upgrading. |
-| `node-cron` | ^4.2.1 | Node.js 20, TypeScript 5.9, ESM | v4 changed the import path — use `import cron from 'node-cron'` not named import |
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| nodemailer ^8.0.4 | Node 20, TypeScript 5.9, ESM | Ships its own types; @types/nodemailer 7.x supplements. Import via `import nodemailer from 'nodemailer'` with `"esModuleInterop": true` in tsconfig (already set). |
+| @react-email/render ^1.0.10 | React 19.1.0 (catalog), Node 20, ESM | renderAsync() preferred over sync render() in Node context. Returns Promise<string>. |
+| @react-email/components ^1.0.10 | React 19.1.0 (catalog) | Server-side rendering — no browser APIs used. Safe to import in api-server. |
+| @react-pdf/renderer ^4.3.2 | React 19.1.0 (v4.1.0+), Node 20 | Already in frontend deps. Import renderToBuffer/renderToStream in api-server. Add `external: ['@react-pdf/renderer']` in build.ts if esbuild fails on ESM resolution (known issue, documented workaround). Do NOT put in pnpm catalog — versions in frontend and api-server should remain independently pinned. |
+| zod 3.25.76 (catalog) | drizzle-zod ^0.8.3 | Zod 4 is available at `zod/v4` subpath import. drizzle-zod 0.8.3 targets Zod 3. Do NOT upgrade drizzle-zod or change catalog Zod version for v2.1 — the Orval-generated `lib/api-zod/` and `lib/api-client-react/` depend on stable Zod 3. Upgrade is a future dedicated migration. |
 
 ---
 
-## Schema Additions Required (for Implementers)
+## What NOT to Change
 
-These are not library decisions but are stack-adjacent enough to note here:
-
-| Area | New Tables |
-|------|-----------|
-| Assessment Engine | `assessments`, `assessment_questions`, `assessment_responses` |
-| Signal Integrations | `integration_configs` (per-tenant connector config with encrypted credentials), `signal_source_type` enum expansion |
-| Foresight v2 | `foresight_simulations`, `foresight_scenarios` |
-| Vendor Lifecycle | Extend existing `vendors` table + new `vendor_monitoring_config` |
-| Compliance Flow | Extend existing `compliance_frameworks` + `compliance_thresholds` |
-
-All encrypted credentials (Sentinel service principal secrets, Shodan API keys, IMAP passwords, MISP tokens) use the existing AES-256-GCM pattern from `llm_configs`. Do not invent a new encryption scheme.
+| Do Not Touch | Why |
+|--------------|-----|
+| `lib/api-client-react/` and `lib/api-zod/` | Orval-generated. All new API routes get added to the OpenAPI spec first, then regenerated. |
+| Job queue internals (`job-queue.ts`) | Only add new queue names via `registerWorker()`. Do not restructure the polling mechanism. |
+| `zod` catalog version (3.25.76) | Changing this breaks the generated client and drizzle-zod in the same release. |
+| Multer configuration in `compliance.ts` | New evidence upload routes should reuse the same `diskStorage` configuration pattern, not replace it. |
+| ENCRYPTION_KEY | Cannot be rotated without re-encrypting all `llm_configs` rows. New notification SMTP credentials stored in `notification_configs` use the same encryption utility (`lib/encryption.ts`). |
 
 ---
 
 ## Sources
 
-- [imapflow npm](https://www.npmjs.com/package/imapflow) — v1.2.9 confirmed, published 2026-03-17 (HIGH confidence)
-- [mailparser npm](https://www.npmjs.com/package/mailparser) — v3.9.4 confirmed, CVE-2026-3455 patched in 3.9.3 (HIGH confidence)
-- [@azure/arm-securityinsight npm](https://www.npmjs.com/package/@azure/arm-securityinsight) — v1.0.0-beta.6 latest (MEDIUM confidence — perpetual beta)
-- [@azure/identity npm](https://www.npmjs.com/package/@azure/identity) — v4.13.0 confirmed (HIGH confidence)
-- [Microsoft Sentinel REST API docs](https://learn.microsoft.com/en-us/rest/api/securityinsights/) — API version 2024-09-01 confirmed stable (HIGH confidence)
-- [NVD Developers Start Here](https://nvd.nist.gov/developers/start-here) — API v2 rate limits confirmed, no Node.js SDK endorsed (HIGH confidence)
-- [Shodan Developer API](https://developer.shodan.io/api) — REST API endpoints confirmed, official clients page lists only stale Node.js options (HIGH confidence)
-- [MISP OpenAPI spec](https://www.misp-project.org/openapi/) — REST API confirmed, no maintained Node.js client (HIGH confidence)
-- [shodan-client npm](https://www.npmjs.com/package/shodan-client) — v3.2.0, 6 years stale — confirmed DO NOT USE (HIGH confidence)
-- [bottleneck npm](https://www.npmjs.com/package/bottleneck) — v2.19.5, 7 years stale — confirmed DO NOT USE (HIGH confidence)
-- [simple-statistics npm](https://www.npmjs.com/package/simple-statistics) — v7.8.8 confirmed (HIGH confidence)
-- [recharts releases](https://github.com/recharts/recharts/releases) — v3.8.0 confirmed current (HIGH confidence)
-- [node-cron npm](https://www.npmjs.com/package/node-cron) — v4.2.1 confirmed (HIGH confidence)
-- [p-ratelimit GitHub](https://github.com/natesilva/p-ratelimit) — TypeScript native, concurrency + interval control (MEDIUM confidence — version not confirmed from npm; check before install)
-- Codebase inspection (`artifacts/api-server/package.json`, `artifacts/api-server/src/services/`, `artifacts/riskmind-app/package.json`) — existing stack confirmed (HIGH confidence)
+- [nodemailer npm](https://www.npmjs.com/package/nodemailer) — version 8.0.4 confirmed, last published within 1 day of research date (HIGH confidence)
+- [@types/nodemailer npm](https://www.npmjs.com/package/@types/nodemailer) — version 7.0.11 confirmed (HIGH confidence)
+- [@react-email/components npm](https://www.npmjs.com/package/@react-email/components) — version 1.0.10 confirmed (HIGH confidence)
+- [@react-email/render npm](https://www.npmjs.com/package/@react-email/render) — version 1.0.10 confirmed (HIGH confidence)
+- [React Email + Nodemailer integration docs](https://react.email/docs/integrations/nodemailer) — renderAsync + sendMail pattern verified (HIGH confidence)
+- [@react-pdf/renderer npm](https://www.npmjs.com/package/@react-pdf/renderer) — version 4.3.2, React 19 support from v4.1.0 (HIGH confidence)
+- [@react-pdf/renderer Node.js compatibility](https://react-pdf.org/compatibility) — server-side renderToBuffer/renderToStream supported (HIGH confidence)
+- [@react-pdf/renderer ESM issue #2624](https://github.com/diegomura/react-pdf/issues/2624) — known ESM/esbuild issue, `external` workaround (MEDIUM confidence — issue open, workaround works)
+- [BullMQ Redis requirement docs](https://docs.bullmq.io/) — Redis is mandatory; no PostgreSQL fallback (HIGH confidence)
+- [BullMQ v5.71.1 npm](https://www.npmjs.com/package/bullmq) — confirmed Redis requirement, excluded on that basis (HIGH confidence)
+- [Zod versioning / subpath import](https://zod.dev/v4/versioning) — catalog 3.25.76 ships Zod 4 at `zod/v4`, no breakage (HIGH confidence)
+- [drizzle-zod Zod v4 compatibility issue #4406](https://github.com/drizzle-team/drizzle-orm/issues/4406) — v4 migration needed but not for v2.1 (MEDIUM confidence — PR merged but not in 0.8.3 release range)
+- WebSearch: nodemailer 8 ESM TypeScript 2026, BullMQ v5 2026, @react-email 2025, EU AI Act Annex III risk tiers — supporting verification (MEDIUM confidence, cross-referenced with official sources above)
 
 ---
-*Stack research for: RiskMind v2.0 — Assessment Engine, Vendor Lifecycle, Compliance Flow, Signal Integrations, Foresight v2*
-*Researched: 2026-03-23*
+*Stack research for: RiskMind v2.1 — Policy, Evidence, Audit, Reporting, AI Governance, Webhooks, Approvals, Tasks, Notifications*
+*Researched: 2026-03-26*
