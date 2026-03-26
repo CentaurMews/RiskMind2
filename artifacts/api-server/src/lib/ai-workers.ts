@@ -1,8 +1,9 @@
-import { db, signalsTable, risksTable, documentsTable } from "@workspace/db";
+import { db, signalsTable, risksTable, documentsTable, foresightSimulationsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { registerWorker, enqueueJob } from "./job-queue";
 import { complete, isAvailable, LLMUnavailableError, type LLMTaskType } from "./llm-service";
 import { RiskSourceAggregator } from "../services/risk-source-aggregator";
+import { runSimulation, type FAIRParams } from "./monte-carlo";
 
 async function findSimilarRisks(embedding: number[], tenantId: string, threshold = 0.8) {
   if (!embedding.length) return [];
@@ -180,5 +181,53 @@ export function registerAIWorkers() {
     return { status: "processed" };
   });
 
-  console.log("[AI Workers] Registered: ai-triage, ai-enrich, doc-process");
+  // ─── Monte Carlo simulation worker ────────────────────────────────────────
+
+  registerWorker("monte-carlo", async (job) => {
+    const { simulationId } = job.payload as { simulationId: string };
+
+    const [simulation] = await db
+      .select()
+      .from(foresightSimulationsTable)
+      .where(eq(foresightSimulationsTable.id, simulationId))
+      .limit(1);
+
+    if (!simulation) return { status: "not_found" };
+    if (simulation.status !== "pending") return { status: "already_processed" };
+
+    // Mark as running
+    await db
+      .update(foresightSimulationsTable)
+      .set({ status: "running", updatedAt: new Date() })
+      .where(eq(foresightSimulationsTable.id, simulationId));
+
+    try {
+      const params = simulation.inputParameters as unknown as FAIRParams;
+      const results = runSimulation(params, simulation.iterationCount);
+
+      await db
+        .update(foresightSimulationsTable)
+        .set({
+          status: "completed",
+          results: results as unknown as Record<string, unknown>,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(foresightSimulationsTable.id, simulationId));
+
+      return { status: "completed", ale: results.ale, iterations: results.iterations };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[Monte Carlo] Simulation ${simulationId} failed:`, errorMsg);
+
+      await db
+        .update(foresightSimulationsTable)
+        .set({ status: "failed", updatedAt: new Date() })
+        .where(eq(foresightSimulationsTable.id, simulationId));
+
+      return { status: "failed", reason: errorMsg };
+    }
+  });
+
+  console.log("[AI Workers] Registered: ai-triage, ai-enrich, doc-process, monte-carlo");
 }
