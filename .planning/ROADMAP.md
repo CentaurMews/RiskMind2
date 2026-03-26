@@ -273,7 +273,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 14-01-PLAN.md — Monte Carlo engine, foresight API routes, job worker, OpenAPI spec + Orval codegen
+- [x] 14-01-PLAN.md — Monte Carlo engine, foresight API routes, job worker, OpenAPI spec + Orval codegen
 - [ ] 14-02-PLAN.md — Foresight page (tabs, scenario list, FAIR parameter form), loss exceedance chart
 - [ ] 14-03-PLAN.md — OSINT calibration panel, scenario comparison view, form integration
 - [ ] 14-04-PLAN.md — Dashboard ALE widget + end-to-end verification
@@ -298,14 +298,14 @@ v1.0 complete. v1.1 complete. v1.2 complete. v2.0 executes: Phases 9-14
 | 11. Vendor Lifecycle Redesign | v2.0 | 5/5 | Complete    | 2026-03-23 |
 | 12. Signal Integrations | v2.0 | 5/5 | Complete   | 2026-03-23 |
 | 13. Compliance Flow | v2.0 | 4/5 | Complete    | 2026-03-25 |
-| 14. Foresight v2 | v2.0 | 0/4 | Not started | - |
+| 14. Foresight v2 | v2.0 | 1/4 | In Progress|  |
 
 ### Phase 15: Migrate Risk Heatmap from CSS Grid to Apache ECharts
 
 **Goal:** The full-page risk heatmap renders via Apache ECharts with position-based severity colors, rich tooltips, dark mode support, and click-to-drill-down -- replacing CSS Grid while preserving Sheet sidebar, URL deep linking, and mobile fallback exactly as-is
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14
 **Depends on:** Phase 8
-**Plans:** 5/5 plans complete
+**Plans:** 1/4 plans executed
 
 Plans:
 - [x] 15-01-PLAN.md — Install echarts deps + create RiskHeatmapChart ECharts component
