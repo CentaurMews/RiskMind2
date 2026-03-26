@@ -1,14 +1,30 @@
 import { useState } from "react";
+import {
+  useListForesightScenarios,
+  useDeleteForesightScenario,
+  useCloneForesightScenario,
+  useCreateForesightSimulation,
+  getListForesightScenariosQueryKey,
+  type ForesightScenario,
+  ForesightSimulationStatus,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,285 +35,221 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Play,
   Copy,
-  Trash2,
-  Plus,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
   Loader2,
-  BarChart3,
+  Play,
+  Plus,
+  Trash2,
+  ChevronUp,
+  TrendingUp,
 } from "lucide-react";
-import { toast } from "sonner";
-import {
-  useListForesightScenarios,
-  useCreateForesightSimulation,
-  useCloneForesightScenario,
-  useDeleteForesightScenario,
-} from "@workspace/api-client-react";
-import type { ForesightScenario } from "@workspace/api-client-react";
+import { toast } from "@/hooks/use-toast";
+import { ScenarioForm } from "./scenario-form";
 import { LossExceedanceChart } from "@/components/foresight/loss-exceedance-chart";
 
-interface ScenarioListProps {
-  onCreateNew?: () => void;
-  onEdit?: (scenario: ForesightScenario) => void;
-}
-
-function formatUsd(value: number): string {
-  if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}M`;
-  }
-  if (value >= 1_000) {
-    return `$${(value / 1_000).toFixed(1)}K`;
-  }
-  return `$${value.toFixed(0)}`;
+function formatUSDCompact(n: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(n);
 }
 
 function SimulationStatusBadge({ status }: { status: string }) {
   switch (status) {
-    case "completed":
-      return (
-        <Badge
-          variant="outline"
-          className="gap-1 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700"
-        >
-          <CheckCircle2 className="h-3 w-3" />
-          Completed
-        </Badge>
-      );
-    case "running":
-      return (
-        <Badge
-          variant="outline"
-          className="gap-1 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700"
-        >
-          <Loader2 className="h-3 w-3 animate-spin" />
-          Running
-        </Badge>
-      );
-    case "pending":
-      return (
-        <Badge variant="outline" className="gap-1 text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          Pending
-        </Badge>
-      );
-    case "failed":
-      return (
-        <Badge
-          variant="outline"
-          className="gap-1 text-destructive border-destructive/40"
-        >
-          <AlertCircle className="h-3 w-3" />
-          Failed
-        </Badge>
-      );
+    case ForesightSimulationStatus.completed:
+      return <Badge className="bg-green-500/10 text-green-600 border-green-200 hover:bg-green-500/10">Completed</Badge>;
+    case ForesightSimulationStatus.running:
+      return <Badge className="bg-blue-500/10 text-blue-600 border-blue-200 hover:bg-blue-500/10"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Running</Badge>;
+    case ForesightSimulationStatus.pending:
+      return <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 hover:bg-amber-500/10">Pending</Badge>;
+    case ForesightSimulationStatus.failed:
+      return <Badge variant="destructive">Failed</Badge>;
     default:
       return null;
   }
 }
 
-function ScenarioCard({
-  scenario,
-  onEdit,
-}: {
+function ScenarioCardSkeleton() {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-3 w-72 mt-1" />
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-20" />
+          <Skeleton className="h-8 w-20" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ScenarioCardProps {
   scenario: ForesightScenario;
-  onEdit?: (s: ForesightScenario) => void;
-}) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showChart, setShowChart] = useState(false);
+  onRunSimulation: (scenario: ForesightScenario) => void;
+  isRunning: boolean;
+}
 
-  const { mutate: runSimulation, isPending: isRunning } =
-    useCreateForesightSimulation({
-      mutation: {
-        onSuccess: () => {
-          toast.success("Simulation started");
-        },
-        onError: () => {
-          toast.error("Failed to start simulation");
-        },
+function ScenarioCard({ scenario, onRunSimulation, isRunning }: ScenarioCardProps) {
+  const qc = useQueryClient();
+  const [expanded, setExpanded] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+
+  const latestSim = scenario.latestSimulation;
+  const simStatus = latestSim?.status;
+  const isActivelyRunning = simStatus === ForesightSimulationStatus.running || simStatus === ForesightSimulationStatus.pending;
+  const hasResults = simStatus === ForesightSimulationStatus.completed && latestSim?.results;
+
+  const deleteMutation = useDeleteForesightScenario({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListForesightScenariosQueryKey() });
+        toast({ title: "Scenario deleted" });
       },
-    });
-
-  const { mutate: cloneScenario, isPending: isCloning } =
-    useCloneForesightScenario({
-      mutation: {
-        onSuccess: () => {
-          toast.success("Scenario cloned");
-        },
-        onError: () => {
-          toast.error("Failed to clone scenario");
-        },
+      onError: () => {
+        toast({ title: "Error", description: "Failed to delete scenario", variant: "destructive" });
       },
-    });
+    },
+  });
 
-  const { mutate: deleteScenario, isPending: isDeleting } =
-    useDeleteForesightScenario({
-      mutation: {
-        onSuccess: () => {
-          toast.success("Scenario deleted");
-        },
-        onError: () => {
-          toast.error("Failed to delete scenario");
-        },
+  const cloneMutation = useCloneForesightScenario({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListForesightScenariosQueryKey() });
+        toast({ title: "Scenario cloned" });
       },
-    });
-
-  const simulation = scenario.latestSimulation;
-  const isSimRunning =
-    simulation?.status === "running" || simulation?.status === "pending";
-  const isCompleted = simulation?.status === "completed";
-  const ale = simulation?.results?.ale;
+      onError: () => {
+        toast({ title: "Error", description: "Failed to clone scenario", variant: "destructive" });
+      },
+    },
+  });
 
   return (
     <>
-      <Card className="hover:shadow-sm transition-shadow">
+      <Card className="transition-all duration-200">
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-base truncate">{scenario.name}</CardTitle>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-semibold truncate">{scenario.name}</h3>
+                {simStatus && <SimulationStatusBadge status={simStatus} />}
+              </div>
               {scenario.description && (
-                <CardDescription className="mt-0.5 line-clamp-2 text-xs">
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                   {scenario.description}
-                </CardDescription>
+                </p>
+              )}
+              {hasResults && latestSim?.results && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  ALE:{" "}
+                  <span className="font-semibold text-foreground">
+                    {formatUSDCompact(latestSim.results.ale)}
+                  </span>
+                  /year
+                </p>
               )}
             </div>
+
             <div className="flex items-center gap-1.5 shrink-0">
-              {scenario.calibratedFrom && (
-                <Badge
-                  variant="outline"
-                  className="text-xs gap-1 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700"
+              {/* Run simulation */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onRunSimulation(scenario)}
+                disabled={isRunning || isActivelyRunning}
+                className="h-7 text-xs gap-1"
+              >
+                {isRunning || isActivelyRunning ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Play className="h-3 w-3" />
+                )}
+                Run
+              </Button>
+
+              {/* Clone */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => cloneMutation.mutate({ id: scenario.id })}
+                disabled={cloneMutation.isPending}
+                title="Clone scenario"
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+
+              {/* Delete */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                onClick={() => setDeleteOpen(true)}
+                title="Delete scenario"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+
+              {/* Expand chart */}
+              {hasResults && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setExpanded((v) => !v)}
+                  title={expanded ? "Collapse chart" : "Expand chart"}
                 >
-                  <CheckCircle2 className="h-3 w-3" />
-                  Calibrated
-                </Badge>
+                  {expanded ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <TrendingUp className="h-3.5 w-3.5" />
+                  )}
+                </Button>
               )}
-              {simulation && <SimulationStatusBadge status={simulation.status} />}
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          {/* ALE + chart toggle */}
-          {isCompleted && ale !== undefined && (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Annual Loss Expectancy
-                </p>
-                <p className="text-xl font-bold tabular-nums">{formatUsd(ale)}</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowChart((v) => !v)}
-              >
-                <BarChart3 className="h-4 w-4 mr-1.5" />
-                {showChart ? "Hide chart" : "View chart"}
-              </Button>
-            </div>
-          )}
-
-          {/* Loss exceedance chart (togglable) */}
-          {showChart && isCompleted && simulation?.results && (
-            <div className="pt-1">
+        {/* Inline loss exceedance chart */}
+        {expanded && hasResults && latestSim?.results && (
+          <CardContent className="pt-0 border-t">
+            <div className="mt-4">
               <LossExceedanceChart
-                histogram={simulation.results.histogram ?? []}
-                percentiles={simulation.results.percentiles ?? {}}
+                histogram={latestSim.results.histogram}
+                percentiles={latestSim.results.percentiles}
+                iterations={latestSim.results.iterations}
+                ale={latestSim.results.ale}
+                title={scenario.name}
               />
             </div>
-          )}
-
-          {/* Running indicator */}
-          {isSimRunning && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Spinner className="h-3.5 w-3.5" />
-              Simulation in progress…
-            </div>
-          )}
-
-          {/* Action row */}
-          <div className="flex items-center gap-2 pt-1">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                runSimulation({
-                  data: {
-                    scenarioId: scenario.id,
-                    iterationCount: 50000,
-                  },
-                })
-              }
-              disabled={isRunning || isSimRunning}
-            >
-              {isRunning ? (
-                <Spinner className="mr-1.5 h-3.5 w-3.5" />
-              ) : (
-                <Play className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              {isCompleted ? "Re-run" : "Run Simulation"}
-            </Button>
-
-            {onEdit && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onEdit(scenario)}
-              >
-                Edit
-              </Button>
-            )}
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => cloneScenario({ id: scenario.id })}
-              disabled={isCloning}
-            >
-              {isCloning ? (
-                <Spinner className="h-3.5 w-3.5" />
-              ) : (
-                <Copy className="h-3.5 w-3.5" />
-              )}
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
-              onClick={() => setShowDeleteDialog(true)}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <Spinner className="h-3.5 w-3.5" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          </div>
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete scenario?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "{scenario.name}" and all associated
-              simulation results.
+              This will permanently delete "{scenario.name}" and all its simulation history.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
               onClick={() => {
-                deleteScenario({ id: scenario.id });
-                setShowDeleteDialog(false);
+                deleteMutation.mutate({ id: scenario.id });
+                setDeleteOpen(false);
               }}
             >
               Delete
@@ -305,67 +257,154 @@ function ScenarioCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit sheet */}
+      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit Scenario</SheetTitle>
+            <SheetDescription>Update the scenario parameters.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <ScenarioForm
+              scenario={scenario}
+              onSuccess={() => setEditOpen(false)}
+              onCancel={() => setEditOpen(false)}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
 
-export function ScenarioList({ onCreateNew, onEdit }: ScenarioListProps) {
-  const { data: scenarios, isLoading, isError } = useListForesightScenarios();
+export function ScenarioList() {
+  const qc = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i}>
-            <CardContent className="pt-6 space-y-3">
-              <Skeleton className="h-5 w-3/4" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-8 w-24" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
+  // Check if any simulation is pending/running to enable polling
+  const { data: scenarios, isLoading } = useListForesightScenarios({
+    query: {
+      refetchInterval: (query) => {
+        const data = query.state.data as ForesightScenario[] | undefined;
+        if (!data) return false;
+        const hasActive = data.some(
+          (s) =>
+            s.latestSimulation?.status === ForesightSimulationStatus.pending ||
+            s.latestSimulation?.status === ForesightSimulationStatus.running
+        );
+        return hasActive ? 2000 : false; // poll every 2s when active simulations exist
+      },
+    },
+  });
 
-  if (isError) {
-    return (
-      <Card className="border-destructive/40">
-        <CardContent className="flex items-center gap-2 py-6">
-          <AlertCircle className="h-5 w-5 text-destructive" />
-          <p className="text-sm text-destructive">Failed to load scenarios</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const createSimulationMutation = useCreateForesightSimulation({
+    mutation: {
+      onSuccess: (sim) => {
+        qc.invalidateQueries({ queryKey: getListForesightScenariosQueryKey() });
+        setRunningIds((prev) => {
+          const next = new Set(prev);
+          next.delete(sim.scenarioId);
+          return next;
+        });
+        toast({ title: "Simulation queued", description: "Results will appear when complete." });
+      },
+      onError: (_err, { data }) => {
+        setRunningIds((prev) => {
+          const next = new Set(prev);
+          next.delete(data.scenarioId);
+          return next;
+        });
+        toast({ title: "Error", description: "Failed to start simulation", variant: "destructive" });
+      },
+    },
+  });
 
-  if (!scenarios || scenarios.length === 0) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-          <BarChart3 className="h-10 w-10 text-muted-foreground/40 mb-4" />
-          <p className="text-sm font-medium text-muted-foreground">
-            No scenarios yet
-          </p>
-          <p className="text-xs text-muted-foreground/60 mt-1 mb-4">
-            Create your first Monte Carlo scenario to get started
-          </p>
-          {onCreateNew && (
-            <Button size="sm" onClick={onCreateNew}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Scenario
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleRunSimulation = (scenario: ForesightScenario) => {
+    const params = scenario.parameters as {
+      iterationCount?: number;
+    };
+    const iterationCount = params.iterationCount ?? 50000;
+
+    setRunningIds((prev) => new Set(prev).add(scenario.id));
+    createSimulationMutation.mutate({
+      data: {
+        scenarioId: scenario.id,
+        iterationCount,
+      },
+    });
+  };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {scenarios.map((scenario) => (
-        <ScenarioCard key={scenario.id} scenario={scenario} onEdit={onEdit} />
-      ))}
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">
+            {scenarios?.length ?? 0} scenario{(scenarios?.length ?? 0) !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          className="gap-1.5"
+          onClick={() => setCreateOpen(true)}
+        >
+          <Plus className="h-4 w-4" />
+          New Scenario
+        </Button>
+      </div>
+
+      {/* Loading */}
+      {isLoading && (
+        <div className="space-y-3">
+          <ScenarioCardSkeleton />
+          <ScenarioCardSkeleton />
+          <ScenarioCardSkeleton />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && (!scenarios || scenarios.length === 0) && (
+        <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed rounded-xl">
+          <TrendingUp className="h-10 w-10 text-muted-foreground/40 mb-3" />
+          <p className="text-sm font-medium text-muted-foreground">No scenarios yet</p>
+          <p className="text-xs text-muted-foreground/70 mt-1 max-w-sm">
+            Create your first scenario to run a Monte Carlo simulation.
+          </p>
+          <Button size="sm" className="mt-4 gap-1.5" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            New Scenario
+          </Button>
+        </div>
+      )}
+
+      {/* Scenario cards */}
+      {!isLoading && scenarios && scenarios.length > 0 && (
+        <div className="space-y-3">
+          {scenarios.map((scenario) => (
+            <ScenarioCard
+              key={scenario.id}
+              scenario={scenario}
+              onRunSimulation={handleRunSimulation}
+              isRunning={runningIds.has(scenario.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Create scenario dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Scenario</DialogTitle>
+          </DialogHeader>
+          <ScenarioForm
+            onSuccess={() => setCreateOpen(false)}
+            onCancel={() => setCreateOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

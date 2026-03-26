@@ -1,47 +1,54 @@
 import { useState, useCallback } from "react";
+import {
+  useCreateForesightScenario,
+  useUpdateForesightScenario,
+  useListRisks,
+  usePostForesightCalibrate,
+  getListForesightScenariosQueryKey,
+  type ForesightScenario,
+  type CalibrationResult,
+  type TriangularParam,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { Spinner } from "@/components/ui/spinner";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, Zap, X } from "lucide-react";
-import { toast } from "sonner";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  useCreateForesightScenario,
-  useUpdateForesightScenario,
-  usePostForesightCalibrate,
-} from "@workspace/api-client-react";
-import type {
-  ForesightScenario,
-  CalibrationResult,
-  TriangularParam,
-} from "@workspace/api-client-react";
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { HelpCircle, Loader2, Zap, CheckCircle2, X } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
-interface FAIRSliderGroupProps {
+// ── TriangularInput slider group ───────────────────────────────────────────────
+
+interface TriangularInputProps {
   label: string;
-  description: string;
-  value: { min: number; mode: number; max: number };
-  onChange: (val: { min: number; mode: number; max: number }) => void;
+  tooltip: string;
+  value: TriangularParam;
+  onChange: (v: TriangularParam) => void;
   min: number;
   max: number;
   step: number;
-  format: (v: number) => string;
+  format?: (n: number) => string;
   calibrated?: boolean;
 }
 
-function FAIRSliderGroup({
+function TriangularInput({
   label,
-  description,
+  tooltip,
   value,
   onChange,
   min,
@@ -49,14 +56,50 @@ function FAIRSliderGroup({
   step,
   format,
   calibrated,
-}: FAIRSliderGroupProps) {
+}: TriangularInputProps) {
+  const fmt = format ?? ((n: number) => String(n));
+
+  const handleMin = (vals: number[]) => {
+    const newMin = vals[0];
+    onChange({
+      min: newMin,
+      mode: Math.max(newMin, value.mode),
+      max: Math.max(newMin, value.max),
+    });
+  };
+
+  const handleMode = (vals: number[]) => {
+    const newMode = vals[0];
+    onChange({
+      min: Math.min(value.min, newMode),
+      mode: newMode,
+      max: Math.max(newMode, value.max),
+    });
+  };
+
+  const handleMax = (vals: number[]) => {
+    const newMax = vals[0];
+    onChange({
+      min: Math.min(value.min, newMax),
+      mode: Math.min(value.mode, newMax),
+      max: newMax,
+    });
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <div>
-          <p className="text-sm font-medium">{label}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
+        <span className="text-sm font-medium">{label}</span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-60">
+              <p className="text-xs">{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         {calibrated && (
           <Badge
             variant="outline"
@@ -68,100 +111,118 @@ function FAIRSliderGroup({
         )}
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Min</Label>
+        {/* Min */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Minimum</span>
+            <span className="font-mono">{fmt(value.min)}</span>
+          </div>
           <Slider
             min={min}
-            max={value.mode}
+            max={max}
             step={step}
             value={[value.min]}
-            onValueChange={([v]) =>
-              onChange({ ...value, min: Math.min(v, value.mode) })
-            }
+            onValueChange={handleMin}
           />
-          <p className="text-xs tabular-nums text-center">{format(value.min)}</p>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Mode</Label>
+        {/* Mode */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Most Likely</span>
+            <span className="font-mono">{fmt(value.mode)}</span>
+          </div>
           <Slider
-            min={value.min}
-            max={value.max}
+            min={min}
+            max={max}
             step={step}
             value={[value.mode]}
-            onValueChange={([v]) =>
-              onChange({
-                ...value,
-                mode: Math.max(value.min, Math.min(v, value.max)),
-              })
-            }
+            onValueChange={handleMode}
           />
-          <p className="text-xs tabular-nums text-center font-medium text-primary">
-            {format(value.mode)}
-          </p>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Max</Label>
+        {/* Max */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Maximum</span>
+            <span className="font-mono">{fmt(value.max)}</span>
+          </div>
           <Slider
-            min={value.mode}
+            min={min}
             max={max}
             step={step}
             value={[value.max]}
-            onValueChange={([v]) =>
-              onChange({ ...value, max: Math.max(v, value.mode) })
-            }
+            onValueChange={handleMax}
           />
-          <p className="text-xs tabular-nums text-center">{format(value.max)}</p>
         </div>
       </div>
     </div>
   );
 }
 
-interface ScenarioFormProps {
-  scenario?: ForesightScenario;
-  /** Pre-filled calibration values (from CalibrationPanel) */
-  calibrationResult?: CalibrationResult | null;
-  onSuccess?: () => void;
-  onCancel?: () => void;
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+interface FAIRState {
+  tef: TriangularParam;
+  vulnerability: TriangularParam;
+  lossMagnitude: TriangularParam;
 }
 
-const DEFAULT_FAIR = {
-  tef: { min: 0.1, mode: 1, max: 5 },
-  vulnerability: { min: 0.1, mode: 0.3, max: 0.7 },
-  lossMagnitude: { min: 10_000, mode: 100_000, max: 1_000_000 },
-};
+function defaultFAIR(): FAIRState {
+  return {
+    tef: { min: 1, mode: 10, max: 52 },
+    vulnerability: { min: 0.1, mode: 0.3, max: 0.7 },
+    lossMagnitude: { min: 10000, mode: 100000, max: 500000 },
+  };
+}
 
-function parseTriangular(
-  raw: unknown
-): { min: number; mode: number; max: number } | null {
-  if (
-    raw &&
-    typeof raw === "object" &&
-    "min" in raw &&
-    "mode" in raw &&
-    "max" in raw
-  ) {
-    const t = raw as { min: unknown; mode: unknown; max: unknown };
-    if (
-      typeof t.min === "number" &&
-      typeof t.mode === "number" &&
-      typeof t.max === "number"
-    ) {
-      return { min: t.min, mode: t.mode, max: t.max };
-    }
-  }
-  return null;
+function parseParamsFromScenario(scenario?: ForesightScenario): FAIRState {
+  if (!scenario?.parameters) return defaultFAIR();
+  const p = scenario.parameters as {
+    tef?: TriangularParam;
+    vulnerability?: TriangularParam;
+    lossMagnitude?: TriangularParam;
+  };
+  return {
+    tef: p.tef ?? defaultFAIR().tef,
+    vulnerability: p.vulnerability ?? defaultFAIR().vulnerability,
+    lossMagnitude: p.lossMagnitude ?? defaultFAIR().lossMagnitude,
+  };
+}
+
+function formatUSD(n: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(n);
 }
 
 function clampTriangular(
   p: TriangularParam,
   domainMin: number,
   domainMax: number
-): { min: number; mode: number; max: number } {
+): TriangularParam {
   const min = Math.max(domainMin, Math.min(p.min, domainMax));
   const max = Math.min(domainMax, Math.max(p.max, domainMin));
   const mode = Math.max(min, Math.min(p.mode, max));
   return { min, mode, max };
+}
+
+const ITERATION_OPTIONS = [
+  { value: "10000", label: "10k (fast)" },
+  { value: "25000", label: "25k" },
+  { value: "50000", label: "50k (recommended)" },
+  { value: "100000", label: "100k (precise)" },
+];
+
+// ── ScenarioForm ───────────────────────────────────────────────────────────────
+
+export interface ScenarioFormProps {
+  scenario?: ForesightScenario;
+  /** Pre-filled calibration values (from CalibrationPanel) */
+  calibrationResult?: CalibrationResult | null;
+  onSuccess?: (scenario: ForesightScenario) => void;
+  onCancel?: () => void;
 }
 
 export function ScenarioForm({
@@ -170,34 +231,17 @@ export function ScenarioForm({
   onSuccess,
   onCancel,
 }: ScenarioFormProps) {
-  const existingParams = scenario?.parameters as Record<string, unknown> | undefined;
+  const qc = useQueryClient();
+  const isEdit = !!scenario;
 
-  // Initialise from existing scenario params or defaults
   const [name, setName] = useState(scenario?.name ?? "");
   const [description, setDescription] = useState(scenario?.description ?? "");
+  const [riskId, setRiskId] = useState(scenario?.riskId ?? "");
+  const [iterationCount, setIterationCount] = useState("50000");
+  const [fair, setFair] = useState<FAIRState>(parseParamsFromScenario(scenario));
 
-  const [tef, setTef] = useState<{ min: number; mode: number; max: number }>(
-    () =>
-      parseTriangular(existingParams?.["tef"]) ?? DEFAULT_FAIR.tef
-  );
-  const [vulnerability, setVulnerability] = useState<{
-    min: number;
-    mode: number;
-    max: number;
-  }>(
-    () =>
-      parseTriangular(existingParams?.["vulnerability"]) ??
-      DEFAULT_FAIR.vulnerability
-  );
-  const [lossMagnitude, setLossMagnitude] = useState<{
-    min: number;
-    mode: number;
-    max: number;
-  }>(
-    () =>
-      parseTriangular(existingParams?.["lossMagnitude"]) ??
-      DEFAULT_FAIR.lossMagnitude
-  );
+  const { data: risksData } = useListRisks();
+  const risks = risksData ?? [];
 
   // Track whether values were calibrated
   const [calibrationResult, setCalibrationResult] =
@@ -221,59 +265,58 @@ export function ScenarioForm({
         setCalibrationResult(data);
         const fields = new Set<string>();
         if (data.tef) {
-          const clamped = clampTriangular(data.tef, 0, 100);
-          setTef(clamped);
+          const clamped = clampTriangular(data.tef, 0, 365);
+          setFair((prev) => ({ ...prev, tef: clamped }));
           fields.add("tef");
         }
         if (data.vulnerability) {
           const clamped = clampTriangular(data.vulnerability, 0, 1);
-          setVulnerability(clamped);
+          setFair((prev) => ({ ...prev, vulnerability: clamped }));
           fields.add("vulnerability");
         }
         if (data.lossMagnitude) {
-          const clamped = clampTriangular(
-            data.lossMagnitude,
-            0,
-            100_000_000
-          );
-          setLossMagnitude(clamped);
+          const clamped = clampTriangular(data.lossMagnitude, 0, 10_000_000);
+          setFair((prev) => ({ ...prev, lossMagnitude: clamped }));
           fields.add("lossMagnitude");
         }
         setCalibratedFields(fields);
         if (fields.size > 0) {
-          toast.success("FAIR parameters pre-filled from signal data");
+          toast({ title: "FAIR parameters pre-filled from signal data" });
         } else {
-          toast.warning(
-            data.message ?? "Insufficient signal data for calibration"
-          );
+          toast({
+            title: "Calibration",
+            description: data.message ?? "Insufficient signal data for calibration",
+          });
         }
       },
       onError: () => {
-        toast.error("Calibration failed");
+        toast({ title: "Error", description: "Calibration failed", variant: "destructive" });
       },
     },
   });
 
   const createMutation = useCreateForesightScenario({
     mutation: {
-      onSuccess: () => {
-        toast.success("Scenario created");
-        onSuccess?.();
+      onSuccess: (created) => {
+        qc.invalidateQueries({ queryKey: getListForesightScenariosQueryKey() });
+        toast({ title: "Scenario created", description: created.name });
+        onSuccess?.(created);
       },
       onError: () => {
-        toast.error("Failed to create scenario");
+        toast({ title: "Error", description: "Failed to create scenario", variant: "destructive" });
       },
     },
   });
 
   const updateMutation = useUpdateForesightScenario({
     mutation: {
-      onSuccess: () => {
-        toast.success("Scenario updated");
-        onSuccess?.();
+      onSuccess: (updated) => {
+        qc.invalidateQueries({ queryKey: getListForesightScenariosQueryKey() });
+        toast({ title: "Scenario updated", description: updated.name });
+        onSuccess?.(updated);
       },
       onError: () => {
-        toast.error("Failed to update scenario");
+        toast({ title: "Error", description: "Failed to update scenario", variant: "destructive" });
       },
     },
   });
@@ -283,18 +326,23 @@ export function ScenarioForm({
     setCalibratedFields(new Set());
   }, []);
 
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isCalibrating = calibrateMutation.isPending;
+  const hasCalibratedData =
+    calibrationResult !== null && calibratedFields.size > 0;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("Scenario name is required");
+      toast({ title: "Name required", variant: "destructive" });
       return;
     }
 
-    const params = {
-      tef,
-      vulnerability,
-      lossMagnitude,
-      iterations: 50_000,
+    const parameters = {
+      tef: fair.tef,
+      vulnerability: fair.vulnerability,
+      lossMagnitude: fair.lossMagnitude,
+      iterationCount: parseInt(iterationCount, 10),
       ...(calibrationResult?.sampleSize
         ? {
             calibratedFrom: `OSINT: ${calibrationResult.sampleSize} signals (${calibrationResult.dataFreshness})`,
@@ -302,103 +350,122 @@ export function ScenarioForm({
         : {}),
     };
 
-    if (scenario) {
+    if (isEdit && scenario) {
       updateMutation.mutate({
         id: scenario.id,
-        data: { name: name.trim(), description: description.trim() || undefined, parameters: params },
+        data: {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          riskId: riskId || null,
+          parameters,
+        },
       });
     } else {
       createMutation.mutate({
         data: {
           name: name.trim(),
           description: description.trim() || undefined,
-          parameters: params,
+          riskId: riskId || undefined,
+          parameters,
         },
       });
     }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
-  const isCalibrating = calibrateMutation.isPending;
-
-  const hasCalibratedData =
-    calibrationResult !== null && calibratedFields.size > 0;
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Header with calibrated badge */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">
-            {scenario ? "Edit Scenario" : "New Scenario"}
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Configure FAIR parameters for Monte Carlo simulation
-          </p>
+      {/* Calibration badge header */}
+      {hasCalibratedData && (
+        <div className="flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className="text-green-700 dark:text-green-400 border-green-300 dark:border-green-700 gap-1"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Calibrated from real data
+          </Badge>
+          {calibrationResult?.dataFreshness && (
+            <span className="text-xs text-muted-foreground">
+              {calibrationResult.dataFreshness}
+            </span>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground"
+            onClick={handleClearCalibration}
+            title="Clear calibration"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
         </div>
-        {hasCalibratedData && (
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className="text-green-700 dark:text-green-400 border-green-300 dark:border-green-700 gap-1"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Calibrated from real data
-            </Badge>
-            {calibrationResult?.dataFreshness && (
-              <span className="text-xs text-muted-foreground">
-                {calibrationResult.dataFreshness}
-              </span>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-muted-foreground"
-              onClick={handleClearCalibration}
-              title="Clear calibration"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
-      {/* Name + description */}
-      <div className="grid gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="scenario-name">Name</Label>
+      {/* Basic fields */}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="scenario-name">Scenario Name *</Label>
           <Input
             id="scenario-name"
-            placeholder="e.g., Ransomware Attack on Core Systems"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Ransomware attack on ERP system"
             required
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="scenario-desc">Description</Label>
+
+        <div className="space-y-2">
+          <Label htmlFor="scenario-description">Description</Label>
           <Textarea
-            id="scenario-desc"
-            placeholder="Optional description of this scenario…"
+            id="scenario-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={2}
+            placeholder="Describe the threat scenario..."
+            rows={3}
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="scenario-risk">Linked Risk (optional)</Label>
+            <Select value={riskId} onValueChange={setRiskId}>
+              <SelectTrigger id="scenario-risk">
+                <SelectValue placeholder="Select a risk..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">None</SelectItem>
+                {risks.map((r) => (
+                  <SelectItem key={r.id ?? ""} value={r.id ?? ""}>
+                    {r.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="scenario-iterations">Iterations</Label>
+            <Select value={iterationCount} onValueChange={setIterationCount}>
+              <SelectTrigger id="scenario-iterations">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ITERATION_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
-      <Separator />
-
-      {/* FAIR parameters */}
-      <div className="space-y-2">
+      {/* FAIR Parameters */}
+      <div className="space-y-5 border-t pt-5">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold">FAIR Parameters</p>
-            <p className="text-xs text-muted-foreground">
-              Triangular distribution inputs — min / mode (most likely) / max
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold">FAIR Parameters</h3>
           <Button
             type="button"
             variant="outline"
@@ -408,8 +475,8 @@ export function ScenarioForm({
           >
             {isCalibrating ? (
               <>
-                <Spinner className="mr-2 h-3.5 w-3.5" />
-                Calibrating…
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                Calibrating...
               </>
             ) : (
               <>
@@ -420,55 +487,44 @@ export function ScenarioForm({
           </Button>
         </div>
 
-        <Card className="mt-3">
-          <CardContent className="pt-5 space-y-6">
-            <FAIRSliderGroup
-              label="Threat Event Frequency (TEF)"
-              description="How many times per year a threat actor could act against this risk"
-              value={tef}
-              onChange={setTef}
-              min={0}
-              max={100}
-              step={0.1}
-              format={(v) =>
-                v < 1 ? `${v.toFixed(2)} evt/yr` : `${v.toFixed(1)} evt/yr`
-              }
-              calibrated={calibratedFields.has("tef")}
-            />
+        {/* TEF */}
+        <TriangularInput
+          label="Threat Event Frequency (TEF)"
+          tooltip="How many times per year a threat agent could act against this asset. A ransomware group targeting mid-size companies may attempt 4-52 times/year."
+          value={fair.tef}
+          onChange={(v) => setFair((prev) => ({ ...prev, tef: v }))}
+          min={0}
+          max={365}
+          step={1}
+          format={(n) => `${n}/yr`}
+          calibrated={calibratedFields.has("tef")}
+        />
 
-            <Separator />
+        {/* Vulnerability */}
+        <TriangularInput
+          label="Vulnerability (P(loss))"
+          tooltip="Probability that a threat event results in loss. Combines your control effectiveness and the threat agent's capability. 0 = perfect controls, 1 = no controls."
+          value={fair.vulnerability}
+          onChange={(v) => setFair((prev) => ({ ...prev, vulnerability: v }))}
+          min={0}
+          max={1}
+          step={0.01}
+          format={(n) => `${(n * 100).toFixed(0)}%`}
+          calibrated={calibratedFields.has("vulnerability")}
+        />
 
-            <FAIRSliderGroup
-              label="Vulnerability (TC × CS)"
-              description="Probability that a threat event results in a loss event (0 – 1)"
-              value={vulnerability}
-              onChange={setVulnerability}
-              min={0}
-              max={1}
-              step={0.01}
-              format={(v) => `${(v * 100).toFixed(0)}%`}
-              calibrated={calibratedFields.has("vulnerability")}
-            />
-
-            <Separator />
-
-            <FAIRSliderGroup
-              label="Loss Magnitude"
-              description="Expected financial impact per loss event"
-              value={lossMagnitude}
-              onChange={setLossMagnitude}
-              min={0}
-              max={100_000_000}
-              step={1_000}
-              format={(v) => {
-                if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-                if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
-                return `$${v.toFixed(0)}`;
-              }}
-              calibrated={calibratedFields.has("lossMagnitude")}
-            />
-          </CardContent>
-        </Card>
+        {/* Loss Magnitude */}
+        <TriangularInput
+          label="Loss Magnitude"
+          tooltip="Expected dollar value of loss per threat event. Includes primary losses (response costs, data recovery) and secondary losses (fines, reputation)."
+          value={fair.lossMagnitude}
+          onChange={(v) => setFair((prev) => ({ ...prev, lossMagnitude: v }))}
+          min={0}
+          max={10000000}
+          step={1000}
+          format={formatUSD}
+          calibrated={calibratedFields.has("lossMagnitude")}
+        />
 
         {hasCalibratedData && calibrationResult?.sampleSize !== undefined && (
           <p className="text-xs text-muted-foreground pl-1">
@@ -480,23 +536,15 @@ export function ScenarioForm({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-3 justify-end pt-2">
+      <div className="flex gap-2 justify-end pt-2">
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
             Cancel
           </Button>
         )}
         <Button type="submit" disabled={isPending}>
-          {isPending ? (
-            <>
-              <Spinner className="mr-2 h-4 w-4" />
-              {scenario ? "Saving…" : "Creating…"}
-            </>
-          ) : scenario ? (
-            "Save Changes"
-          ) : (
-            "Create Scenario"
-          )}
+          {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {isEdit ? "Update Scenario" : "Create Scenario"}
         </Button>
       </div>
     </form>
